@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.71" />
     <PackageReference Include="MongoDB.Driver" Version="3.1.0" />
   </ItemGroup>
 

@@ -1,7 +1,7 @@
-﻿using HtmlAgilityPack;
-using MongoDB.Bson;
+﻿using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 class Program
@@ -11,47 +11,48 @@ class Program
         // MongoDB setup
         var client = new MongoClient("mongodb://root:example@localhost:27017");
         var database = client.GetDatabase("EDGAR");
-        var rawCollection = database.GetCollection<BsonDocument>("RawFilings");
         var parsedCollection = database.GetCollection<BsonDocument>("ParsedFilings");
+        var documentsCollection = database.GetCollection<BsonDocument>("FilingDocuments");
 
-        // Fetch the raw HTML from the database
-        var rawData = await rawCollection.Find(new BsonDocument()).FirstOrDefaultAsync();
-        if (rawData == null)
+        // Fetch parsed filings
+        var parsedData = await parsedCollection.Find(new BsonDocument()).FirstOrDefaultAsync();
+        if (parsedData == null)
         {
-            Console.WriteLine("No raw data found in the database.");
+            Console.WriteLine("No parsed data found in the database.");
             return;
         }
 
-        string rawHtml = rawData["raw_data"].AsString;
+        var filings = parsedData["filings"].AsBsonArray;
+        using HttpClient httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("User-Agent", "EDGARScraper (inno.and.logic@gmail.com)");
 
-        // Parse the HTML
-        var htmlDoc = new HtmlDocument();
-        htmlDoc.LoadHtml(rawHtml);
-
-        var filings = new BsonArray();
-        foreach (var row in htmlDoc.DocumentNode.SelectNodes("//table[@class='tableFile2']/tr"))
+        foreach (var filing in filings)
         {
-            var cells = row.SelectNodes("td");
-            if (cells != null && cells.Count >= 4)
+            var filingDoc = filing.AsBsonDocument;
+            string documentLink = filingDoc["document_link"].AsString;
+
+            // Download filing document
+            try
             {
-                filings.Add(new BsonDocument
+                var documentContent = await httpClient.GetStringAsync(documentLink);
+                var document = new BsonDocument
                 {
-                    { "filing_type", cells[0].InnerText.Trim() },
-                    { "filing_date", cells[3].InnerText.Trim() },
-                    { "document_link", "https://www.sec.gov" + cells[1].SelectSingleNode("a")?.Attributes["href"]?.Value }
-                });
+                    { "company", parsedData["company"].AsBsonDocument },
+                    { "filing_type", filingDoc["filing_type"].AsString },
+                    { "filing_date", filingDoc["filing_date"].AsString },
+                    { "document_link", documentLink },
+                    { "content", documentContent },
+                    { "downloaded_at", DateTime.UtcNow }
+                };
+
+                // Save to MongoDB
+                await documentsCollection.InsertOneAsync(document);
+                Console.WriteLine($"Downloaded and saved document: {documentLink}");
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Failed to download document: {documentLink}. Error: {ex.Message}");
             }
         }
-
-        // Save parsed data to MongoDB
-        var parsedDocument = new BsonDocument
-        {
-            { "company", rawData["company"].AsBsonDocument },
-            { "filings", filings },
-            { "parsed_at", DateTime.UtcNow }
-        };
-        await parsedCollection.InsertOneAsync(parsedDocument);
-
-        Console.WriteLine("Parsed and saved filing metadata.");
     }
 }

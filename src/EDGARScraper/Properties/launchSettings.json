@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "EDGARScraper": {
+      "commandName": "Project",
+      //"commandLineArgs": "--fetch"
+      //"commandLineArgs": "--parse"
+      "commandLineArgs": "--download"
+    }
+  }
+}

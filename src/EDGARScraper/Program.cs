@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 class Program
 {
+    private static IMongoDatabase? _database = null;
+    private static HttpClient? _httpClient = null;
+
     static async Task Main(string[] args)
     {
         if (args.Length == 0)
@@ -34,20 +37,15 @@ class Program
 
     static async Task FetchRawData()
     {
-        // MongoDB setup
-        var client = new MongoClient("mongodb://root:example@localhost:27017");
-        var database = client.GetDatabase("EDGAR");
-        var collection = database.GetCollection<BsonDocument>("RawFilings");
+        var collection = GetCollection("RawFilings");
 
         // EDGAR URL for filings (Example: Apple Inc.)
         string cik = "0000320193"; // Apple Inc.
         string url = $"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}&type=10-K&count=5";
 
         // Fetch filing data
-        using HttpClient httpClient = new HttpClient();
-        httpClient.DefaultRequestHeaders.Add("User-Agent", "YourAppName (your-email@example.com)");
-
-        var response = await httpClient.GetStringAsync(url);
+        string? response = await FetchContentAsync(url);
+        if (response is null) return;
 
         // Save raw HTML response to MongoDB
         var document = new BsonDocument
@@ -65,10 +63,8 @@ class Program
     static async Task ParseMetadata()
     {
         // MongoDB setup
-        var client = new MongoClient("mongodb://root:example@localhost:27017");
-        var database = client.GetDatabase("EDGAR");
-        var rawCollection = database.GetCollection<BsonDocument>("RawFilings");
-        var parsedCollection = database.GetCollection<BsonDocument>("ParsedFilings");
+        var rawCollection = GetCollection("RawFilings");
+        var parsedCollection = GetCollection("ParsedFilings");
 
         // Fetch the raw HTML from the database
         var rawData = await rawCollection.Find(new BsonDocument()).FirstOrDefaultAsync();
@@ -114,10 +110,8 @@ class Program
     static async Task DownloadDocuments()
     {
         // MongoDB setup
-        var client = new MongoClient("mongodb://root:example@localhost:27017");
-        var database = client.GetDatabase("EDGAR");
-        var parsedCollection = database.GetCollection<BsonDocument>("ParsedFilings");
-        var documentsCollection = database.GetCollection<BsonDocument>("FilingDocuments");
+        var parsedCollection = GetCollection("ParsedFilings");
+        var documentsCollection = GetCollection("FilingDocuments");
 
         // Fetch parsed filings
         var parsedData = await parsedCollection.Find(new BsonDocument()).FirstOrDefaultAsync();
@@ -128,9 +122,7 @@ class Program
         }
 
         var filings = parsedData["filings"].AsBsonArray;
-        using HttpClient httpClient = new HttpClient();
-        httpClient.DefaultRequestHeaders.Add("User-Agent", "EDGARScraper (inno.and.logic@gmail.com)");
-
+        
         foreach (var filing in filings)
         {
             var filingDoc = filing.AsBsonDocument;
@@ -139,7 +131,9 @@ class Program
             // Download filing document
             try
             {
-                var documentContent = await httpClient.GetStringAsync(documentLink);
+                string? documentContent = await FetchContentAsync(documentLink);
+                if (documentContent is null) continue;
+
                 var document = new BsonDocument
                 {
                     { "company", parsedData["company"].AsBsonDocument },
@@ -158,6 +152,41 @@ class Program
             {
                 Console.WriteLine($"Failed to download document: {documentLink}. Error: {ex.Message}");
             }
+        }
+    }
+
+    static IMongoDatabase GetDatabase()
+    {
+        if (_database is null)
+        {
+            var client = new MongoClient("mongodb://root:example@localhost:27017");
+            _database = client.GetDatabase("EDGAR");
+        }
+        return _database;
+    }
+
+    static IMongoCollection<BsonDocument> GetCollection(string collectionName)
+    {
+        IMongoDatabase database = GetDatabase();
+        return database.GetCollection<BsonDocument>(collectionName);
+    }
+
+    static async Task<string?> FetchContentAsync(string url)
+    {
+        try
+        {
+            if (_httpClient is null)
+            {
+                _httpClient = new HttpClient();
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", "EDGARScraper (inno.and.logic@gmail.com)");
+            }
+
+            return await _httpClient.GetStringAsync(url);
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Failed to fetch content from {url}. Error: {ex.Message}");
+            return null;
         }
     }
 }

@@ -4,7 +4,9 @@
       "commandName": "Project",
       //"commandLineArgs": "--fetch"
       //"commandLineArgs": "--parse"
-      "commandLineArgs": "--download"
+      //"commandLineArgs": "--download"
+      //"commandLineArgs": "--extract-xbrl-links"
+      "commandLineArgs": "--parse-financial"
     }
   }
 }

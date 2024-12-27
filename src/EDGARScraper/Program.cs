@@ -1,8 +1,11 @@
-﻿using MongoDB.Bson;
+﻿using DataModels;
+using MongoDB.Bson;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Utilities;
 
 namespace EDGARScraper;
 
@@ -44,6 +47,11 @@ internal class Program
                 {
                     var xbrlParser = new XBRLParser(MongoDbService);
                     await xbrlParser.ParseXBRL();
+                    break;
+                }
+            case "--get-full-cik-list":
+                {
+                    await DownloadAndSaveFullCikList();
                     break;
                 }
             default:
@@ -164,5 +172,52 @@ internal class Program
                     companyXbrlLink.XbrlUrl, ex.Message);
             }
         }
+    }
+
+    static async Task DownloadAndSaveFullCikList()
+    {
+        string url = "https://www.sec.gov/Archives/edgar/cik-lookup-data.txt";
+        string? content = await HttpClientService.FetchContentAsync(url);
+        if (string.IsNullOrEmpty(content))
+        {
+            Console.WriteLine("Failed to download CIK list from {0}", url);
+            return;
+        }
+
+        using var reader = new StringReader(content);
+        string? line;
+        int i = 0;
+        while ((line = reader.ReadLine()) != null)
+        {
+            ++i;
+
+            if (i % 1000 == 0) Console.WriteLine("Processed {0} lines", i);
+
+            // Remove the trailing colon
+            if (line.EndsWith(':')) line = line[..^1];
+
+            int lastColonIndex = line.LastIndexOf(':');
+            if (lastColonIndex == -1)
+            {
+                Console.WriteLine("Failed to parse line {0}", line);
+                continue;
+            }
+
+            string companyName = line[..lastColonIndex].Trim();
+            string cik = line[(lastColonIndex + 1)..].Trim();
+
+            if (string.IsNullOrEmpty(companyName) || string.IsNullOrEmpty(cik))
+            {
+                Console.WriteLine("Failed to parse line {0}", line);
+                continue;
+            }
+
+            var company = new Company(cik, companyName);
+            Results res = await MongoDbService.SaveCompany(company);
+            if (res.IsError)
+                Console.WriteLine("Failed to save company: {0}. Error: {1}", company, res.ErrorMessage);
+        }
+
+        Console.WriteLine("Processed {0} lines", i);
     }
 }

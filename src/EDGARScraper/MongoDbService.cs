@@ -1,9 +1,10 @@
-﻿using MongoDB.Bson;
+﻿using DataModels;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
-using System.Reflection.Metadata;
 using System.Threading.Tasks;
+using Utilities;
 
 namespace EDGARScraper;
 
@@ -184,6 +185,37 @@ internal class MongoDbService
             cik, result.MatchedCount, result.ModifiedCount, result.UpsertedId is not null);
     }
 
+    internal async Task<Results> SaveCompany(Company company)
+    {
+        try
+        {
+            IMongoCollection<BsonDocument> collection = GetCollection("Companies");
+
+            BsonDocument document = company.ToBsonDocument();
+
+            FilterDefinitionBuilder<BsonDocument> filterBuilder = Builders<BsonDocument>.Filter;
+            FilterDefinition<BsonDocument> filter = filterBuilder.Eq("name", company.Name);
+            if (!string.IsNullOrEmpty(company.Cik))
+                filter = filterBuilder.And(filter, filterBuilder.Eq("cik", company.Cik));
+
+            /* ReplaceOneResult result = */
+            await collection.ReplaceOneAsync(filter, document, UpsertOptions);
+
+            // Log here
+            // Console.WriteLine("Saved company: {0}. Results: Matched={1}, Modified={2}, Upserted={3}",
+            //     company.Name, result.MatchedCount, result.ModifiedCount, result.UpsertedId is not null);
+
+            return Results.Success;
+        }
+        catch (Exception ex)
+        {
+            // Log here
+            return Results.FailureResult("Error in SaveCompany - " + ex.Message);
+        }
+    }
+
+    #region PRIVATE HELPER METHODS
+
     private IMongoDatabase GetDatabase()
     {
         if (_database is null)
@@ -193,4 +225,6 @@ internal class MongoDbService
         }
         return _database;
     }
+
+    #endregion
 }

@@ -2,11 +2,7 @@
   "profiles": {
     "EDGARScraper": {
       "commandName": "Project",
-      //"commandLineArgs": "--fetch"
-      //"commandLineArgs": "--parse"
-      //"commandLineArgs": "--download"
-      //"commandLineArgs": "--extract-xbrl-links"
-      "commandLineArgs": "--parse-financial"
+      "commandLineArgs": "--get-full-cik-list"
     }
   }
 }

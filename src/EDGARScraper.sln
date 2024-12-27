@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Files", "Solution Files", "{861B639E-5EAB-4BF9-A416-9F0EC4020512}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		Directory.Build.props = Directory.Build.props
+		NuGet.config = NuGet.config
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataModels", "DataModels\DataModels.csproj", "{07640F8E-2CB9-471B-BA0D-011A420371E7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EDGARScraper", "EDGARScraper\EDGARScraper.csproj", "{8DCEC2DE-FA46-4B92-B6D7-676D989FDD98}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utilities", "Utilities\Utilities.csproj", "{7311A418-FB68-402D-948D-C069BBD94B0C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{07640F8E-2CB9-471B-BA0D-011A420371E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07640F8E-2CB9-471B-BA0D-011A420371E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07640F8E-2CB9-471B-BA0D-011A420371E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07640F8E-2CB9-471B-BA0D-011A420371E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8DCEC2DE-FA46-4B92-B6D7-676D989FDD98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8DCEC2DE-FA46-4B92-B6D7-676D989FDD98}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8DCEC2DE-FA46-4B92-B6D7-676D989FDD98}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8DCEC2DE-FA46-4B92-B6D7-676D989FDD98}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7311A418-FB68-402D-948D-C069BBD94B0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7311A418-FB68-402D-948D-C069BBD94B0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7311A418-FB68-402D-948D-C069BBD94B0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7311A418-FB68-402D-948D-C069BBD94B0C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

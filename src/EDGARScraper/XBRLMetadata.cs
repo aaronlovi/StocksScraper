@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using DataModels;
+using System.Collections.Generic;
 using System.Xml.Linq;
 
 namespace EDGARScraper;

@@ -1,4 +1,6 @@
-﻿namespace EDGARScraper;
+﻿using System.Collections.Generic;
+
+namespace EDGARScraper;
 
 internal static class Constants
 {

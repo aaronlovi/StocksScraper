@@ -1,4 +1,5 @@
 ﻿using DataModels;
+using DataModels.XbrlFileModels;
 using MongoDB.Bson;
 using System;
 using System.Collections.Generic;
@@ -54,6 +55,11 @@ internal class Program
             case "--get-full-cik-list":
                 {
                     await DownloadAndSaveFullCikList();
+                    break;
+                }
+            case "--parse-bulk-xbrl-archive":
+                {
+                    await ParseBulkXbrlArchive();
                     break;
                 }
             default:
@@ -210,15 +216,23 @@ internal class Program
             }
 
             string companyName = line[..lastColonIndex].Trim();
-            string cik = line[(lastColonIndex + 1)..].Trim();
+            string cikStr = line[(lastColonIndex + 1)..].Trim();
 
-            if (string.IsNullOrEmpty(companyName) || string.IsNullOrEmpty(cik))
+            if (string.IsNullOrEmpty(companyName) || string.IsNullOrEmpty(cikStr))
             {
                 Console.WriteLine("Failed to parse line {0}", line);
                 continue;
             }
 
-            var company = new Company(cik, companyName, Constants.EdgarDataSource);
+            if (!int.TryParse(cikStr, out int cik))
+            {
+                Console.WriteLine("Failed to parse CIK {0}", cikStr);
+                continue;
+            }
+            
+            cikStr = $"{cik:0}";
+
+            var company = new Company(cikStr, companyName, Constants.EdgarDataSource);
             companies.Add(company);
 
             if (companies.Count >= batchSize)
@@ -230,7 +244,6 @@ internal class Program
                     if (res.IsError)
                         Console.WriteLine("Failed to save batch of companies. Error: {0}", res.ErrorMessage);
                 }));
-
                 companies.Clear();
             }
         }
@@ -250,5 +263,76 @@ internal class Program
         await Task.WhenAll(tasks);
 
         Console.WriteLine("Processed {0} lines", i);
+    }
+
+    static async Task ParseBulkXbrlArchive()
+    {
+        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string archivePath = Path.Combine(userProfile, "Downloads", "companyfacts.zip");
+
+        using var zipReader = new ZipFileReader(archivePath);
+
+        int i = 0;
+        long totalLength = 0;
+        var xbrlDataList = new List<(XbrlJson, IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>>)>();
+        const int batchSize = 100;
+        var tasks = new List<Task>();
+
+        foreach (string fileName in zipReader.EnumerateFileNames())
+        {
+            if (!fileName.EndsWith(".json")) continue;
+
+            ++i;
+
+            if ((i % 100) == 0)
+                Console.WriteLine("Processed {0} files. Total length: {1:#,###} bytes", i, totalLength);
+
+            try
+            {
+                string fileContent = zipReader.ExtractFileContent(fileName);
+                totalLength += fileContent.Length;
+                
+                var parser = new XBRLFileParser(fileContent);
+                Results res = parser.Parse();
+                if (res.IsError)
+                {
+                    Console.WriteLine("Failed to parse {0}. Error: {1}", fileName, res.ErrorMessage);
+                    continue;
+                }
+
+                xbrlDataList.Add((parser.XbrlJson!, parser.DataPoints));
+                if (xbrlDataList.Count >= batchSize)
+                {
+                    var batch = new List<(XbrlJson, IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>>)>(xbrlDataList);
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        Results res = await MongoDbService.SaveXbrlFileDataBatch(batch);
+                        if (res.IsError)
+                            Console.WriteLine("Failed to save batch of company data. Error: {0}", res.ErrorMessage);
+                    }));
+                    xbrlDataList.Clear();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Failed to process {0}. Error: {1}", fileName, ex.Message);
+            }
+        }
+
+        // Save any remaining data
+        if (xbrlDataList.Count > 0)
+        {
+            var batch = new List<(XbrlJson, IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>>)>(xbrlDataList);
+            tasks.Add(Task.Run(async () =>
+            {
+                Results res = await MongoDbService.SaveXbrlFileDataBatch(batch);
+                if (res.IsError)
+                    Console.WriteLine("Failed to save batch of company data. Error: {0}", res.ErrorMessage);
+            }));
+        }
+
+        await Task.WhenAll(tasks);
+
+        Console.WriteLine("Processed {0} files. Total length: {1:#,###} bytes", i, totalLength);
     }
 }

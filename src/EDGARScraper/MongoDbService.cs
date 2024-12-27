@@ -1,4 +1,5 @@
 ﻿using DataModels;
+using DataModels.XbrlFileModels;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
@@ -32,14 +33,17 @@ internal class MongoDbService
 
     internal async Task CreateIndices()
     {
-        IMongoCollection<BsonDocument> companiesCollection = GetCollection("Companies");
-
+        IMongoCollection<BsonDocument> collection = GetCollection("Companies");
         IndexKeysDefinition<BsonDocument> indexKeys = Builders<BsonDocument>.IndexKeys
             .Ascending("name")
             .Ascending("cik");
-
         var indexModel = new CreateIndexModel<BsonDocument>(indexKeys);
-        await companiesCollection.Indexes.CreateOneAsync(indexModel);
+        await collection.Indexes.CreateOneAsync(indexModel);
+
+        collection = GetCollection("RawFinancialData");
+        indexKeys = Builders<BsonDocument>.IndexKeys.Ascending("cik");
+        indexModel = new CreateIndexModel<BsonDocument>(indexKeys);
+        await collection.Indexes.CreateOneAsync(indexModel);
 
         Console.WriteLine("Indices created successfully.");
     }
@@ -259,6 +263,39 @@ internal class MongoDbService
                 if (!string.IsNullOrEmpty(company.Cik))
                     filter = filterBuilder.And(filter, filterBuilder.Eq("cik", company.Cik));
 
+                var upsertOne = new ReplaceOneModel<BsonDocument>(filter, document) { IsUpsert = true };
+                bulkOperations.Add(upsertOne);
+            }
+
+            if (bulkOperations.Count > 0)
+                await collection.BulkWriteAsync(bulkOperations);
+
+            return Results.Success;
+        }
+        catch (Exception ex)
+        {
+            return Results.FailureResult("Error in SaveCompaniesBulk - " + ex.Message);
+        }
+    }
+
+    internal async Task<Results> SaveXbrlFileDataBatch(List<(XbrlJson, IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>>)> batch)
+    {
+        using var _ = await _semaphore.AcquireAsync();
+
+        try
+        {
+            IMongoCollection<BsonDocument> collection = GetCollection("RawFinancialData");
+
+            var bulkOperations = new List<WriteModel<BsonDocument>>();
+
+            foreach ((XbrlJson xbrlJson, IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>> dataPoints) in batch)
+            {
+                BsonDocument document = BsonDocumentExtensions.XBRLFileDataToBsonDocument(dataPoints);
+                document.Add("cik", xbrlJson.CikString);
+
+                FilterDefinitionBuilder<BsonDocument> filterBuilder = Builders<BsonDocument>.Filter;
+                FilterDefinition<BsonDocument> filter = filterBuilder.Eq("cik", xbrlJson.CikString);
+                
                 var upsertOne = new ReplaceOneModel<BsonDocument>(filter, document) { IsUpsert = true };
                 bulkOperations.Add(upsertOne);
             }

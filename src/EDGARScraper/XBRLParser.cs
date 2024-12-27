@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson;
+﻿using DataModels;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;

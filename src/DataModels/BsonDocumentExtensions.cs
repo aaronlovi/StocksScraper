@@ -1,4 +1,5 @@
 ﻿using MongoDB.Bson;
+using System.Collections.Generic;
 
 namespace DataModels;
 
@@ -8,12 +9,10 @@ public static class BsonDocumentExtensions
     {
         var document = new BsonDocument
         {
+            { "cik", company.Cik },
             { "name", company.Name },
             { "data_source", company.DataSource },
         };
-
-        if (!string.IsNullOrEmpty(company.Cik))
-            document.Add("cik", company.Cik);
 
         if (company.Instruments is not null)
             AddInstrumentsToCompany(company, document);
@@ -37,5 +36,46 @@ public static class BsonDocumentExtensions
             instruments.Add(instrumentDoc);
         }
         document.Add("instruments", instruments);
+    }
+
+    public static BsonDocument XBRLFileDataToBsonDocument(
+        IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>> dataPoints)
+    {
+        var bsonDocument = new BsonDocument();
+
+        foreach (var factEntry in dataPoints)
+        {
+            var factName = factEntry.Key;
+            var unitsDataPoints = new BsonDocument();
+
+            foreach (var unitEntry in factEntry.Value)
+            {
+                var unitName = unitEntry.Key;
+                var datePoints = new BsonArray();
+
+                foreach (var datePairEntry in unitEntry.Value)
+                {
+                    var datePair = datePairEntry.Key;
+                    var dataPoint = datePairEntry.Value;
+
+                    var dataPointDocument = new BsonDocument
+                    {
+                        { "StartDate", datePair.StartTimeUtc },
+                        { "EndDate", datePair.EndTimeUtc },
+                        { "Value", dataPoint.Value },
+                        { "Unit", dataPoint.Units.Name },
+                        { "FiledDate", dataPoint.FiledTimeUtc }
+                    };
+
+                    datePoints.Add(dataPointDocument);
+                }
+
+                unitsDataPoints.Add(unitName, datePoints);
+            }
+
+            bsonDocument.Add(factName, unitsDataPoints);
+        }
+
+        return bsonDocument;
     }
 }

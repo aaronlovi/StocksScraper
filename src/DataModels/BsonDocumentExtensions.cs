@@ -8,7 +8,8 @@ public static class BsonDocumentExtensions
     {
         var document = new BsonDocument
         {
-            { "name", company.Name }
+            { "name", company.Name },
+            { "data_source", company.DataSource },
         };
 
         if (!string.IsNullOrEmpty(company.Cik))

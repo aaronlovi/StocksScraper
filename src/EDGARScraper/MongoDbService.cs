@@ -3,6 +3,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Utilities;
 
@@ -11,13 +12,36 @@ namespace EDGARScraper;
 internal class MongoDbService
 {
     private static readonly ReplaceOptions UpsertOptions = new() { IsUpsert = true };
+    private const int ConnectionCount = 100;
+    private const string ConnectionString = "mongodb://root:example@localhost:27017";
 
+    private readonly SemaphoreSlim _semaphore;
     private IMongoDatabase? _database = null;
+
+    internal MongoDbService()
+    {
+        _semaphore = new(ConnectionCount);
+        _database = null;
+    }
 
     internal IMongoCollection<BsonDocument> GetCollection(string collectionName)
     {
         IMongoDatabase database = GetDatabase();
         return database.GetCollection<BsonDocument>(collectionName);
+    }
+
+    internal async Task CreateIndices()
+    {
+        IMongoCollection<BsonDocument> companiesCollection = GetCollection("Companies");
+
+        IndexKeysDefinition<BsonDocument> indexKeys = Builders<BsonDocument>.IndexKeys
+            .Ascending("name")
+            .Ascending("cik");
+
+        var indexModel = new CreateIndexModel<BsonDocument>(indexKeys);
+        await companiesCollection.Indexes.CreateOneAsync(indexModel);
+
+        Console.WriteLine("Indices created successfully.");
     }
 
     internal async Task SaveRawData(string cik, string url, string rawData)
@@ -187,6 +211,8 @@ internal class MongoDbService
 
     internal async Task<Results> SaveCompany(Company company)
     {
+        using var _ = await _semaphore.AcquireAsync();
+
         try
         {
             IMongoCollection<BsonDocument> collection = GetCollection("Companies");
@@ -214,14 +240,50 @@ internal class MongoDbService
         }
     }
 
+    internal async Task<Results> SaveCompaniesBulk(List<Company> companies)
+    {
+        using var _ = await _semaphore.AcquireAsync();
+
+        try
+        {
+            IMongoCollection<BsonDocument> collection = GetCollection("Companies");
+
+            var bulkOperations = new List<WriteModel<BsonDocument>>();
+
+            foreach (var company in companies)
+            {
+                BsonDocument document = company.ToBsonDocument();
+
+                FilterDefinitionBuilder<BsonDocument> filterBuilder = Builders<BsonDocument>.Filter;
+                FilterDefinition<BsonDocument> filter = filterBuilder.Eq("name", company.Name);
+                if (!string.IsNullOrEmpty(company.Cik))
+                    filter = filterBuilder.And(filter, filterBuilder.Eq("cik", company.Cik));
+
+                var upsertOne = new ReplaceOneModel<BsonDocument>(filter, document) { IsUpsert = true };
+                bulkOperations.Add(upsertOne);
+            }
+
+            if (bulkOperations.Count > 0)
+                await collection.BulkWriteAsync(bulkOperations);
+
+            return Results.Success;
+        }
+        catch (Exception ex)
+        {
+            return Results.FailureResult("Error in SaveCompaniesBulk - " + ex.Message);
+        }
+    }
+
     #region PRIVATE HELPER METHODS
 
     private IMongoDatabase GetDatabase()
     {
         if (_database is null)
         {
-            var client = new MongoClient("mongodb://root:example@localhost:27017");
-            _database = client.GetDatabase("EDGAR");
+            var settings = MongoClientSettings.FromConnectionString(ConnectionString);
+            settings.MaxConnectionPoolSize = ConnectionCount; // Adjust as needed
+            var client = new MongoClient(settings);
+            _database = client.GetDatabase(Constants.EdgarDataSource);
         }
         return _database;
     }

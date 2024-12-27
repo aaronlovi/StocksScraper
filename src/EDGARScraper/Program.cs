@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Utilities;
 
@@ -27,6 +28,7 @@ internal class Program
         }
 
         await PuppeteerService.EnsureBrowser();
+        await MongoDbService.CreateIndices();
 
         switch (args[0].ToLowerInvariant())
         {
@@ -187,6 +189,10 @@ internal class Program
         using var reader = new StringReader(content);
         string? line;
         int i = 0;
+        var companies = new List<Company>();
+        const int batchSize = 1000;
+        var tasks = new List<Task>();
+
         while ((line = reader.ReadLine()) != null)
         {
             ++i;
@@ -212,11 +218,36 @@ internal class Program
                 continue;
             }
 
-            var company = new Company(cik, companyName);
-            Results res = await MongoDbService.SaveCompany(company);
-            if (res.IsError)
-                Console.WriteLine("Failed to save company: {0}. Error: {1}", company, res.ErrorMessage);
+            var company = new Company(cik, companyName, Constants.EdgarDataSource);
+            companies.Add(company);
+
+            if (companies.Count >= batchSize)
+            {
+                var batch = new List<Company>(companies);
+                tasks.Add(Task.Run(async () =>
+                {
+                    Results res = await MongoDbService.SaveCompaniesBulk(batch);
+                    if (res.IsError)
+                        Console.WriteLine("Failed to save batch of companies. Error: {0}", res.ErrorMessage);
+                }));
+
+                companies.Clear();
+            }
         }
+
+        // Save any remaining companies
+        if (companies.Count > 0)
+        {
+            var batch = new List<Company>(companies);
+            tasks.Add(Task.Run(async () =>
+            {
+                Results res = await MongoDbService.SaveCompaniesBulk(batch);
+                if (res.IsError)
+                    Console.WriteLine("Failed to save batch of companies. Error: {0}", res.ErrorMessage);
+            }));
+        }
+
+        await Task.WhenAll(tasks);
 
         Console.WriteLine("Processed {0} lines", i);
     }

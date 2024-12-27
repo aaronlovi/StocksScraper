@@ -2,4 +2,8 @@
 
 namespace DataModels;
 
-public record Company(string? Cik, string Name, List<Instrument>? Instruments = null);
+public record Company(
+    string? Cik,
+    string Name,
+    string DataSource,
+    List<Instrument>? Instruments = null);

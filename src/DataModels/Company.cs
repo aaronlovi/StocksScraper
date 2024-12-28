@@ -3,7 +3,7 @@
 namespace DataModels;
 
 public record Company(
-    string? Cik,
-    string Name,
+    ulong CompanyId,
+    ulong Cik,
     string DataSource,
     List<Instrument>? Instruments = null);

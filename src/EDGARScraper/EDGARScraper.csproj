@@ -7,7 +7,14 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\DataModels\DataModels.csproj" />
+		<ProjectReference Include="..\Stocks.Persistence\Stocks.Persistence.csproj" />
 		<ProjectReference Include="..\Utilities\Utilities.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="appsettings.json">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
 	</ItemGroup>
 
 </Project>

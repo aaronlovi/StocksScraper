@@ -1,18 +1,30 @@
-﻿using DataModels;
-using DataModels.XbrlFileModels;
-using MongoDB.Bson;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using DataModels;
+using DataModels.XbrlFileModels;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
+using Serilog;
+using Stocks.Persistence;
 using Utilities;
+
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace EDGARScraper;
 
 internal class Program
 {
+    private const string DefaultPortStr = "7001";
 
     private static EdgarHttpClientService? _httpClientService;
     private static MongoDbService? _mongoDbService;
@@ -20,53 +32,164 @@ internal class Program
     private static EdgarHttpClientService HttpClientService => _httpClientService ??= new();
     private static MongoDbService MongoDbService => _mongoDbService ??= new();
 
-    static async Task Main(string[] args)
+    private static ILogger _log;
+    private static IDbmService? _dbm;
+    static Program()
     {
-        if (args.Length == 0)
+        _log = GetBootstrapLogger();
+    }
+
+    static async Task<int> Main(string[] args)
+    {
+        try
         {
-            Console.WriteLine("Please provide a command-line switch: --fetch, --parse, or --download");
-            return;
+            _log.LogInformation("Building the host");
+            var host = BuildHost<Startup>(args);
+            _log.LogInformation("Running the host");
+
+            if (args.Length == 0)
+            {
+                Console.WriteLine("Please provide a command-line switch: --fetch, --parse, or --download");
+                return 2;
+            }
+
+            await PuppeteerService.EnsureBrowser();
+            await MongoDbService.CreateIndices();
+
+            IServiceProvider svp = host.Services;
+            _dbm = svp.GetRequiredService<IDbmService>();
+
+            switch (args[0].ToLowerInvariant())
+            {
+                case "--fetch":
+                    await FetchRawData();
+                    break;
+                case "--parse":
+                    await ParseMetadata();
+                    break;
+                case "--download":
+                    await DownloadFilingDetailDocuments();
+                    break;
+                case "--extract-xbrl-links":
+                    await ExtractXBRLLinks();
+                    await DownloadXBRLDocuments();
+                    break;
+                case "--parse-financial":
+                    {
+                        var xbrlParser = new XBRLParser(MongoDbService);
+                        await xbrlParser.ParseXBRL();
+                        break;
+                    }
+                case "--get-full-cik-list":
+                    {
+                        await DownloadAndSaveFullCikList();
+                        break;
+                    }
+                case "--parse-bulk-xbrl-archive":
+                    {
+                        await ParseBulkXbrlArchive();
+                        break;
+                    }
+                default:
+                    _log.LogError("Invalid command-line switch. Please use --fetch, --parse, or --download");
+                    return 3;
+            }
+
+            return 0;
         }
-
-        await PuppeteerService.EnsureBrowser();
-        await MongoDbService.CreateIndices();
-
-        switch (args[0].ToLowerInvariant())
+        catch (Exception ex)
         {
-            case "--fetch":
-                await FetchRawData();
-                break;
-            case "--parse":
-                await ParseMetadata();
-                break;
-            case "--download":
-                await DownloadFilingDetailDocuments();
-                break;
-            case "--extract-xbrl-links":
-                await ExtractXBRLLinks();
-                await DownloadXBRLDocuments();
-                break;
-            case "--parse-financial":
-                {
-                    var xbrlParser = new XBRLParser(MongoDbService);
-                    await xbrlParser.ParseXBRL();
-                    break;
-                }
-            case "--get-full-cik-list":
-                {
-                    await DownloadAndSaveFullCikList();
-                    break;
-                }
-            case "--parse-bulk-xbrl-archive":
-                {
-                    await ParseBulkXbrlArchive();
-                    break;
-                }
-            default:
-                Console.WriteLine("Invalid command-line switch. Please use --fetch, --parse, or --download");
-                break;
+            _log.LogError(ex, "Service execution is terminated with an error");
+            return 1;
+        }
+        finally
+        {
+            Log.CloseAndFlush();
         }
     }
+
+    private static ILogger GetBootstrapLogger()
+    {
+        Log.Logger = new LoggerConfiguration()
+            .WriteTo.Console()
+            .CreateBootstrapLogger();
+
+        var serviceCollection = new ServiceCollection();
+        serviceCollection.AddLogging(builder =>
+        {
+            builder.ClearProviders();
+            builder.AddSerilog(Log.Logger);
+        });
+
+        var serviceProvider = serviceCollection.BuildServiceProvider();
+        var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+        return loggerFactory.CreateLogger<Program>();
+    }
+
+    private static IHost BuildHost<TStartup>(string[] args) where TStartup : class
+    {
+        var host = Host.CreateDefaultBuilder(args)
+            .ConfigureWebHostDefaults(webBuilder => { webBuilder.UseStartup<TStartup>(); })
+            .ConfigureServices((context, services) => {
+
+                var grpcPort = int.Parse(context.Configuration!.GetSection("Ports")["Grpc"] ?? DefaultPortStr, CultureInfo.InvariantCulture);
+
+                services
+                    .Configure<KestrelServerOptions>(opt =>
+                    {
+                        opt.ListenAnyIP(grpcPort, options => options.Protocols = HttpProtocols.Http2);
+                        opt.AllowAlternateSchemes = true;
+                    });
+
+                services
+                    .AddHttpClient()
+                    .AddSingleton<PostgresExecutor>()
+                    .AddSingleton<DbMigrations>();
+
+                if (DoesConfigContainConnectionString(context.Configuration))
+                    services.AddSingleton<IDbmService, DbmService>();
+
+                services.AddGrpc();
+            })
+            .ConfigureLogging(builder => {
+
+                Log.Logger = new LoggerConfiguration()
+                    .WriteTo.Console()
+                    .WriteTo.File(
+                        "stocks-data-.txt",
+                        rollingInterval: RollingInterval.Day,
+                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Properties:j} {Message:lj}{NewLine}{Exception}")
+                    .CreateLogger();
+
+                _ = builder
+                    .ClearProviders()
+                    .AddSerilog(Log.Logger);
+            })
+            .Build();
+
+        _log = host.Services.GetRequiredService<ILogger<Program>>();
+        LogConfig(host.Services.GetRequiredService<IConfiguration>());
+
+        return host;
+    }
+
+    private static bool DoesConfigContainConnectionString(IConfiguration configuration)
+        => configuration.GetConnectionString(DbmService.StocksDataConnectionStringName) is not null;
+
+    private static void LogConfig(IConfiguration _)
+    {
+        //logger.LogInformation("==========BEGIN CRITICAL CONFIGURATION==========");
+        //LogConfigSection(config, GoogleCredentialsOptions.GoogleCredentials);
+        //LogConfigSection(config, HostedServicesOptions.HostedServices);
+        //LogConfigSection(config, FeatureFlagsOptions.FeatureFlags);
+        //logger.LogInformation("==========END CRITICAL CONFIGURATION==========");
+    }
+
+    //private static void LogConfigSection(IConfiguration config, string section)
+    //{
+    //    foreach (var child in config.GetSection(section).GetChildren())
+    //        _log.LogInformation("[{Section}] {Key} = {Value}", section, child.Key, child.Value);
+    //}
 
     /// <summary>
     /// Fetches the landing page containing the list of filings for a company
@@ -184,26 +307,33 @@ internal class Program
 
     static async Task DownloadAndSaveFullCikList()
     {
-        string url = "https://www.sec.gov/Archives/edgar/cik-lookup-data.txt";
+        const int BatchSize = 1000;
+        const string url = "https://www.sec.gov/Archives/edgar/cik-lookup-data.txt";
+
         string? content = await HttpClientService.FetchContentAsync(url);
         if (string.IsNullOrEmpty(content))
         {
-            Console.WriteLine("Failed to download CIK list from {0}", url);
+            _log.LogWarning("Failed to download CIK list from {Url}", url);
             return;
         }
 
-        using var reader = new StringReader(content);
-        string? line;
-        int i = 0;
-        var companies = new List<Company>();
-        const int batchSize = 1000;
-        var tasks = new List<Task>();
+        await _dbm!.EmptyCompaniesTables(CancellationToken.None);
 
+        int i = 0;
+        var companiesBatch = new List<Company>();
+        var companyNamesBatch = new List<CompanyName>();
+        var tasks = new List<Task>();
+        var foundCiks = new HashSet<ulong>();
+
+        int numApple = 0;
+
+        string? line;
+        using var reader = new StringReader(content);
         while ((line = reader.ReadLine()) != null)
         {
             ++i;
 
-            if (i % 1000 == 0) Console.WriteLine("Processed {0} lines", i);
+            if (i % 1000 == 0) _log.LogInformation("Processed {NumLines} lines", i);
 
             // Remove the trailing colon
             if (line.EndsWith(':')) line = line[..^1];
@@ -211,7 +341,7 @@ internal class Program
             int lastColonIndex = line.LastIndexOf(':');
             if (lastColonIndex == -1)
             {
-                Console.WriteLine("Failed to parse line {0}", line);
+                _log.LogWarning("Failed to parse line {Line}", line);
                 continue;
             }
 
@@ -220,49 +350,76 @@ internal class Program
 
             if (string.IsNullOrEmpty(companyName) || string.IsNullOrEmpty(cikStr))
             {
-                Console.WriteLine("Failed to parse line {0}", line);
+                _log.LogWarning("Failed to parse line {Line}", line);
                 continue;
             }
 
-            if (!int.TryParse(cikStr, out int cik))
+            if (!ulong.TryParse(cikStr, out ulong cik))
             {
-                Console.WriteLine("Failed to parse CIK {0}", cikStr);
+                _log.LogWarning("Failed to parse CIK {Cik}", cikStr);
                 continue;
             }
-            
-            cikStr = $"{cik:0}";
 
-            var company = new Company(cikStr, companyName, Constants.EdgarDataSource);
-            companies.Add(company);
-
-            if (companies.Count >= batchSize)
+            if (foundCiks.Add(cik))
             {
-                var batch = new List<Company>(companies);
-                tasks.Add(Task.Run(async () =>
+                ulong companyId = await _dbm!.GetNextId64(CancellationToken.None);
+                var company = new Company(companyId, cik, Constants.EdgarDataSource);
+                companiesBatch.Add(company);
+
+                if (cik == 320193)
                 {
-                    Results res = await MongoDbService.SaveCompaniesBulk(batch);
-                    if (res.IsError)
-                        Console.WriteLine("Failed to save batch of companies. Error: {0}", res.ErrorMessage);
-                }));
-                companies.Clear();
+                    ++numApple;
+                    if (numApple > 1)
+                        _log.LogWarning("Found more than one entry for Apple Inc. (CIK: {Cik})", cik);
+                }
             }
+
+            ulong companyNameId = await _dbm!.GetNextId64(CancellationToken.None);
+            var companyNameObj = new CompanyName(companyNameId, cik, companyName);
+            companyNamesBatch.Add(companyNameObj);
+
+            if (companiesBatch.Count >= BatchSize)
+                SaveCompanyBatch(companiesBatch, tasks);
+
+            if (companyNamesBatch.Count >= BatchSize)
+                SaveCompanyNamesBatch(companyNamesBatch, tasks);
         }
 
-        // Save any remaining companies
-        if (companies.Count > 0)
-        {
-            var batch = new List<Company>(companies);
-            tasks.Add(Task.Run(async () =>
-            {
-                Results res = await MongoDbService.SaveCompaniesBulk(batch);
-                if (res.IsError)
-                    Console.WriteLine("Failed to save batch of companies. Error: {0}", res.ErrorMessage);
-            }));
-        }
+        // Save any remaining objects
 
+        if (companiesBatch.Count > 0)
+            SaveCompanyBatch(companiesBatch, tasks);
+
+        if (companyNamesBatch.Count > 0)
+            SaveCompanyNamesBatch(companyNamesBatch, tasks);
+        
         await Task.WhenAll(tasks);
 
-        Console.WriteLine("Processed {0} lines", i);
+        _log.LogInformation("Processed {NumLines} lines", i);
+    }
+
+    private static void SaveCompanyBatch(List<Company> companies, List<Task> tasks)
+    {
+        var batch = new List<Company>(companies);
+        tasks.Add(Task.Run(async () =>
+        {
+            Results res = await _dbm!.SaveCompaniesBatch(batch, CancellationToken.None);
+            if (res.IsError)
+                _log.LogWarning("Failed to save batch of companies. Error: {Error}", res.ErrorMessage);
+        }));
+        companies.Clear();
+    }
+
+    private static void SaveCompanyNamesBatch(List<CompanyName> companyNames, List<Task> tasks)
+    {
+        var batch = new List<CompanyName>(companyNames);
+        tasks.Add(Task.Run(async () =>
+        {
+            Results res = await _dbm!.SaveCompanyNamesBatch(batch, CancellationToken.None);
+            if (res.IsError)
+                _log.LogWarning("Failed to save batch of company names. Error: {Error}", res.ErrorMessage);
+        }));
+        companyNames.Clear();
     }
 
     static async Task ParseBulkXbrlArchive()

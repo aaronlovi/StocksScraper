@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataModels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Utilities;
 
 namespace Stocks.Persistence;
 
@@ -24,7 +27,7 @@ public sealed class DbmService : IDisposable, IDbmService
         _exec = svp.GetRequiredService<PostgresExecutor>();
 
         IConfiguration config = svp.GetRequiredService<IConfiguration>();
-        string connStr = config.GetConnectionString("tsx-scraper") ?? string.Empty;
+        string connStr = config.GetConnectionString(StocksDataConnectionStringName) ?? string.Empty;
         if (string.IsNullOrEmpty(connStr))
             throw new InvalidOperationException("Connection string is empty");
 
@@ -99,6 +102,28 @@ public sealed class DbmService : IDisposable, IDbmService
         {
             throw new InvalidOperationException("Failed to get next id from database");
         }
+    }
+
+    #endregion
+
+    #region Companies
+
+    public async Task<Results> EmptyCompaniesTables(CancellationToken ct)
+    {
+        var stmt = new TruncateCompaniesTablesStmt();
+        return await _exec.ExecuteWithRetry(stmt, ct);
+    }
+
+    public async Task<Results> SaveCompaniesBatch(List<Company> companies, CancellationToken ct)
+    {
+        var stmt = new InsertCompaniesBatchStmt(companies);
+        return await _exec.ExecuteWithRetry(stmt, ct);
+    }
+
+    public async Task<Results> SaveCompanyNamesBatch(List<CompanyName> companyNames, CancellationToken ct)
+    {
+        var stmt = new InsertCompanyNamesBatchStmt(companyNames);
+        return await _exec.ExecuteWithRetry(stmt, ct);
     }
 
     #endregion

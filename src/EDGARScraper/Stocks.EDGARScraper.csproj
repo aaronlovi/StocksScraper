@@ -6,9 +6,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\DataModels\DataModels.csproj" />
+		<ProjectReference Include="..\DataModels\Stocks.DataModels.csproj" />
 		<ProjectReference Include="..\Stocks.Persistence\Stocks.Persistence.csproj" />
-		<ProjectReference Include="..\Utilities\Utilities.csproj" />
+		<ProjectReference Include="..\Utilities\Stocks.Utilities.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -16,6 +16,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EDGARScraper", "EDGARScrape
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utilities", "Utilities\Utilities.csproj", "{7311A418-FB68-402D-948D-C069BBD94B0C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.Persistence", "Stocks.Persistence\Stocks.Persistence.csproj", "{4CB3BD47-4871-40BE-8A48-C1A6BC885183}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -34,6 +36,10 @@ Global
 		{7311A418-FB68-402D-948D-C069BBD94B0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7311A418-FB68-402D-948D-C069BBD94B0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7311A418-FB68-402D-948D-C069BBD94B0C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

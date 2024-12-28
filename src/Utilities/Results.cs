@@ -1,10 +1,10 @@
 ﻿namespace Utilities;
 
-public class Results
+public record Results
 {
     public static readonly Results Success = new(true);
 
-    private Results(bool success, string errorMessage = "")
+    public Results(bool success, string errorMessage = "")
     {
         IsSuccess = success;
         ErrorMessage = errorMessage;
@@ -19,9 +19,9 @@ public class Results
     public static Results FailureResult(string errorMessage) => new(false, errorMessage);
 }
 
-public class GenericResults<T>
+public record GenericResults<T>
 {
-    private GenericResults(bool success, string errorMessage = "", T? data = default)
+    public GenericResults(bool success, string errorMessage = "", T? data = default)
     {
         IsSuccess = success;
         ErrorMessage = errorMessage;

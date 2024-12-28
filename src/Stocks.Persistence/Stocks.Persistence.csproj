@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Remove="Migrations\*.sql" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="Migrations\*.sql" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Utilities\Utilities.csproj" />
+	</ItemGroup>
+
+</Project>

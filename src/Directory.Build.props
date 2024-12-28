@@ -4,11 +4,16 @@
 		<ImplicitUsings>disable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<NoWarn>IDE0130</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Evolve" Version="3.2.0" />
 		<PackageReference Include="HtmlAgilityPack" Version="1.11.71" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
 		<PackageReference Include="MongoDB.Driver" Version="3.1.0" />
+		<PackageReference Include="Npgsql" Version="9.0.2" />
 		<PackageReference Include="PuppeteerSharp" Version="20.0.5" />
 	</ItemGroup>
 </Project>

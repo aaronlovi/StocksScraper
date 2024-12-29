@@ -34,6 +34,8 @@ internal class Program
 
     private static ILogger _log;
     private static IDbmService? _dbm;
+    private static IServiceProvider? _svp;
+
     static Program()
     {
         _log = GetBootstrapLogger();
@@ -56,8 +58,8 @@ internal class Program
             await PuppeteerService.EnsureBrowser();
             await MongoDbService.CreateIndices();
 
-            IServiceProvider svp = host.Services;
-            _dbm = svp.GetRequiredService<IDbmService>();
+            _svp = host.Services;
+            _dbm = _svp.GetRequiredService<IDbmService>();
 
             switch (args[0].ToLowerInvariant())
             {
@@ -320,12 +322,12 @@ internal class Program
         await _dbm!.EmptyCompaniesTables(CancellationToken.None);
 
         int i = 0;
+        int numCompanies = 0;
+        int numCompanyNames = 0;
         var companiesBatch = new List<Company>();
         var companyNamesBatch = new List<CompanyName>();
         var tasks = new List<Task>();
-        var foundCiks = new HashSet<ulong>();
-
-        int numApple = 0;
+        var companyIdsByCiks = new Dictionary<ulong, ulong>(); // CIK -> CompanyId
 
         string? line;
         using var reader = new StringReader(content);
@@ -360,42 +362,47 @@ internal class Program
                 continue;
             }
 
-            if (foundCiks.Add(cik))
+            if (!companyIdsByCiks.TryGetValue(cik, out ulong companyId))
             {
-                ulong companyId = await _dbm!.GetNextId64(CancellationToken.None);
+                companyId = await _dbm!.GetNextId64(CancellationToken.None);
+                companyIdsByCiks.Add(cik, companyId);
                 var company = new Company(companyId, cik, Constants.EdgarDataSource);
                 companiesBatch.Add(company);
-
-                if (cik == 320193)
-                {
-                    ++numApple;
-                    if (numApple > 1)
-                        _log.LogWarning("Found more than one entry for Apple Inc. (CIK: {Cik})", cik);
-                }
             }
 
             ulong companyNameId = await _dbm!.GetNextId64(CancellationToken.None);
-            var companyNameObj = new CompanyName(companyNameId, cik, companyName);
+            var companyNameObj = new CompanyName(companyNameId, companyId, companyName);
             companyNamesBatch.Add(companyNameObj);
 
-            if (companiesBatch.Count >= BatchSize)
-                SaveCompanyBatch(companiesBatch, tasks);
-
-            if (companyNamesBatch.Count >= BatchSize)
-                SaveCompanyNamesBatch(companyNamesBatch, tasks);
+            if (companiesBatch.Count >= BatchSize) SaveCompanyBatchAndClear();
+            if (companyNamesBatch.Count >= BatchSize) SaveCompanyNamesBatchAndClear();
         }
 
         // Save any remaining objects
 
-        if (companiesBatch.Count > 0)
-            SaveCompanyBatch(companiesBatch, tasks);
+        if (companiesBatch.Count > 0) SaveCompanyBatchAndClear();
+        if (companyNamesBatch.Count > 0) SaveCompanyNamesBatchAndClear();
 
-        if (companyNamesBatch.Count > 0)
-            SaveCompanyNamesBatch(companyNamesBatch, tasks);
-        
         await Task.WhenAll(tasks);
 
-        _log.LogInformation("Processed {NumLines} lines", i);
+        _log.LogInformation("Processed {NumLines} lines; {NumCompanies} companies; {NumCompanyNames} company Names",
+            i, numCompanies, numCompanyNames);
+
+        // Local helper methods
+
+        void SaveCompanyBatchAndClear()
+        {
+            numCompanies += companiesBatch.Count;
+            SaveCompanyBatch(companiesBatch, tasks);
+            companiesBatch.Clear();
+        }
+
+        void SaveCompanyNamesBatchAndClear()
+        {
+            numCompanyNames += companyNamesBatch.Count;
+            SaveCompanyNamesBatch(companyNamesBatch, tasks);
+            companyNamesBatch.Clear();
+        }
     }
 
     private static void SaveCompanyBatch(List<Company> companies, List<Task> tasks)
@@ -407,7 +414,6 @@ internal class Program
             if (res.IsError)
                 _log.LogWarning("Failed to save batch of companies. Error: {Error}", res.ErrorMessage);
         }));
-        companies.Clear();
     }
 
     private static void SaveCompanyNamesBatch(List<CompanyName> companyNames, List<Task> tasks)
@@ -419,13 +425,11 @@ internal class Program
             if (res.IsError)
                 _log.LogWarning("Failed to save batch of company names. Error: {Error}", res.ErrorMessage);
         }));
-        companyNames.Clear();
     }
 
     static async Task ParseBulkXbrlArchive()
     {
-        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        string archivePath = Path.Combine(userProfile, "Downloads", "companyfacts.zip");
+        string archivePath = GetConfigValue("CompanyFactsBulkZipPath");
 
         using var zipReader = new ZipFileReader(archivePath);
 
@@ -491,5 +495,13 @@ internal class Program
         await Task.WhenAll(tasks);
 
         Console.WriteLine("Processed {0} files. Total length: {1:#,###} bytes", i, totalLength);
+    }
+
+    private static string GetConfigValue(string key)
+    {
+        if (_svp is null)
+            throw new InvalidOperationException("Service provider is not initialized");
+        IConfiguration configuration = _svp.GetRequiredService<IConfiguration>();
+        return configuration[key] ?? throw new InvalidOperationException($"Configuration key '{key}' not found");
     }
 }

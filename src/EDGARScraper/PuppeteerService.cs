@@ -1,9 +1,12 @@
-﻿using PuppeteerSharp;
-using System;
+﻿using System;
 using System.Threading.Tasks;
+using PuppeteerSharp;
 
 namespace EDGARScraper;
 
+/// <summary>
+/// Not yet in use, but the code is working so may be re-used in the future
+/// </summary>
 internal class PuppeteerService
 {
     internal static async Task<string> FetchRenderedHtmlAsync(string url)

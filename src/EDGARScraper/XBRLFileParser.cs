@@ -1,26 +1,38 @@
-﻿using DataModels;
-using DataModels.XbrlFileModels;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
+using DataModels.XbrlFileModels;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Stocks.DataModels;
 using Utilities;
 
 namespace EDGARScraper;
 
 internal class XBRLFileParser
 {
+    private ulong _companyId;
     private XbrlJson? _xbrlJson;
     private readonly string _content;
+    private readonly Dictionary<ulong, ulong> _companyIdsByCiks;
     private readonly Dictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>> _dataPoints;
+    private readonly ILogger<XBRLFileParser> _logger;
 
-    internal XBRLFileParser(string content)
+    private ulong Cik => _xbrlJson?.Cik ?? 0;
+
+    internal XBRLFileParser(
+        string content,
+        Dictionary<ulong, ulong> companyIdsByCiks,
+        IServiceProvider svp)
     {
         _content = content;
+        _companyIdsByCiks = companyIdsByCiks;
         _dataPoints = [];
+        _logger = svp.GetRequiredService<ILogger<XBRLFileParser>>();
     }
 
-    public XbrlJson? XbrlJson => _xbrlJson;
-    internal IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>> DataPoints => _dataPoints;
+    internal IEnumerable<DataPoint> DataPoints => _dataPoints.Values.SelectMany(x => x.Values.SelectMany(y => y.Values));
 
     internal Results Parse()
     {
@@ -28,12 +40,19 @@ internal class XBRLFileParser
         {
             _xbrlJson = JsonSerializer.Deserialize<XbrlJson>(_content);
             if (_xbrlJson is null)
+            {
+                _logger.LogWarning("Parse - Failed to deserialize XBRL JSON.");
                 return Results.FailureResult("Failed to deserialize XBRL JSON.");
+            }
+
+            if (!_companyIdsByCiks.TryGetValue(Cik, out _companyId))
+            {
+                _logger.LogWarning("Parse - Failed to find company ID for CIK {Cik}, aborting", Cik);
+                return Results.FailureResult($"Failed to find company ID for CIK {Cik}, aborting");
+            }
 
             foreach ((string factName, Fact fact) in _xbrlJson.Facts.UsGaap)
-            {
                 ProcessFact(factName, fact);
-            }
 
             return Results.Success;
         }
@@ -48,24 +67,22 @@ internal class XBRLFileParser
         Dictionary<string, Dictionary<DatePair, DataPoint>> unitsDataPoints =
             _dataPoints.GetOrCreateEntry(factName);
 
-        foreach ((string unit, List<Unit> units) in fact.Units)
-        {
-            ProcessUnitsForFact(unitsDataPoints, unit, units);
-        }
+        foreach ((string unitName, List<Unit> units) in fact.Units)
+            ProcessUnitsForFact(factName, unitsDataPoints, unitName.ToLowerInvariant(), units);
     }
 
-    private static void ProcessUnitsForFact(Dictionary<string, Dictionary<DatePair, DataPoint>> unitsDataPoints, string unit, List<Unit> units)
+    private void ProcessUnitsForFact(
+        string factName, Dictionary<string, Dictionary<DatePair, DataPoint>> unitsDataPoints, string unitName, List<Unit> units)
     {
         Dictionary<DatePair, DataPoint> dataPointsByDatePair =
-            unitsDataPoints.GetOrCreateEntry(unit);
+            unitsDataPoints.GetOrCreateEntry(unitName);
 
         foreach (Unit unitData in units)
-        {
-            ProcessUnitItemForFact(unit, dataPointsByDatePair, unitData);
-        }
+            ProcessUnitItemForFact(factName, unitName, dataPointsByDatePair, unitData);
     }
 
-    private static void ProcessUnitItemForFact(string unit, Dictionary<DatePair, DataPoint> dataPointsByDatePair, Unit unitData)
+    private void ProcessUnitItemForFact(
+        string factName, string unit, Dictionary<DatePair, DataPoint> dataPointsByDatePair, Unit unitData)
     {
         DatePair datePair = unitData.DatePair;
 
@@ -76,9 +93,12 @@ internal class XBRLFileParser
         }
 
         dataPointsByDatePair[datePair] = new DataPoint(
+            0,
+            _companyId,
+            factName.ToLowerInvariant(),
             datePair,
             unitData.Value,
-            new DataPointUnit(unit),
+            new DataPointUnit(0, unit),
             unitData.FiledDate);
     }
 }

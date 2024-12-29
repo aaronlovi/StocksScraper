@@ -2,8 +2,8 @@
   "profiles": {
     "EDGARScraper": {
       "commandName": "Project",
-      "commandLineArgs": "--get-full-cik-list"
-      //"commandLineArgs": "--parse-bulk-xbrl-archive"
+      //"commandLineArgs": "--get-full-cik-list"
+      "commandLineArgs": "--parse-bulk-xbrl-archive"
     }
   }
 }

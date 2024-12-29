@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text.Json.Serialization;
+using Stocks.DataModels;
 
 namespace DataModels.XbrlFileModels;
 

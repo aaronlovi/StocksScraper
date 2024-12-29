@@ -1,4 +1,5 @@
 ﻿using MongoDB.Bson;
+using Stocks.DataModels;
 using System.Collections.Generic;
 
 namespace DataModels;
@@ -30,7 +31,7 @@ public static class BsonDocumentExtensions
                         { "StartDate", datePair.StartTimeUtc },
                         { "EndDate", datePair.EndTimeUtc },
                         { "Value", dataPoint.Value },
-                        { "Unit", dataPoint.Units.Name },
+                        { "Unit", dataPoint.Units.UnitName },
                         { "FiledDate", dataPoint.FiledTimeUtc }
                     };
 

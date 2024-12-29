@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using DataModels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Stocks.DataModels;
 using Utilities;
 
 namespace Stocks.Persistence;
@@ -108,21 +108,70 @@ public sealed class DbmService : IDisposable, IDbmService
 
     #region Companies
 
+    public async Task<GenericResults<IReadOnlyCollection<Company>>> GetCompaniesByDataSource(
+        string dataSource, CancellationToken ct)
+    {
+        var stmt = new GetCompaniesByDataSourceStmt(dataSource);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+        {
+            _logger.LogInformation("GetCompaniesByDataSource success - Num companies: {NumCompanies}", stmt.Companies.Count);
+            return GenericResults<IReadOnlyCollection<Company>>.SuccessResult(stmt.Companies);
+        }
+        else
+        {
+            _logger.LogWarning("GetCompaniesByDataSource failed with error {Error}", res.ErrorMessage);
+            return GenericResults<IReadOnlyCollection<Company>>.FailureResult(res.ErrorMessage);
+        }
+    }
+
     public async Task<Results> EmptyCompaniesTables(CancellationToken ct)
     {
         var stmt = new TruncateCompaniesTablesStmt();
         return await _exec.ExecuteWithRetry(stmt, ct);
     }
 
-    public async Task<Results> SaveCompaniesBatch(List<Company> companies, CancellationToken ct)
+    public async Task<Results> BulkInsertCompanies(List<Company> companies, CancellationToken ct)
     {
-        var stmt = new InsertCompaniesBatchStmt(companies);
+        var stmt = new BulkInsertCompaniesStmt(companies);
         return await _exec.ExecuteWithRetry(stmt, ct);
     }
 
-    public async Task<Results> SaveCompanyNamesBatch(List<CompanyName> companyNames, CancellationToken ct)
+    public async Task<Results> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct)
     {
-        var stmt = new InsertCompanyNamesBatchStmt(companyNames);
+        var stmt = new BulkInsertCompanyNamesStmt(companyNames);
+        return await _exec.ExecuteWithRetry(stmt, ct);
+    }
+
+    #endregion
+
+    #region Data points
+
+    public async Task<GenericResults<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct)
+    {
+        var stmt = new GetAllDataPointUnitsStmt();
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+        {
+            _logger.LogInformation("GetDataPointUnits success - Num units: {NumUnits}", stmt.Units.Count);
+            return GenericResults<IReadOnlyCollection<DataPointUnit>>.SuccessResult(stmt.Units);
+        }
+        else
+        {
+            _logger.LogWarning("GetDataPointUnits failed with error {Error}", res.ErrorMessage);
+            return GenericResults<IReadOnlyCollection<DataPointUnit>>.FailureResult(res.ErrorMessage);
+        }
+    }
+
+    public async Task<Results> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct)
+    {
+        var stmt = new InsertDataPointUnitStmt(dataPointUnit);
+        return await _exec.ExecuteWithRetry(stmt, ct);
+    }
+
+    public async Task<Results> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct)
+    {
+        var stmt = new BulkInsertDataPointsStmt(dataPoints);
         return await _exec.ExecuteWithRetry(stmt, ct);
     }
 

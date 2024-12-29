@@ -18,6 +18,7 @@ comment on column companies.company_id is 'Unique identifier for the company';
 comment on column companies.cik is 'Central Index Key (CIK) for American stocks, sourced from EDGAR. Zero otherwise.';
 comment on column companies.data_source is 'Source of the data, currently ''EDGAR'' only, but will include other sources in the future';
 create index idx_companies_cik on companies (cik);
+create index idx_companies_data_source on companies (data_source);
 
 create table if not exists company_names (
     name_id bigint not null,
@@ -43,7 +44,7 @@ comment on column units.unit_name is 'Name of the unit, limited to 100 character
 create table if not exists data_points (
     data_point_id bigint not null,
     company_id bigint not null,
-    unit_id int not null,
+    unit_id bigint not null,
     fact_name varchar(255) not null,
     start_date date not null,
     end_date date not null,

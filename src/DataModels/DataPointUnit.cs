@@ -1,3 +1,6 @@
-﻿namespace DataModels;
+﻿namespace Stocks.DataModels;
 
-public record DataPointUnit(string Name);
+public record DataPointUnit(ulong UnitId, string UnitName)
+{
+    public string UnitNameNormalized => UnitName.ToLowerInvariant();
+}

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using DataModels;
+using Stocks.DataModels;
 using Utilities;
 
 namespace Stocks.Persistence;
@@ -15,7 +15,14 @@ public interface IDbmService
 
     // Companies
 
+    Task<GenericResults<IReadOnlyCollection<Company>>> GetCompaniesByDataSource(string dataSource, CancellationToken ct);
     Task<Results> EmptyCompaniesTables(CancellationToken ct);
-    Task<Results> SaveCompaniesBatch(List<Company> companies, CancellationToken ct);
-    Task<Results> SaveCompanyNamesBatch(List<CompanyName> companyNames, CancellationToken ct);
+    Task<Results> BulkInsertCompanies(List<Company> companies, CancellationToken ct);
+    Task<Results> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct);
+
+    // Data points and data point units
+
+    Task<GenericResults<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct);
+    Task<Results> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct);
+    Task<Results> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct);
 }

@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace DataModels;
+namespace Stocks.DataModels;
 
 public record Company(
     ulong CompanyId,

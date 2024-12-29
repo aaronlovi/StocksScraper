@@ -4,7 +4,7 @@ namespace DataModels.XbrlFileModels;
 
 public record XbrlJson
 {
-    [JsonPropertyName("cik")] public int Cik { get; init; }
+    [JsonPropertyName("cik")] public ulong Cik { get; init; }
     [JsonPropertyName("entityName")] public string EntityName { get; init; } = "";
     [JsonPropertyName("facts")] public Facts Facts { get; init; } = new();
 

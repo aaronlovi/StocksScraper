@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
@@ -15,6 +16,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using Serilog;
+using Stocks.DataModels;
 using Stocks.Persistence;
 using Utilities;
 
@@ -32,22 +34,22 @@ internal class Program
     private static EdgarHttpClientService HttpClientService => _httpClientService ??= new();
     private static MongoDbService MongoDbService => _mongoDbService ??= new();
 
-    private static ILogger _log;
+    private static ILogger _logger;
     private static IDbmService? _dbm;
     private static IServiceProvider? _svp;
 
     static Program()
     {
-        _log = GetBootstrapLogger();
+        _logger = GetBootstrapLogger();
     }
 
     static async Task<int> Main(string[] args)
     {
         try
         {
-            _log.LogInformation("Building the host");
+            _logger.LogInformation("Building the host");
             var host = BuildHost<Startup>(args);
-            _log.LogInformation("Running the host");
+            _logger.LogInformation("Running the host");
 
             if (args.Length == 0)
             {
@@ -93,7 +95,7 @@ internal class Program
                         break;
                     }
                 default:
-                    _log.LogError("Invalid command-line switch. Please use --fetch, --parse, or --download");
+                    _logger.LogError("Invalid command-line switch. Please use --fetch, --parse, or --download");
                     return 3;
             }
 
@@ -101,7 +103,7 @@ internal class Program
         }
         catch (Exception ex)
         {
-            _log.LogError(ex, "Service execution is terminated with an error");
+            _logger.LogError(ex, "Service execution is terminated with an error");
             return 1;
         }
         finally
@@ -146,7 +148,9 @@ internal class Program
                 services
                     .AddHttpClient()
                     .AddSingleton<PostgresExecutor>()
-                    .AddSingleton<DbMigrations>();
+                    .AddSingleton<DbMigrations>()
+                    .AddTransient<Func<string, Dictionary<ulong, ulong>, XBRLFileParser>>(
+                        sp => (content, companyIdsByCiks) => new XBRLFileParser(content, companyIdsByCiks, sp));
 
                 if (DoesConfigContainConnectionString(context.Configuration))
                     services.AddSingleton<IDbmService, DbmService>();
@@ -169,7 +173,7 @@ internal class Program
             })
             .Build();
 
-        _log = host.Services.GetRequiredService<ILogger<Program>>();
+        _logger = host.Services.GetRequiredService<ILogger<Program>>();
         LogConfig(host.Services.GetRequiredService<IConfiguration>());
 
         return host;
@@ -315,7 +319,7 @@ internal class Program
         string? content = await HttpClientService.FetchContentAsync(url);
         if (string.IsNullOrEmpty(content))
         {
-            _log.LogWarning("Failed to download CIK list from {Url}", url);
+            _logger.LogWarning("Failed to download CIK list from {Url}", url);
             return;
         }
 
@@ -335,7 +339,7 @@ internal class Program
         {
             ++i;
 
-            if (i % 1000 == 0) _log.LogInformation("Processed {NumLines} lines", i);
+            if (i % 1000 == 0) _logger.LogInformation("Processed {NumLines} lines", i);
 
             // Remove the trailing colon
             if (line.EndsWith(':')) line = line[..^1];
@@ -343,7 +347,7 @@ internal class Program
             int lastColonIndex = line.LastIndexOf(':');
             if (lastColonIndex == -1)
             {
-                _log.LogWarning("Failed to parse line {Line}", line);
+                _logger.LogWarning("Failed to parse line {Line}", line);
                 continue;
             }
 
@@ -352,13 +356,13 @@ internal class Program
 
             if (string.IsNullOrEmpty(companyName) || string.IsNullOrEmpty(cikStr))
             {
-                _log.LogWarning("Failed to parse line {Line}", line);
+                _logger.LogWarning("Failed to parse line {Line}", line);
                 continue;
             }
 
             if (!ulong.TryParse(cikStr, out ulong cik))
             {
-                _log.LogWarning("Failed to parse CIK {Cik}", cikStr);
+                _logger.LogWarning("Failed to parse CIK {Cik}", cikStr);
                 continue;
             }
 
@@ -366,7 +370,7 @@ internal class Program
             {
                 companyId = await _dbm!.GetNextId64(CancellationToken.None);
                 companyIdsByCiks.Add(cik, companyId);
-                var company = new Company(companyId, cik, Constants.EdgarDataSource);
+                var company = new Company(companyId, cik, ModelsConstants.EdgarDataSource);
                 companiesBatch.Add(company);
             }
 
@@ -374,127 +378,175 @@ internal class Program
             var companyNameObj = new CompanyName(companyNameId, companyId, companyName);
             companyNamesBatch.Add(companyNameObj);
 
-            if (companiesBatch.Count >= BatchSize) SaveCompanyBatchAndClear();
-            if (companyNamesBatch.Count >= BatchSize) SaveCompanyNamesBatchAndClear();
+            if (companiesBatch.Count >= BatchSize) BulkInsertCompaniesAndClearBatch();
+            if (companyNamesBatch.Count >= BatchSize) BulkInsertCompanyNamesAndClearBatch();
         }
 
         // Save any remaining objects
 
-        if (companiesBatch.Count > 0) SaveCompanyBatchAndClear();
-        if (companyNamesBatch.Count > 0) SaveCompanyNamesBatchAndClear();
+        if (companiesBatch.Count > 0) BulkInsertCompaniesAndClearBatch();
+        if (companyNamesBatch.Count > 0) BulkInsertCompanyNamesAndClearBatch();
 
         await Task.WhenAll(tasks);
 
-        _log.LogInformation("Processed {NumLines} lines; {NumCompanies} companies; {NumCompanyNames} company Names",
+        _logger.LogInformation("Processed {NumLines} lines; {NumCompanies} companies; {NumCompanyNames} company Names",
             i, numCompanies, numCompanyNames);
 
         // Local helper methods
 
-        void SaveCompanyBatchAndClear()
+        void BulkInsertCompaniesAndClearBatch()
         {
             numCompanies += companiesBatch.Count;
-            SaveCompanyBatch(companiesBatch, tasks);
+            BulkInsertCompanies(companiesBatch, tasks);
             companiesBatch.Clear();
         }
 
-        void SaveCompanyNamesBatchAndClear()
+        void BulkInsertCompanyNamesAndClearBatch()
         {
             numCompanyNames += companyNamesBatch.Count;
-            SaveCompanyNamesBatch(companyNamesBatch, tasks);
+            BulkInsertCompanyNames(companyNamesBatch, tasks);
             companyNamesBatch.Clear();
         }
     }
 
-    private static void SaveCompanyBatch(List<Company> companies, List<Task> tasks)
+    private static void BulkInsertCompanies(IReadOnlyCollection<Company> companies, List<Task> tasks)
     {
         var batch = new List<Company>(companies);
         tasks.Add(Task.Run(async () =>
         {
-            Results res = await _dbm!.SaveCompaniesBatch(batch, CancellationToken.None);
+            Results res = await _dbm!.BulkInsertCompanies(batch, CancellationToken.None);
             if (res.IsError)
-                _log.LogWarning("Failed to save batch of companies. Error: {Error}", res.ErrorMessage);
+                _logger.LogWarning("Failed to save batch of companies. Error: {Error}", res.ErrorMessage);
         }));
     }
 
-    private static void SaveCompanyNamesBatch(List<CompanyName> companyNames, List<Task> tasks)
+    private static void BulkInsertCompanyNames(IReadOnlyCollection<CompanyName> companyNames, List<Task> tasks)
     {
         var batch = new List<CompanyName>(companyNames);
         tasks.Add(Task.Run(async () =>
         {
-            Results res = await _dbm!.SaveCompanyNamesBatch(batch, CancellationToken.None);
+            Results res = await _dbm!.BulkInsertCompanyNames(batch, CancellationToken.None);
             if (res.IsError)
-                _log.LogWarning("Failed to save batch of company names. Error: {Error}", res.ErrorMessage);
+                _logger.LogWarning("Failed to save batch of company names. Error: {Error}", res.ErrorMessage);
         }));
     }
 
-    static async Task ParseBulkXbrlArchive()
+    private static async Task ParseBulkXbrlArchive()
     {
+        const int BatchSize = 1000;
         string archivePath = GetConfigValue("CompanyFactsBulkZipPath");
 
         using var zipReader = new ZipFileReader(archivePath);
 
         int i = 0;
+        int numDataPoints = 0;
+        int numDataPointUnits = 0;
         long totalLength = 0;
-        var xbrlDataList = new List<(XbrlJson, IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>>)>();
-        const int batchSize = 100;
-        var tasks = new List<Task>();
+        var dataPointsBatch = new List<DataPoint>();
+        var companyIdsByCiks = new Dictionary<ulong, ulong>();
+        var unitsByUnitName = new Dictionary<string, DataPointUnit>();
 
+        GenericResults<IReadOnlyCollection<Company>> companyResults =
+            await _dbm!.GetCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
+        if (companyResults.IsError)
+        {
+            _logger.LogError("ParseBulkXbrlArchive - Failed to get companies. Error: {Error}", companyResults.ErrorMessage);
+            return;
+        }
+
+        foreach (Company c in companyResults.Data!)
+            companyIdsByCiks[c.Cik] = c.CompanyId;
+
+        GenericResults<IReadOnlyCollection<DataPointUnit>> dpuResults =
+            await _dbm!.GetDataPointUnits(CancellationToken.None);
+        if (dpuResults.IsError)
+        {
+            _logger.LogError("ParseBulkXbrlArchive - Failed to get data point units. Error: {Error}", dpuResults.ErrorMessage);
+            return;
+        }
+
+        foreach (DataPointUnit dpu in dpuResults.Data!)
+            unitsByUnitName[dpu.UnitName] = dpu;
+
+        var tasks = new List<Task>();
         foreach (string fileName in zipReader.EnumerateFileNames())
         {
             if (!fileName.EndsWith(".json")) continue;
 
             ++i;
-
-            if ((i % 100) == 0)
-                Console.WriteLine("Processed {0} files. Total length: {1:#,###} bytes", i, totalLength);
+            if ((i % 100) == 0) LogProgress();
 
             try
             {
                 string fileContent = zipReader.ExtractFileContent(fileName);
                 totalLength += fileContent.Length;
-                
-                var parser = new XBRLFileParser(fileContent);
+
+                var parserFactory = _svp!.GetRequiredService<Func<string, Dictionary<ulong, ulong>, XBRLFileParser>>();
+                XBRLFileParser parser = parserFactory(fileContent, companyIdsByCiks);
                 Results res = parser.Parse();
                 if (res.IsError)
                 {
-                    Console.WriteLine("Failed to parse {0}. Error: {1}", fileName, res.ErrorMessage);
+                    _logger.LogWarning("Failed to parse {FileName}. Error: {ErrMsg}", fileName, res.ErrorMessage);
                     continue;
                 }
 
-                xbrlDataList.Add((parser.XbrlJson!, parser.DataPoints));
-                if (xbrlDataList.Count >= batchSize)
+                foreach (DataPoint dp in parser.DataPoints)
                 {
-                    var batch = new List<(XbrlJson, IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>>)>(xbrlDataList);
-                    tasks.Add(Task.Run(async () =>
+                    string unitName = dp.Units.UnitNameNormalized;
+                    if (!unitsByUnitName.TryGetValue(unitName, out DataPointUnit? dpu))
                     {
-                        Results res = await MongoDbService.SaveXbrlFileDataBatch(batch);
-                        if (res.IsError)
-                            Console.WriteLine("Failed to save batch of company data. Error: {0}", res.ErrorMessage);
-                    }));
-                    xbrlDataList.Clear();
+                        ++numDataPointUnits;
+                        ulong dpuId = await _dbm!.GetNextId64(CancellationToken.None);
+                        dpu = unitsByUnitName[unitName] = new DataPointUnit(dpuId, unitName);
+                        var insertDpuRes = await _dbm.InsertDataPointUnit(dpu, CancellationToken.None);
+                        _logger.LogInformation("ParseBulkXbrlArchive - Inserted data point unit: {DataPointUnit}", dpu);
+                    }
+
+                    ulong dpId = await _dbm!.GetNextId64(CancellationToken.None);
+                    DataPoint dataPointToInsert = dp with { DataPointId = dpId, Units = dpu }; // With data point unit id populated
+                    dataPointsBatch.Add(dataPointToInsert);
+
+                    if (dataPointsBatch.Count >= BatchSize) BulkInsertDataPointsAndClearBatch();
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Failed to process {0}. Error: {1}", fileName, ex.Message);
+                _logger.LogError(ex, "ParseBulkXbrlArchive: Failed to process {FileName}", fileName);
             }
         }
 
-        // Save any remaining data
-        if (xbrlDataList.Count > 0)
-        {
-            var batch = new List<(XbrlJson, IReadOnlyDictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>>)>(xbrlDataList);
-            tasks.Add(Task.Run(async () =>
-            {
-                Results res = await MongoDbService.SaveXbrlFileDataBatch(batch);
-                if (res.IsError)
-                    Console.WriteLine("Failed to save batch of company data. Error: {0}", res.ErrorMessage);
-            }));
-        }
+        // Save any remaining objects
+
+        if (dataPointsBatch.Count != 0) BulkInsertDataPointsAndClearBatch();
 
         await Task.WhenAll(tasks);
 
-        Console.WriteLine("Processed {0} files. Total length: {1:#,###} bytes", i, totalLength);
+        LogProgress();
+
+        // Local helper methods
+
+        void LogProgress() =>
+            _logger.LogInformation("Processed {NumFiles} files; {NumDataPoints} data points; {NumDataPointUnits} data point units; Total length: {TotalLength} bytes",
+                i, numDataPoints, numDataPointUnits, totalLength);
+
+        void BulkInsertDataPointsAndClearBatch()
+        {
+            numDataPoints += dataPointsBatch.Count;
+            BulkInsertDataPoints(dataPointsBatch, tasks);
+            dataPointsBatch.Clear();
+        }
+    }
+
+    private static void BulkInsertDataPoints(IReadOnlyCollection<DataPoint> dataPointsBatch, List<Task> tasks)
+    {
+        var batch = new List<DataPoint>(dataPointsBatch);
+
+        tasks.Add(Task.Run(async () =>
+        {
+            Results res = await _dbm!.BulkInsertDataPoints(batch, CancellationToken.None);
+            if (res.IsError)
+                _logger.LogWarning("Failed to save batch of data points. Error: {Error}", res.ErrorMessage);
+        }));
     }
 
     private static string GetConfigValue(string key)

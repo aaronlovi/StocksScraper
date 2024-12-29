@@ -1,15 +1,15 @@
 ﻿#pragma warning disable IDE0290 // Use primary constructor
 
 using System.Collections.Generic;
-using DataModels;
 using Npgsql;
+using Stocks.DataModels;
 
 namespace Stocks.Persistence;
 
-internal sealed class InsertCompanyNamesBatchStmt : BulkInsertDbStmtBase<CompanyName>
+internal sealed class BulkInsertCompanyNamesStmt : BulkInsertDbStmtBase<CompanyName>
 {
-    public InsertCompanyNamesBatchStmt(IReadOnlyCollection<CompanyName> companyNames)
-        : base(nameof(InsertCompanyNamesBatchStmt), companyNames)
+    public BulkInsertCompanyNamesStmt(IReadOnlyCollection<CompanyName> companyNames)
+        : base(nameof(BulkInsertCompanyNamesStmt), companyNames)
     { }
 
     protected override string GetCopyCommand() =>

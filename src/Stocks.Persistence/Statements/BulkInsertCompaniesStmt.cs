@@ -1,19 +1,15 @@
 ﻿#pragma warning disable IDE0290 // Use primary constructor
 
-using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Threading;
-using DataModels;
 using Npgsql;
-using MongoDB.Driver;
+using Stocks.DataModels;
 
 namespace Stocks.Persistence;
 
-internal sealed class InsertCompaniesBatchStmt : BulkInsertDbStmtBase<Company>
+internal sealed class BulkInsertCompaniesStmt : BulkInsertDbStmtBase<Company>
 {
-    public InsertCompaniesBatchStmt(IReadOnlyCollection<Company> companies)
-        : base(nameof(InsertCompaniesBatchStmt), companies)
+    public BulkInsertCompaniesStmt(IReadOnlyCollection<Company> companies)
+        : base(nameof(BulkInsertCompaniesStmt), companies)
     { }
 
     protected override string GetCopyCommand() =>

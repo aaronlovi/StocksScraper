@@ -1,11 +1,12 @@
-﻿using DataModels;
-using DataModels.XbrlFileModels;
-using MongoDB.Bson;
-using MongoDB.Driver;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataModels;
+using DataModels.XbrlFileModels;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using Stocks.DataModels;
 using Utilities;
 
 namespace EDGARScraper;
@@ -255,7 +256,7 @@ internal class MongoDbService
             var settings = MongoClientSettings.FromConnectionString(ConnectionString);
             settings.MaxConnectionPoolSize = ConnectionCount; // Adjust as needed
             var client = new MongoClient(settings);
-            _database = client.GetDatabase(Constants.EdgarDataSource);
+            _database = client.GetDatabase(ModelsConstants.EdgarDataSource);
         }
         return _database;
     }

@@ -1,7 +1,7 @@
 ﻿using System;
 using Utilities;
 
-namespace DataModels;
+namespace Stocks.DataModels;
 
 public record DatePair(DateOnly StartDate, DateOnly EndDate)
 {

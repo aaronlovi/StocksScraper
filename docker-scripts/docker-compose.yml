@@ -10,6 +10,8 @@ services:
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped
+    networks:
+      - stocks-data-network
 
   mongo-express:
     image: mongo-express:1.0.2-20-alpine3.19
@@ -23,6 +25,8 @@ services:
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: admin
     restart: unless-stopped
+    networks:
+      - stocks-data-network
 
   postgres:
     image: postgres:17.2-bookworm
@@ -36,6 +40,8 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
+    networks:
+      - stocks-data-network
 
   pgadmin:
     image: dpage/pgadmin4:8.14
@@ -46,7 +52,12 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin
     restart: unless-stopped
+    networks:
+      - stocks-data-network
 
 volumes:
   mongo-data:
   postgres-data:
+
+networks:
+  stocks-data-network:

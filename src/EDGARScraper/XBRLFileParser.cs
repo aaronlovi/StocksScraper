@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
-using DataModels.XbrlFileModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
+using Stocks.DataModels.EdgarFileModels;
 using Utilities;
 
 namespace EDGARScraper;
@@ -93,12 +93,14 @@ internal class XBRLFileParser
         }
 
         dataPointsByDatePair[datePair] = new DataPoint(
-            0,
+            0, // Data point ID is not known at this point
             _companyId,
             factName.ToLowerInvariant(),
+            unitData.FilingReference,
             datePair,
             unitData.Value,
-            new DataPointUnit(0, unit),
-            unitData.FiledDate);
+            new DataPointUnit(0, unit), // Data point unit ID is not known at this point
+            unitData.FiledDate,
+            0); // Submission ID is not known at this point
     }
 }

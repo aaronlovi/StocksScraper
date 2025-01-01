@@ -177,6 +177,32 @@ public sealed class DbmService : IDisposable, IDbmService
 
     #endregion
 
+    #region Company submissions
+
+    public async Task<GenericResults<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct)
+    {
+        var stmt = new GetAllSubmissionsStmt();
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+        {
+            _logger.LogInformation("GetSubmissions success - Num submissions: {NumSubmissions}", stmt.Submissions.Count);
+            return GenericResults<IReadOnlyCollection<Submission>>.SuccessResult(stmt.Submissions);
+        }
+        else
+        {
+            _logger.LogWarning("GetSubmissions failed with error {Error}", res.ErrorMessage);
+            return GenericResults<IReadOnlyCollection<Submission>>.FailureResult(res.ErrorMessage);
+        }
+    }
+
+    public async Task<Results> BulkInsertSubmissions(List<Submission> batch, CancellationToken ct)
+    {
+        var stmt = new BulkInsertSubmissionsStmt(batch);
+        return await _exec.ExecuteWithRetry(stmt, ct);
+    }
+
+    #endregion
+
     public void Dispose()
     {
         // Dispose of Postgres executor

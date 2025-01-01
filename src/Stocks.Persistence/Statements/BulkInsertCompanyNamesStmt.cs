@@ -1,6 +1,7 @@
 ﻿#pragma warning disable IDE0290 // Use primary constructor
 
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Npgsql;
 using Stocks.DataModels;
 
@@ -15,10 +16,10 @@ internal sealed class BulkInsertCompanyNamesStmt : BulkInsertDbStmtBase<CompanyN
     protected override string GetCopyCommand() =>
         "COPY company_names (name_id, company_id, name) FROM STDIN (FORMAT BINARY)";
 
-    protected override void WriteItem(NpgsqlBinaryImporter writer, CompanyName companyName)
+    protected override async Task WriteItemAsync(NpgsqlBinaryImporter writer, CompanyName companyName)
     {
-        writer.Write((long)companyName.NameId, NpgsqlTypes.NpgsqlDbType.Bigint);
-        writer.Write((long)companyName.CompanyId, NpgsqlTypes.NpgsqlDbType.Bigint);
-        writer.Write(companyName.Name, NpgsqlTypes.NpgsqlDbType.Varchar);
+        await writer.WriteAsync((long)companyName.NameId, NpgsqlTypes.NpgsqlDbType.Bigint);
+        await writer.WriteAsync((long)companyName.CompanyId, NpgsqlTypes.NpgsqlDbType.Bigint);
+        await writer.WriteAsync(companyName.Name, NpgsqlTypes.NpgsqlDbType.Varchar);
     }
 }

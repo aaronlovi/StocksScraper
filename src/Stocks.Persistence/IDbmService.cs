@@ -25,4 +25,9 @@ public interface IDbmService
     Task<GenericResults<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct);
     Task<Results> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct);
     Task<Results> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct);
+
+    // Company submissions
+
+    Task<GenericResults<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct);
+    Task<Results> BulkInsertSubmissions(List<Submission> batch, CancellationToken none);
 }

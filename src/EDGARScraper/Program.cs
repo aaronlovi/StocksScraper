@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.Globalization;
 using System.IO;
-using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
@@ -12,7 +13,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Core;
 using Stocks.DataModels;
+using Stocks.DataModels.EdgarFileModels;
+using Stocks.DataModels.Enums;
 using Stocks.Persistence;
 using Utilities;
 
@@ -23,6 +27,7 @@ namespace EDGARScraper;
 internal class Program
 {
     private const string DefaultPortStr = "7001";
+    private const int ParseBulkEdgarSubmissionsBatchSize = 1000;
     private const int ParseBulkXbrlNumDataPointsBatchSize = 1000;
 
     private static EdgarHttpClientService? _httpClientService;
@@ -41,6 +46,8 @@ internal class Program
     {
         try
         {
+            DateTime start = DateTime.UtcNow;
+
             _logger.LogInformation("Building the host");
             var host = BuildHost<Startup>(args);
             _logger.LogInformation("Running the host");
@@ -61,6 +68,11 @@ internal class Program
                         await DownloadAndSaveFullCikList();
                         break;
                     }
+                case "--parse-bulk-edgar-submissions-list":
+                    {
+                        await ParseBulkEdgarSubmissionsList();
+                        break;
+                    }
                 case "--parse-bulk-xbrl-archive":
                     {
                         await ParseBulkXbrlArchive();
@@ -70,6 +82,10 @@ internal class Program
                     _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
                     return 3;
             }
+
+            DateTime end = DateTime.UtcNow;
+            TimeSpan timeTaken = end - start;
+            _logger.LogInformation("Service execution completed in {TimeTaken:#,###.000}s", timeTaken.TotalSeconds);
 
             return 0;
         }
@@ -145,8 +161,9 @@ internal class Program
             })
             .Build();
 
-        _logger = host.Services.GetRequiredService<ILogger<Program>>();
-        LogConfig(host.Services.GetRequiredService<IConfiguration>());
+        _svp = host.Services;
+        _logger = _svp.GetRequiredService<ILogger<Program>>();
+        LogConfig(_svp.GetRequiredService<IConfiguration>());
 
         return host;
     }
@@ -158,6 +175,7 @@ internal class Program
     {
         _logger.LogInformation("==========BEGIN CRITICAL CONFIGURATION==========");
         _logger.LogInformation("CompanyFactsBulkZipPath: {CompanyFactsBulkZipPath}", GetConfigValue("CompanyFactsBulkZipPath"));
+        _logger.LogInformation("EdgarSubmissionsBulkZipPath: {EdgarSubmissionsBulkZipPath}", GetConfigValue("EdgarSubmissionsBulkZipPath"));
         //LogConfigSection(config, GoogleCredentialsOptions.GoogleCredentials);
         //LogConfigSection(config, HostedServicesOptions.HostedServices);
         //LogConfigSection(config, FeatureFlagsOptions.FeatureFlags);
@@ -284,32 +302,138 @@ internal class Program
         }));
     }
 
-    private class ParseBulkXbrlArchiveContext
+    private static async Task ParseBulkEdgarSubmissionsList()
     {
-        public ParseBulkXbrlArchiveContext()
+        string archivePath = GetConfigValue("EdgarSubmissionsBulkZipPath");
+
+        using var zipReader = new ZipFileReader(archivePath);
+
+        var context = new ParseBulkEdgarSubmissionsContext(_svp!);
+
+        GenericResults<IReadOnlyCollection<Company>> companyResults =
+            await _dbm!.GetCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
+        if (companyResults.IsError)
         {
-            CurrentFileName = string.Empty;
-            DataPointsBatch = [];
-            Tasks = [];
-            CompanyIdsByCiks = [];
-            UnitsByUnitName = [];
+            _logger.LogError("ParseBulkEdgarSubmissionsList - Failed to get companies. Error: {Error}", companyResults.ErrorMessage);
+            return;
         }
 
-        public int NumFiles { get; set; }
-        public int NumDataPoints { get; set; }
-        public int NumDataPointUnits { get; set; }
-        public long TotalLength { get; set; }
-        public string CurrentFileName { get; set; }
-        public List<DataPoint> DataPointsBatch { get; init; }
-        public List<Task> Tasks { get; init; }
-        public Dictionary<ulong, ulong> CompanyIdsByCiks { get; init; }
-        public Dictionary<string, DataPointUnit> UnitsByUnitName { get; init; }
+        foreach (Company c in companyResults.Data!)
+            context.CompanyIdsByCiks[c.Cik] = c.CompanyId;
 
-        public void LogProgress()
+        foreach (string fileName in zipReader.EnumerateFileNames())
         {
-            _logger.LogInformation("Processed {NumFiles} files; {NumDataPoints} data points; {NumDataPointUnits} data point units; Total length: {TotalLength} bytes",
-                NumFiles, NumDataPoints, NumDataPointUnits, TotalLength);
+            if (!fileName.EndsWith(".json")) continue;
+            
+            context.IsCurrentFileSubmissionsFile = fileName.Contains("-submissions-");
+            ++context.NumFiles;
+            if ((context.NumFiles % 100) == 0) context.LogProgress();
+
+            context.CurrentFileName = fileName;
+            await ParseOneFileSubmission(zipReader, context);
         }
+
+        // Save any remaining objects
+
+        if (context.SubmissionsBatch.Count != 0)
+            context.NumSubmissions += BulkInsertSubmissionsAndClearBatch(context.SubmissionsBatch, context.Tasks);
+
+        await Task.WhenAll(context.Tasks);
+
+        context.LogProgress();
+    }
+
+    private static async Task ParseOneFileSubmission(ZipFileReader zipReader, ParseBulkEdgarSubmissionsContext context)
+    {
+        try
+        {
+            string fileContent = zipReader.ExtractFileContent(context.CurrentFileName);
+            context.TotalLength += fileContent.Length;
+
+            (FilingsDetails? filingsDetails, ulong companyId) = GetFilingsDetails(fileContent, context);
+            if (filingsDetails is null)
+            {
+                _logger.LogWarning("ParseOneFileSubmission - Failed to parse {FileName}", context.CurrentFileName);
+                return;
+            }
+
+            if (companyId == ulong.MaxValue)
+            {
+                _logger.LogWarning("ParseOneFileSubmission - Failed to find company ID for {FileName}", context.CurrentFileName);
+                return;
+            }
+
+            IReadOnlyCollection<Submission> submissions = context.JsonConverter.ToSubmissions(filingsDetails);
+            foreach (Submission s in submissions)
+            {
+                ulong submissionId = await _dbm!.GetNextId64(CancellationToken.None);
+                Submission submissionToInsert = s with { SubmissionId = submissionId, CompanyId = companyId };
+                context.SubmissionsBatch.Add(submissionToInsert);
+
+                if (context.SubmissionsBatch.Count >= ParseBulkEdgarSubmissionsBatchSize)
+                    context.NumSubmissions += BulkInsertSubmissionsAndClearBatch(context.SubmissionsBatch, context.Tasks);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ParseOneFileSubmission - Failed to process {FileName}", context.CurrentFileName);
+        }
+    }
+
+    private static (FilingsDetails?, ulong) GetFilingsDetails(string fileContent, ParseBulkEdgarSubmissionsContext context)
+    {
+        if (context.IsCurrentFileSubmissionsFile)
+        {
+            FilingsDetails? filingsDetails = JsonSerializer.Deserialize<FilingsDetails>(fileContent);
+
+            // Get company CIK from the file name, e.g. CIK0000829323-submissions-001.json
+            if (context.CurrentFileName.Length < 13)
+                return (filingsDetails, ulong.MaxValue);
+
+            string cikStr = context.CurrentFileName[..13].Substring(3);
+            if (!ulong.TryParse(cikStr, out ulong cik))
+                return (filingsDetails, ulong.MaxValue);
+
+            if (!context.CompanyIdsByCiks.TryGetValue(cik, out ulong companyId))
+                return (filingsDetails, ulong.MaxValue);
+
+            return (filingsDetails, companyId);
+        }
+        else
+        {
+            RecentFilingsContainer? submissionsJson = JsonSerializer.Deserialize<RecentFilingsContainer>(fileContent);
+            
+            if (submissionsJson is null) return (null, ulong.MaxValue);
+
+            FilingsDetails filingsDetails = submissionsJson.Filings.Recent;
+
+            if (!context.CompanyIdsByCiks.TryGetValue(submissionsJson.Cik, out ulong companyId))
+                return (filingsDetails, ulong.MaxValue);
+            else
+                return (filingsDetails, companyId);
+        }
+    }
+
+    private static int BulkInsertSubmissionsAndClearBatch(List<Submission> submissionsBatch, List<Task> tasks)
+    {
+        int numDataPointsInBatch = submissionsBatch.Count;
+
+        BulkInsertSubmissions(submissionsBatch, tasks);
+        submissionsBatch.Clear();
+
+        return numDataPointsInBatch;
+    }
+
+    private static void BulkInsertSubmissions(List<Submission> submissionsBatch, List<Task> tasks)
+    {
+        var batch = new List<Submission>(submissionsBatch);
+
+        tasks.Add(Task.Run(async () =>
+        {
+            Results res = await _dbm!.BulkInsertSubmissions(batch, CancellationToken.None);
+            if (res.IsError)
+                _logger.LogWarning("Failed to save batch of submissions. Error: {Error}", res.ErrorMessage);
+        }));
     }
 
     private static async Task ParseBulkXbrlArchive()
@@ -318,7 +442,7 @@ internal class Program
 
         using var zipReader = new ZipFileReader(archivePath);
 
-        var context = new ParseBulkXbrlArchiveContext();
+        var context = new ParseBulkXbrlArchiveContext(_svp!);
 
         GenericResults<IReadOnlyCollection<Company>> companyResults =
             await _dbm!.GetCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
@@ -329,7 +453,7 @@ internal class Program
         }
 
         foreach (Company c in companyResults.Data!)
-            context.CompanyIdsByCiks[c.Cik] = c.CompanyId;
+            context.CompanyIdsByCik[c.Cik] = c.CompanyId;
 
         GenericResults<IReadOnlyCollection<DataPointUnit>> dpuResults =
             await _dbm!.GetDataPointUnits(CancellationToken.None);
@@ -342,6 +466,20 @@ internal class Program
         foreach (DataPointUnit dpu in dpuResults.Data!)
             context.UnitsByUnitName[dpu.UnitName] = dpu;
 
+        GenericResults<IReadOnlyCollection<Submission>> submissionResults =
+            await _dbm!.GetSubmissions(CancellationToken.None);
+        if (submissionResults.IsError)
+        {
+            _logger.LogError("ParseBulkXbrlArchive - Failed to get submissions. Error: {Error}", submissionResults.ErrorMessage);
+            return;
+        }
+
+        foreach (Submission s in submissionResults.Data!)
+        {
+            List<Submission> companySubmissions = context.SubmissionsByCompanyId.GetOrCreateEntry(s.CompanyId);
+            companySubmissions.Add(s);
+        }
+
         foreach (string fileName in zipReader.EnumerateFileNames())
         {
             if (!fileName.EndsWith(".json")) continue;
@@ -349,6 +487,7 @@ internal class Program
             ++context.NumFiles;
             if ((context.NumFiles % 100) == 0) context.LogProgress();
 
+            context.CurrentFileName = fileName;
             await ParseOneFileXBRL(zipReader, context);
         }
 
@@ -370,7 +509,7 @@ internal class Program
             context.TotalLength += fileContent.Length;
 
             var parserFactory = _svp!.GetRequiredService<Func<string, Dictionary<ulong, ulong>, XBRLFileParser>>();
-            XBRLFileParser parser = parserFactory(fileContent, context.CompanyIdsByCiks);
+            XBRLFileParser parser = parserFactory(fileContent, context.CompanyIdsByCik);
             Results res = parser.Parse();
             if (res.IsError)
             {
@@ -380,29 +519,58 @@ internal class Program
             }
 
             foreach (DataPoint dp in parser.DataPoints)
-            {
-                string unitName = dp.Units.UnitNameNormalized;
-                if (!context.UnitsByUnitName.TryGetValue(unitName, out DataPointUnit? dpu))
-                {
-                    ++context.NumDataPointUnits;
-                    ulong dpuId = await _dbm!.GetNextId64(CancellationToken.None);
-                    dpu = context.UnitsByUnitName[unitName] = new DataPointUnit(dpuId, unitName);
-                    var insertDpuRes = await _dbm.InsertDataPointUnit(dpu, CancellationToken.None);
-                    _logger.LogInformation("ParseOneFileXBRL - Inserted data point unit: {DataPointUnit}", dpu);
-                }
-
-                ulong dpId = await _dbm!.GetNextId64(CancellationToken.None);
-                DataPoint dataPointToInsert = dp with { DataPointId = dpId, Units = dpu }; // With data point unit id populated
-                context.DataPointsBatch.Add(dataPointToInsert);
-
-                if (context.DataPointsBatch.Count >= ParseBulkXbrlNumDataPointsBatchSize)
-                    context.NumDataPoints += BulkInsertDataPointsAndClearBatch(context.DataPointsBatch, context.Tasks);
-            }
+                await ProcessDataPoint(dp, context);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "ParseOneFileXBRL - Failed to process {FileName}", context.CurrentFileName);
         }
+    }
+
+    private static async Task ProcessDataPoint(DataPoint dp, ParseBulkXbrlArchiveContext context)
+    {
+        if (!context.SubmissionsByCompanyId.TryGetValue(dp.CompanyId, out List<Submission>? submissions))
+        {
+            _logger.LogWarning("ParseOneFileXBRL:ProcessDataPoint - Failed to find submissions for company: {CompanyId}",
+                dp.CompanyId);
+            return;
+        }
+
+        GenericResults<Submission> findSubmissionForDataPointResults = CorrelateDataPointToSubmission(dp, submissions);
+        if (findSubmissionForDataPointResults.IsError)
+        {
+            _logger.LogWarning("ParseOneFileXBRL:ProcessDataPoint - Failed to find submission for data point. {CompanyId},{DataPoint}. Error: {Error}",
+                dp.CompanyId, dp, findSubmissionForDataPointResults.ErrorMessage);
+            return;
+        }
+
+        string unitName = dp.Units.UnitNameNormalized;
+        if (!context.UnitsByUnitName.TryGetValue(unitName, out DataPointUnit? dpu))
+        {
+            ++context.NumDataPointUnits;
+            ulong dpuId = await _dbm!.GetNextId64(CancellationToken.None);
+            dpu = context.UnitsByUnitName[unitName] = new DataPointUnit(dpuId, unitName);
+            _ = await _dbm.InsertDataPointUnit(dpu, CancellationToken.None);
+            _logger.LogInformation("ParseOneFileXBRL:ProcessDataPoint - Inserted data point unit: {DataPointUnit}", dpu);
+        }
+
+        ulong dpId = await _dbm!.GetNextId64(CancellationToken.None);
+        DataPoint dataPointToInsert = dp with { DataPointId = dpId, Units = dpu }; // With data point unit id populated
+        context.DataPointsBatch.Add(dataPointToInsert);
+
+        if (context.DataPointsBatch.Count >= ParseBulkXbrlNumDataPointsBatchSize)
+            context.NumDataPoints += BulkInsertDataPointsAndClearBatch(context.DataPointsBatch, context.Tasks);
+    }
+
+    private static GenericResults<Submission> CorrelateDataPointToSubmission(DataPoint dp, List<Submission> submissions)
+    {
+        foreach (var submission in submissions)
+        {
+            if (dp.FilingReference == submission.FilingReference)
+                return GenericResults<Submission>.SuccessResult(submission);
+        }
+
+        return GenericResults<Submission>.FailureResult("No matching submission found for the given data point.");
     }
 
     private static int BulkInsertDataPointsAndClearBatch(List<DataPoint> dataPointsBatch, List<Task> tasks)

@@ -1,9 +1,10 @@
 {
-  "profiles": {
-    "EDGARScraper": {
-      "commandName": "Project",
-      //"commandLineArgs": "--get-full-cik-list"
-      "commandLineArgs": "--parse-bulk-xbrl-archive"
+    "profiles": {
+        "EDGARScraper": {
+            "commandName": "Project",
+            //"commandLineArgs": "--get-full-cik-list"
+            //"commandLineArgs": "--parse-bulk-edgar-submissions-list"
+            "commandLineArgs": "--parse-bulk-xbrl-archive"
+        }
     }
-  }
 }

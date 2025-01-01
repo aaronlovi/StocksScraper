@@ -7,10 +7,12 @@ public record DataPoint(
     ulong DataPointId,
     ulong CompanyId,
     string FactName,
+    string FilingReference,
     DatePair DatePair,
     decimal Value,
     DataPointUnit Units,
-    DateOnly FiledDate)
+    DateOnly FiledDate,
+    ulong SubmissionId)
 {
     public DateTime FiledTimeUtc => FiledDate.AsUtcTime();
     public DateTime StartTimeUtc => DatePair.StartDate.AsUtcTime();

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace DataModels.XbrlFileModels;
+namespace Stocks.DataModels.EdgarFileModels;
 
 public record Facts
 {

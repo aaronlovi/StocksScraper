@@ -194,20 +194,24 @@ internal abstract class NonQueryBatchedDbStmtBase(string _className) : IPostgres
 
 internal abstract class BulkInsertDbStmtBase<T>(string _className, IReadOnlyCollection<T> _items)
     : IPostgresStatement
+    where T : class
 {
     protected abstract string GetCopyCommand();
-    protected abstract void WriteItem(NpgsqlBinaryImporter writer, T item);
+    protected abstract Task WriteItemAsync(NpgsqlBinaryImporter writer, T item);
 
     public async Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct)
     {
+        T? failedItem = default;
+
         try
         {
             using var writer = conn.BeginBinaryImport(GetCopyCommand());
 
-            foreach (var item in _items)
+            foreach (T item in _items)
             {
+                failedItem = item;
                 await writer.StartRowAsync(ct);
-                WriteItem(writer, item);
+                await WriteItemAsync(writer, item);
             }
 
             await writer.CompleteAsync(ct);
@@ -215,7 +219,8 @@ internal abstract class BulkInsertDbStmtBase<T>(string _className, IReadOnlyColl
         }
         catch (Exception ex)
         {
-            string errMsg = $"{_className} failed - {ex.Message}";
+            string failedItemStr = failedItem?.ToString() ?? "NULL";
+            string errMsg = $"{_className} failed - {ex.Message}. Item: {failedItemStr}";
             return DbStmtResult.StatementFailure(errMsg);
         }
     }

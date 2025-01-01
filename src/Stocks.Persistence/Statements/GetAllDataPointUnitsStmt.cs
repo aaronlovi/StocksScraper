@@ -6,36 +6,39 @@ namespace Stocks.Persistence;
 
 internal sealed class GetAllDataPointUnitsStmt : QueryDbStmtBase
 {
-    private const string sql = "SELECT unit_id, unit_name FROM units";
+    private const string sql = "SELECT data_point_unit_id, data_point_unit_name FROM data_point_units";
 
-    private readonly List<DataPointUnit> _units;
+    private readonly List<DataPointUnit> _dataPointUnits;
 
-    private static int _unitIdIndex = -1;
-    private static int _unitNameIndex = -1;
+    private static int _dataPointUnitIdIndex = -1;
+    private static int _dataPointUnitNameIndex = -1;
 
     public GetAllDataPointUnitsStmt()
         : base(sql, nameof(GetAllDataPointUnitsStmt))
-        => _units = [];
+        => _dataPointUnits = [];
 
-    public IReadOnlyCollection<DataPointUnit> Units => _units;
+    public IReadOnlyCollection<DataPointUnit> Units => _dataPointUnits;
 
     protected override void BeforeRowProcessing(NpgsqlDataReader reader)
     {
         base.BeforeRowProcessing(reader);
 
-        if (_unitIdIndex != -1) return;
+        if (_dataPointUnitIdIndex != -1) return;
 
-        _unitIdIndex = reader.GetOrdinal("unit_id");
-        _unitNameIndex = reader.GetOrdinal("unit_name");
+        _dataPointUnitIdIndex = reader.GetOrdinal("data_point_unit_id");
+        _dataPointUnitNameIndex = reader.GetOrdinal("data_point_unit_name");
     }
 
-    protected override void ClearResults() => _units.Clear();
+    protected override void ClearResults() => _dataPointUnits.Clear();
 
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() => [];
 
     protected override bool ProcessCurrentRow(NpgsqlDataReader reader)
     {
-        _units.Add(new DataPointUnit((ulong)reader.GetInt64(_unitIdIndex), reader.GetString(_unitNameIndex)));
+        var dataPointUnit = new DataPointUnit(
+            (ulong)reader.GetInt64(_dataPointUnitIdIndex),
+            reader.GetString(_dataPointUnitNameIndex));
+        _dataPointUnits.Add(dataPointUnit);
         return true;
     }
 }

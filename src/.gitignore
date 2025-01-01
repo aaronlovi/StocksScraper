@@ -52,3 +52,6 @@ bld/
 
 ## DotNet Temp files
 artifacts/
+
+# Others
+*.odt

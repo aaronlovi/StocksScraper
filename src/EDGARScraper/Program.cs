@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.Design;
 using System.Globalization;
 using System.IO;
 using System.Text.Json;
@@ -13,10 +12,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using Serilog.Core;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
-using Stocks.DataModels.Enums;
 using Stocks.Persistence;
 using Utilities;
 
@@ -78,6 +75,13 @@ internal class Program
                         await ParseBulkXbrlArchive();
                         break;
                     }
+                case "--run-all":
+                    {
+                        await DownloadAndSaveFullCikList();
+                        await ParseBulkEdgarSubmissionsList();
+                        await ParseBulkXbrlArchive();
+                        break;
+                    }
                 default:
                     _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
                     return 3;
@@ -121,6 +125,10 @@ internal class Program
     private static IHost BuildHost<TStartup>(string[] args) where TStartup : class
     {
         var host = Host.CreateDefaultBuilder(args)
+            .ConfigureAppConfiguration((context, config) =>
+            {
+                config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            })
             .ConfigureWebHostDefaults(webBuilder => { webBuilder.UseStartup<TStartup>(); })
             .ConfigureServices((context, services) => {
 
@@ -145,19 +153,15 @@ internal class Program
 
                 services.AddGrpc();
             })
-            .ConfigureLogging(builder => {
-
-                Log.Logger = new LoggerConfiguration()
-                    .WriteTo.Console()
-                    .WriteTo.File(
-                        "stocks-data-.txt",
-                        rollingInterval: RollingInterval.Day,
-                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Properties:j} {Message:lj}{NewLine}{Exception}")
-                    .CreateLogger();
-
-                _ = builder
-                    .ClearProviders()
-                    .AddSerilog(Log.Logger);
+            .ConfigureLogging((context, builder) =>
+            {
+                _ = builder.ClearProviders();
+            })
+            .UseSerilog((context, LoggerConfiguration) =>
+            {
+                LoggerConfiguration
+                    .ReadFrom.Configuration(context.Configuration)
+                    .Enrich.FromLogContext();
             })
             .Build();
 

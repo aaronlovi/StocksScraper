@@ -4,7 +4,8 @@
             "commandName": "Project",
             //"commandLineArgs": "--get-full-cik-list"
             //"commandLineArgs": "--parse-bulk-edgar-submissions-list"
-            "commandLineArgs": "--parse-bulk-xbrl-archive"
+            //"commandLineArgs": "--parse-bulk-xbrl-archive"
+            "commandLineArgs": "--run-all"
         }
     }
 }

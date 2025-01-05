@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Stocks.DataModels;
 using Utilities;
 
@@ -198,7 +199,56 @@ public sealed class DbmService : IDisposable, IDbmService
     public async Task<Results> BulkInsertSubmissions(List<Submission> batch, CancellationToken ct)
     {
         var stmt = new BulkInsertSubmissionsStmt(batch);
-        return await _exec.ExecuteWithRetry(stmt, ct);
+        using PostgresTransaction transaction = await _exec.BeginTransaction(ct);
+        DbStmtResult res = await _exec.ExecuteUnderTransactionWithRetry(stmt, transaction, ct);
+
+        if (res.IsError && res.FailureReason is DbStmtFailureReason.Duplicate)
+        {
+            // Nothing got written. Retry the batch one by one (slow)
+            res = await RetryInsertSubmissions(batch, ct);
+        }
+
+        return res;
+    }
+
+
+    private async Task<DbStmtResult> RetryInsertSubmissions(List<Submission> batch, CancellationToken ct)
+    {
+        _logger.LogWarning("Failed to bulk insert submissions due to duplicates, retrying one by one. {NumSubmissions} to insert",
+            batch.Count);
+
+        int successCount = 0;
+        int failureCount = 0;
+        var insertOneSubmissionStmt = new InsertSubmissionStmt();
+        foreach (Submission submission in batch)
+        {
+            insertOneSubmissionStmt.Submission = submission;
+            DbStmtResult res = await _exec.ExecuteWithRetry(insertOneSubmissionStmt, ct);
+            ProcessSubmissionResult(ref successCount, ref failureCount, submission, res);
+        }
+
+        _logger.LogWarning("BulkInsertSubmissions failed to insert {FailureCount} submissions, succeeded with {SuccessCount}",
+        failureCount, successCount);
+
+        return DbStmtResult.StatementFailure(
+            $"BulkInsertSubmissions failed to insert {failureCount} submissions, succeeded with {successCount}",
+            DbStmtFailureReason.Duplicate);
+
+        // Local helper methods
+
+        void ProcessSubmissionResult(ref int successCount, ref int failureCount, Submission submission, DbStmtResult res)
+        {
+            if (res.IsSuccess)
+            {
+                successCount++;
+            }
+            else
+            {
+                failureCount++;
+                _logger.LogWarning("BulkInsertSubmissions failed to insert submission {Submission} with error {Error}",
+                    submission, res);
+            }
+        }
     }
 
     #endregion

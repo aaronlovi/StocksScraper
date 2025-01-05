@@ -5,6 +5,10 @@ using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Elastic.Channels;
+using Elastic.Ingest.Elasticsearch;
+using Elastic.Ingest.Elasticsearch.DataStreams;
+using Elastic.Serilog.Sinks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration;
@@ -89,7 +93,7 @@ internal class Program
 
             DateTime end = DateTime.UtcNow;
             TimeSpan timeTaken = end - start;
-            _logger.LogInformation("Service execution completed in {TimeTaken:#,###.000}s", timeTaken.TotalSeconds);
+            _logger.LogInformation("Service execution completed in {TimeTaken}s", timeTaken.TotalSeconds);
 
             return 0;
         }
@@ -153,15 +157,22 @@ internal class Program
 
                 services.AddGrpc();
             })
-            .ConfigureLogging((context, builder) =>
-            {
-                _ = builder.ClearProviders();
-            })
+            .ConfigureLogging((context, builder) => builder.ClearProviders())
             .UseSerilog((context, LoggerConfiguration) =>
             {
+                LoggerConfiguration.ReadFrom.Configuration(context.Configuration);
+
                 LoggerConfiguration
                     .ReadFrom.Configuration(context.Configuration)
-                    .Enrich.FromLogContext();
+                    .WriteTo.Elasticsearch([new Uri("http://localhost:9200")], opts =>
+                    {
+                        opts.DataStream = new DataStreamName("logs-edgar", "edgar-scraper", "debug");
+                        opts.BootstrapMethod = BootstrapMethod.Failure;
+                        opts.ConfigureChannel = channelOpts =>
+                        {
+                            channelOpts.BufferOptions = new BufferOptions();
+                        };
+                    });
             })
             .Build();
 
@@ -394,7 +405,7 @@ internal class Program
             if (context.CurrentFileName.Length < 13)
                 return (filingsDetails, ulong.MaxValue);
 
-            string cikStr = context.CurrentFileName[..13].Substring(3);
+            string cikStr = context.CurrentFileName[..13][3..];
             if (!ulong.TryParse(cikStr, out ulong cik))
                 return (filingsDetails, ulong.MaxValue);
 
@@ -535,8 +546,8 @@ internal class Program
     {
         if (!context.SubmissionsByCompanyId.TryGetValue(dp.CompanyId, out List<Submission>? submissions))
         {
-            _logger.LogWarning("ParseOneFileXBRL:ProcessDataPoint - Failed to find submissions for company: {CompanyId}",
-                dp.CompanyId);
+            _logger.LogWarning("ParseOneFileXBRL:ProcessDataPoint - Failed to find submissions for company: {CompanyId},{DataPoint}",
+                dp.CompanyId, dp);
             return;
         }
 

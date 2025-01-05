@@ -217,6 +217,12 @@ internal abstract class BulkInsertDbStmtBase<T>(string _className, IReadOnlyColl
             await writer.CompleteAsync(ct);
             return DbStmtResult.StatementSuccess(_items.Count);
         }
+        catch (PostgresException ex) when (ex.SqlState == "23505")
+        {
+            string failedItemStr = failedItem?.ToString() ?? "NULL";
+            string errMsg = $"{_className} failed - {ex.Message}. Item: {failedItemStr}";
+            return DbStmtResult.StatementFailure(errMsg, DbStmtFailureReason.Duplicate);
+        }
         catch (Exception ex)
         {
             string failedItemStr = failedItem?.ToString() ?? "NULL";

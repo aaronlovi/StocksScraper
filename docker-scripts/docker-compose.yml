@@ -1,42 +1,14 @@
 services:
-  mongodb:
-    image: mongo:8.0.4-noble
-    container_name: mongodb
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: example
-    volumes:
-      - mongo-data:/data/db
-    restart: unless-stopped
-    networks:
-      - stocks-data-network
-
-  mongo-express:
-    image: mongo-express:1.0.2-20-alpine3.19
-    container_name: mongo-express
-    ports:
-      - "8081:8081"
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: example
-      ME_CONFIG_MONGODB_URL: mongodb://root:example@mongodb:27017/admin
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: admin
-    restart: unless-stopped
-    networks:
-      - stocks-data-network
 
   postgres:
-    image: postgres:17.2-bookworm
+    image: postgres:${POSTGRES_VERSION}
     container_name: postgres
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: stocks-data
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -44,20 +16,65 @@ services:
       - stocks-data-network
 
   pgadmin:
-    image: dpage/pgadmin4:8.14
+    image: dpage/pgadmin4:${PGADMIN_VERSION}
     container_name: pgadmin
     ports:
       - "5050:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     restart: unless-stopped
     networks:
       - stocks-data-network
+  
+  elasticsearch:
+    container_name: elasticsearch
+    image: elasticsearch:${ELASTIC_STACK_VERSION}
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - ${ES_PORT}:9200
+    environment:
+      - node.name=elasticsearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+    mem_limit: ${ES_MEM_LIMIT}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - stocks-data-network
+    healthcheck:
+      test: [ "CMD-SHELL", "curl", "-f", "http://localhost:9200 || exit 1" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  kibana:
+    container_name: kibana
+    image: kibana:${ELASTIC_STACK_VERSION}
+    environment:
+      - SERVER_NAME=kibana
+      - ELASTICSEARCH_URL=http://elasticsearch:${ES_PORT}
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:${ES_PORT}
+    mem_limit: ${KB_MEM_LIMIT}
+    ports:
+      - "${KIBANA_PORT}:5601"
+    volumes:
+      - kibanadata:/usr/share/kibana/data
+    networks:
+      - stocks-data-network
+
 
 volumes:
-  mongo-data:
   postgres-data:
+    driver: local
+  esdata:
+    driver: local
+  kibanadata:
+    driver: local
 
 networks:
   stocks-data-network:

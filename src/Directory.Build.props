@@ -8,6 +8,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Elastic.Serilog.Sinks" Version="8.12.3" />
 		<PackageReference Include="Evolve" Version="3.2.0" />
 		<PackageReference Include="Grpc.AspNetCore.Server" Version="2.67.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />

@@ -199,8 +199,7 @@ public sealed class DbmService : IDisposable, IDbmService
     public async Task<Results> BulkInsertSubmissions(List<Submission> batch, CancellationToken ct)
     {
         var stmt = new BulkInsertSubmissionsStmt(batch);
-        using PostgresTransaction transaction = await _exec.BeginTransaction(ct);
-        DbStmtResult res = await _exec.ExecuteUnderTransactionWithRetry(stmt, transaction, ct);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
 
         if (res.IsError && res.FailureReason is DbStmtFailureReason.Duplicate)
         {
@@ -228,7 +227,7 @@ public sealed class DbmService : IDisposable, IDbmService
         }
 
         _logger.LogWarning("BulkInsertSubmissions failed to insert {FailureCount} submissions, succeeded with {SuccessCount}",
-        failureCount, successCount);
+            failureCount, successCount);
 
         return DbStmtResult.StatementFailure(
             $"BulkInsertSubmissions failed to insert {failureCount} submissions, succeeded with {successCount}",

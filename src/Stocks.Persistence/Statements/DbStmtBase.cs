@@ -219,8 +219,7 @@ internal abstract class BulkInsertDbStmtBase<T>(string _className, IReadOnlyColl
         }
         catch (PostgresException ex) when (ex.SqlState == "23505")
         {
-            string failedItemStr = failedItem?.ToString() ?? "NULL";
-            string errMsg = $"{_className} failed - {ex.Message}. Item: {failedItemStr}";
+            string errMsg = $"{_className} failed - {ex.Message}";
             return DbStmtResult.StatementFailure(errMsg, DbStmtFailureReason.Duplicate);
         }
         catch (Exception ex)

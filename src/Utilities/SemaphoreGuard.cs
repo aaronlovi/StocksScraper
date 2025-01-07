@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-namespace Utilities;
+namespace Stocks.Shared;
 
 internal sealed class SemaphoreGuard(SemaphoreSlim _semaphore) : IDisposable
 {

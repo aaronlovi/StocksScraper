@@ -1,4 +1,4 @@
-﻿namespace Utilities;
+﻿namespace Stocks.Shared;
 
 public record Results
 {

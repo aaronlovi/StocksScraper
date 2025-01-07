@@ -50,10 +50,10 @@ public class SubmissionJsonConverter
         {
             try
             {
-                FilingType filingType = submissionJson.CoreTypesList[i].ToFilingType();
+                FilingType filingType = submissionJson.GetFilingTypeAtIndex(i);
                 if (filingType is FilingType.Invalid) continue;
 
-                FilingCategory filingCategory = submissionJson.CoreTypesList[i].ToFilingCategory();
+                FilingCategory filingCategory = submissionJson.GetFilingCategoryAtIndex(i);
                 if (filingCategory is FilingCategory.Invalid or FilingCategory.Other) continue;
 
                 bool res = DateOnly.TryParseExact(submissionJson.ReportDatesList[i], "yyyy-MM-dd", out DateOnly reportDate);

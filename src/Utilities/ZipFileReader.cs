@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 
-namespace Utilities;
+namespace Stocks.Shared;
 
 public sealed class ZipFileReader(string zipFilePath) : IDisposable
 {

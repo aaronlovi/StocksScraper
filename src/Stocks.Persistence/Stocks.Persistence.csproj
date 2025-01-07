@@ -14,7 +14,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\DataModels\Stocks.DataModels.csproj" />
-		<ProjectReference Include="..\Utilities\Stocks.Utilities.csproj" />
+		<ProjectReference Include="..\Utilities\Stocks.Shared.csproj" />
 	</ItemGroup>
 
 </Project>

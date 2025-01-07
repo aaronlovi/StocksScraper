@@ -1,4 +1,4 @@
-﻿using Utilities;
+﻿using Stocks.Shared;
 
 namespace Stocks.Persistence;
 

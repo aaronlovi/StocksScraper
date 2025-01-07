@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Utilities;
+namespace Stocks.Shared;
 
 public static class SemaphoreSlimExtensions
 {

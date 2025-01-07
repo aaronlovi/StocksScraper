@@ -14,7 +14,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.DataModels", "DataMo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.EDGARScraper", "EDGARScraper\Stocks.EDGARScraper.csproj", "{8DCEC2DE-FA46-4B92-B6D7-676D989FDD98}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.Utilities", "Utilities\Stocks.Utilities.csproj", "{7311A418-FB68-402D-948D-C069BBD94B0C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.Shared", "Utilities\Stocks.Shared.csproj", "{7311A418-FB68-402D-948D-C069BBD94B0C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.Persistence", "Stocks.Persistence\Stocks.Persistence.csproj", "{4CB3BD47-4871-40BE-8A48-C1A6BC885183}"
 EndProject

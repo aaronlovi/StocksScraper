@@ -3,6 +3,6 @@
 		<TargetFramework>net8.0</TargetFramework>
 	</PropertyGroup>
 	<ItemGroup>
-	  <ProjectReference Include="..\Utilities\Stocks.Utilities.csproj" />
+	  <ProjectReference Include="..\Utilities\Stocks.Shared.csproj" />
 	</ItemGroup>
 </Project>

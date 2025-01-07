@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Utilities;
+namespace Stocks.Shared;
 
 public static class DateExtensions
 {

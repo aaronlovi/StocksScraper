@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using Stocks.Utilities.JsonUtils;
+using Stocks.DataModels.Enums;
+using Stocks.Shared.JsonUtils;
 
 namespace Stocks.DataModels.EdgarFileModels;
 
@@ -9,7 +11,7 @@ namespace Stocks.DataModels.EdgarFileModels;
 /// </summary>
 public record RecentFilingsContainer
 {
-    [JsonPropertyName("cik"), JsonConverter(typeof(StringToUlongConverter))] public ulong Cik { get; init; }
+    [JsonPropertyName("cik")] public ulong Cik { get; init; }
     [JsonPropertyName("filings")] public RecentFilings Filings { get; init; } = new();
 }
 
@@ -40,4 +42,28 @@ public record FilingsDetails
     [JsonPropertyName("isInlineXBRL"), JsonConverter(typeof(IntListToBoolListConverter))] public List<bool> IsInlineXbrlList { get; init; } = [];
     [JsonPropertyName("primaryDocument")] public List<string> PrimaryDocumentsList { get; init; } = [];
     [JsonPropertyName("primaryDocDescription")] public List<string> PrimaryDocDescriptionsList { get; init; } = [];
+
+    public FilingType GetFilingTypeAtIndex(int index)
+    {
+        if (index < 0 || index > FormsList.Count || index > CoreTypesList.Count)
+            throw new ArgumentOutOfRangeException(nameof(index));
+
+        FilingType filingType = FormsList[index].ToFilingType();
+
+        return filingType is not FilingType.Invalid 
+            ? filingType 
+            : CoreTypesList[index].ToFilingType();
+    }
+
+    public FilingCategory GetFilingCategoryAtIndex(int index)
+    {
+        if (index < 0 || index > CoreTypesList.Count)
+            throw new ArgumentOutOfRangeException(nameof(index));
+
+        FilingCategory filingCategory = FormsList[index].ToFilingCategory();
+
+        return filingCategory is not FilingCategory.Invalid and not FilingCategory.Other
+            ? filingCategory
+            : CoreTypesList[index].ToFilingCategory();
+    }
 }

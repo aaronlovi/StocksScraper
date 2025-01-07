@@ -1,6 +1,6 @@
 ﻿using System;
 using Stocks.DataModels.Enums;
-using Utilities;
+using Stocks.Shared;
 
 namespace Stocks.DataModels;
 

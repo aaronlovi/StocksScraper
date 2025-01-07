@@ -2,7 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Stocks.Utilities.JsonUtils;
+namespace Stocks.Shared.JsonUtils;
 
 public class StringToUlongConverter : JsonConverter<ulong>
 {

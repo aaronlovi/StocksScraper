@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Stocks.DataModels;
-using Utilities;
+using Stocks.Shared;
 
 namespace Stocks.Persistence;
 

@@ -176,6 +176,12 @@ internal abstract class NonQueryBatchedDbStmtBase(string _className) : IPostgres
             int numRows = await batch.ExecuteNonQueryAsync(ct);
             return DbStmtResult.StatementSuccess(numRows);
         }
+        catch (PostgresException ex)
+        {
+            string errMsg = $"{_className} failed - {ex.Message}";
+            DbStmtFailureReason failureReason = (ex.SqlState == "23505") ? DbStmtFailureReason.Duplicate : DbStmtFailureReason.Other;
+            return DbStmtResult.StatementFailure(errMsg, failureReason);
+        }
         catch (Exception ex)
         {
             string errMsg = $"{_className} failed - {ex.Message}";
@@ -217,10 +223,13 @@ internal abstract class BulkInsertDbStmtBase<T>(string _className, IReadOnlyColl
             await writer.CompleteAsync(ct);
             return DbStmtResult.StatementSuccess(_items.Count);
         }
-        catch (PostgresException ex) when (ex.SqlState == "23505")
+        catch (PostgresException ex)
         {
             string errMsg = $"{_className} failed - {ex.Message}";
-            return DbStmtResult.StatementFailure(errMsg, DbStmtFailureReason.Duplicate);
+            DbStmtFailureReason failureReason = (ex.SqlState == "23505")
+                ? DbStmtFailureReason.Duplicate
+                : DbStmtFailureReason.Other;
+            return DbStmtResult.StatementFailure(errMsg, failureReason);
         }
         catch (Exception ex)
         {

@@ -19,7 +19,7 @@ using Serilog;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
 using Stocks.Persistence;
-using Utilities;
+using Stocks.Shared;
 
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
@@ -149,8 +149,8 @@ internal class Program
                     .AddHttpClient()
                     .AddSingleton<PostgresExecutor>()
                     .AddSingleton<DbMigrations>()
-                    .AddTransient<Func<string, Dictionary<ulong, ulong>, XBRLFileParser>>(
-                        sp => (content, companyIdsByCiks) => new XBRLFileParser(content, companyIdsByCiks, sp));
+                    .AddTransient<Func<string, ParseBulkXbrlArchiveContext, XBRLFileParser>>(
+                        sp => (content, context) => new XBRLFileParser(content, context.CompanyIdsByCik, context.SubmissionsByCompanyId, sp));
 
                 if (DoesConfigContainConnectionString(context.Configuration))
                     services.AddSingleton<IDbmService, DbmService>();
@@ -399,7 +399,7 @@ internal class Program
     {
         if (context.IsCurrentFileSubmissionsFile)
         {
-            FilingsDetails? filingsDetails = JsonSerializer.Deserialize<FilingsDetails>(fileContent);
+            FilingsDetails? filingsDetails = JsonSerializer.Deserialize<FilingsDetails>(fileContent, Conventions.DefaultOptions);
 
             // Get company CIK from the file name, e.g. CIK0000829323-submissions-001.json
             if (context.CurrentFileName.Length < 13)
@@ -416,7 +416,7 @@ internal class Program
         }
         else
         {
-            RecentFilingsContainer? submissionsJson = JsonSerializer.Deserialize<RecentFilingsContainer>(fileContent);
+            RecentFilingsContainer? submissionsJson = JsonSerializer.Deserialize<RecentFilingsContainer>(fileContent, Conventions.DefaultOptions);
             
             if (submissionsJson is null) return (null, ulong.MaxValue);
 
@@ -523,8 +523,8 @@ internal class Program
             string fileContent = zipReader.ExtractFileContent(context.CurrentFileName);
             context.TotalLength += fileContent.Length;
 
-            var parserFactory = _svp!.GetRequiredService<Func<string, Dictionary<ulong, ulong>, XBRLFileParser>>();
-            XBRLFileParser parser = parserFactory(fileContent, context.CompanyIdsByCik);
+            var parserFactory = _svp!.GetRequiredService<Func<string, ParseBulkXbrlArchiveContext, XBRLFileParser>>();
+            XBRLFileParser parser = parserFactory(fileContent, context);
             Results res = parser.Parse();
             if (res.IsError)
             {

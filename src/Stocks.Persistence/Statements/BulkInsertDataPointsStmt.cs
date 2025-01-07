@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Elastic.Channels.Buffers;
 using Npgsql;
 using NpgsqlTypes;
 using Stocks.DataModels;
@@ -15,7 +16,7 @@ internal sealed class BulkInsertDataPointsStmt : BulkInsertDbStmtBase<DataPoint>
     { }
 
     protected override string GetCopyCommand() => "COPY data_points"
-        + " (data_point_id, company_id, unit_id, fact_name, start_date, end_date, value, filed_date)"
+        + " (data_point_id, company_id, unit_id, fact_name, start_date, end_date, value, filed_date, submission_id)"
         + " FROM STDIN (FORMAT BINARY)";
 
     protected override async Task WriteItemAsync(NpgsqlBinaryImporter writer, DataPoint dataPoint)
@@ -28,5 +29,6 @@ internal sealed class BulkInsertDataPointsStmt : BulkInsertDbStmtBase<DataPoint>
         await writer.WriteAsync(dataPoint.DatePair.EndTimeUtc, NpgsqlDbType.Date);
         await writer.WriteAsync(dataPoint.Value, NpgsqlDbType.Numeric);
         await writer.WriteAsync(dataPoint.FiledTimeUtc, NpgsqlDbType.Date);
+        await writer.WriteAsync((long)dataPoint.SubmissionId, NpgsqlDbType.Bigint);
     }
 }

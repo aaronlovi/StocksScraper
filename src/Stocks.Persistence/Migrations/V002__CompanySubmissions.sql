@@ -9,7 +9,9 @@ comment on column filing_types.filing_type_name is 'Name of the filing type (e.g
 insert into filing_types values
 (1, '10-K'),
 (2, '10-Q'),
-(3, '8-K');
+(3, '8-K'),
+(4, '10-K/A'),
+(5, '10-Q/A');
 
 -------------------------------------------------------------------------------
 

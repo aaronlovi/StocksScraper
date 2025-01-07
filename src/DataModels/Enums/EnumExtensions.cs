@@ -8,6 +8,8 @@ public static class EnumExtensions
             "10-K" => FilingType.TenK,
             "10-Q" => FilingType.TenQ,
             "8-K" => FilingType.EightK,
+            "10-K/A" => FilingType.TenK_A,
+            "10-Q/A" => FilingType.TenQ_A,
             _ => FilingType.Invalid
         };
 
@@ -15,7 +17,9 @@ public static class EnumExtensions
         coreType switch
         {
             "10-K" => FilingCategory.Annual,
+            "10-K/A" => FilingCategory.Annual,
             "10-Q" => FilingCategory.Quarterly,
+            "10-Q/A" => FilingCategory.Quarterly,
             _ => FilingCategory.Other
         };
 }

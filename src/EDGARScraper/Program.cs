@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,7 +40,7 @@ internal class Program
 
     static Program()
     {
-        _logger = GetBootstrapLogger();
+        _logger = HostingUtils.GetBootstrapLogger<Program>();
     }
 
     static async Task<int> Main(string[] args)
@@ -116,24 +115,6 @@ internal class Program
         }
     }
 
-    private static ILogger GetBootstrapLogger()
-    {
-        Log.Logger = new LoggerConfiguration()
-            .WriteTo.Console()
-            .CreateBootstrapLogger();
-
-        var serviceCollection = new ServiceCollection();
-        serviceCollection.AddLogging(builder =>
-        {
-            builder.ClearProviders();
-            builder.AddSerilog(Log.Logger);
-        });
-
-        var serviceProvider = serviceCollection.BuildServiceProvider();
-        var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
-        return loggerFactory.CreateLogger<Program>();
-    }
-
     private static IHost BuildHost<TStartup>(string[] args) where TStartup : class
     {
         var host = Host.CreateDefaultBuilder(args)
@@ -167,21 +148,8 @@ internal class Program
             })
             .ConfigureLogging((context, builder) => builder.ClearProviders())
             .UseSerilog((context, LoggerConfiguration) =>
-            {
-                LoggerConfiguration.ReadFrom.Configuration(context.Configuration);
-
-                LoggerConfiguration
-                    .ReadFrom.Configuration(context.Configuration)
-                    .WriteTo.Elasticsearch([new Uri("http://localhost:9200")], opts =>
-                    {
-                        opts.DataStream = new DataStreamName("logs-edgar", "edgar-scraper", "debug");
-                        opts.BootstrapMethod = BootstrapMethod.Failure;
-                        opts.ConfigureChannel = channelOpts =>
-                        {
-                            channelOpts.BufferOptions = new BufferOptions();
-                        };
-                    });
-            })
+                LoggerConfiguration.ReadFrom.Configuration(context.Configuration)
+            )
             .Build();
 
         _svp = host.Services;

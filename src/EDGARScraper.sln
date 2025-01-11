@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.Shared", "Utilities\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.Persistence", "Stocks.Persistence\Stocks.Persistence.csproj", "{4CB3BD47-4871-40BE-8A48-C1A6BC885183}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.DataService", "Stocks.DataService\Stocks.DataService.csproj", "{38C65915-E6C2-4A73-A47B-18FCCE3A523C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -40,6 +42,10 @@ Global
 		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Release|Any CPU.Build.0 = Release|Any CPU
+		{38C65915-E6C2-4A73-A47B-18FCCE3A523C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{38C65915-E6C2-4A73-A47B-18FCCE3A523C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{38C65915-E6C2-4A73-A47B-18FCCE3A523C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{38C65915-E6C2-4A73-A47B-18FCCE3A523C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -54,7 +54,7 @@ public class SubmissionJsonConverter
                 if (filingType is FilingType.Invalid) continue;
 
                 FilingCategory filingCategory = submissionJson.GetFilingCategoryAtIndex(i);
-                if (filingCategory is FilingCategory.Invalid or FilingCategory.Other) continue;
+                if (filingCategory is FilingCategory.Invalid) continue;
 
                 bool res = DateOnly.TryParseExact(submissionJson.ReportDatesList[i], "yyyy-MM-dd", out DateOnly reportDate);
                 if (!res) continue;

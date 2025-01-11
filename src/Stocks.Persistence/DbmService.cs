@@ -46,6 +46,16 @@ public sealed class DbmService : IDisposable, IDbmService
         }
     }
 
+    #region Utilities
+
+    public async Task<Results> DropAllTables(CancellationToken ct)
+    {
+        var stmt = new DropAllTablesStmt();
+        return await _exec.ExecuteWithRetry(stmt, ct);
+    }
+
+    #endregion
+
     #region Generator
 
     public ValueTask<ulong> GetNextId64(CancellationToken ct) => GetIdRange64(1, ct);
@@ -70,7 +80,7 @@ public sealed class DbmService : IDisposable, IDbmService
         using var locker = new SemaphoreLocker(_generatorMutex);
         await locker.Acquire(ct);
 
-        // May have bene changed already by another thread, so check again
+        // May have been changed already by another thread, so check again
         lock (_generatorMutex)
         {
             if (_lastUsed + count <= _endId)

@@ -1,5 +1,4 @@
 ﻿using Stocks.EDGARScraper.Enums;
-using Stocks.EDGARScraper.Extensions;
 using Stocks.Shared;
 
 namespace EDGARScraper;

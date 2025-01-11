@@ -64,6 +64,11 @@ internal class Program
 
             switch (args[0].ToLowerInvariant())
             {
+                case "--drop-all-tables":
+                    {
+                        await _dbm!.DropAllTables(CancellationToken.None);
+                        break;
+                    }
                 case "--get-full-cik-list":
                     {
                         await DownloadAndSaveFullCikList();

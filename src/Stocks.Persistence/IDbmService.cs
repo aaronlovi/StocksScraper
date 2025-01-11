@@ -8,6 +8,10 @@ namespace Stocks.Persistence;
 
 public interface IDbmService
 {
+    // Utilities
+
+    Task<Results> DropAllTables(CancellationToken ct);
+
     // Id generator
 
     ValueTask<ulong> GetNextId64(CancellationToken ct);

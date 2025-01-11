@@ -1,8 +1,12 @@
-﻿using Stocks.EDGARScraper.Enums;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace Stocks.EDGARScraper.Extensions;
+namespace Stocks.EDGARScraper.Enums;
 
-internal static class Extensions
+internal static class EnumExtensions
 {
     internal static bool IsWarningLevel(this XBRLFileParserFailureReason reason) =>
         reason switch

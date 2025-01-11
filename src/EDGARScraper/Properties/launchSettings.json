@@ -2,6 +2,7 @@
     "profiles": {
         "EDGARScraper": {
             "commandName": "Project",
+            //"commandLineArgs": "--drop-all-tables"
             //"commandLineArgs": "--get-full-cik-list"
             //"commandLineArgs": "--parse-bulk-edgar-submissions-list"
             //"commandLineArgs": "--parse-bulk-xbrl-archive"

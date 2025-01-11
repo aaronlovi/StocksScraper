@@ -62,7 +62,7 @@ public record FilingsDetails
 
         FilingCategory filingCategory = FormsList[index].ToFilingCategory();
 
-        return filingCategory is not FilingCategory.Invalid and not FilingCategory.Other
+        return filingCategory is not FilingCategory.Invalid
             ? filingCategory
             : CoreTypesList[index].ToFilingCategory();
     }

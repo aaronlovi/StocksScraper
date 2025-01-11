@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
+using Stocks.DataModels.Enums;
 using Stocks.EDGARScraper.Enums;
 using Stocks.Shared;
 
@@ -115,7 +116,17 @@ internal class XBRLFileParser
 
         bool VerifyFilingReference(Unit unitData)
         {
-            if (_submissionsByFilingReference.ContainsKey(unitData.FilingReference)) return true;
+            if (_submissionsByFilingReference.TryGetValue(unitData.FilingReference, out Submission? submission))
+            {
+                if (submission.FilingCategory is FilingCategory.Other)
+                {
+                    _logger.LogDebug("ProcessUnitsForFact - Skipping data point with filing reference {FilingReference} because it has a filing category of 'Other'. Filing category: {FilingCategory}",
+                        unitData.FilingReference, submission.FilingCategory);
+                    return false;
+                }
+
+                return true;
+            }
 
             if (_filingReferencesWithNoSubmissions.Add(unitData.FilingReference))
             {

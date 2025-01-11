@@ -51,7 +51,12 @@ public sealed class DbmService : IDisposable, IDbmService
     public async Task<Results> DropAllTables(CancellationToken ct)
     {
         var stmt = new DropAllTablesStmt();
-        return await _exec.ExecuteWithRetry(stmt, ct);
+        var res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("DropAllTables success");
+        else
+            _logger.LogError("DropAllTables failed with error {Error}", res.ErrorMessage);
+        return res;
     }
 
     #endregion
@@ -138,19 +143,34 @@ public sealed class DbmService : IDisposable, IDbmService
     public async Task<Results> EmptyCompaniesTables(CancellationToken ct)
     {
         var stmt = new TruncateCompaniesTablesStmt();
-        return await _exec.ExecuteWithRetry(stmt, ct);
+        var res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("EmptyCompaniesTables success");
+        else
+            _logger.LogError("EmptyCompaniesTables failed with error {Error}", res.ErrorMessage);
+        return res;
     }
 
     public async Task<Results> BulkInsertCompanies(List<Company> companies, CancellationToken ct)
     {
         var stmt = new BulkInsertCompaniesStmt(companies);
-        return await _exec.ExecuteWithRetry(stmt, ct);
+        var res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertCompanies success - Num companies: {NumCompanies}", companies.Count);
+        else
+            _logger.LogError("BulkInsertCompanies failed with error {Error}", res.ErrorMessage);
+        return res;
     }
 
     public async Task<Results> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct)
     {
         var stmt = new BulkInsertCompanyNamesStmt(companyNames);
-        return await _exec.ExecuteWithRetry(stmt, ct);
+        var res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertCompanyNames success - Num company names: {NumCompanyNames}", companyNames.Count);
+        else
+            _logger.LogError("BulkInsertCompanyNames failed with error {Error}", res.ErrorMessage);
+        return res;
     }
 
     #endregion
@@ -176,13 +196,23 @@ public sealed class DbmService : IDisposable, IDbmService
     public async Task<Results> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct)
     {
         var stmt = new InsertDataPointUnitStmt(dataPointUnit);
-        return await _exec.ExecuteWithRetry(stmt, ct);
+        var res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("InsertDataPointUnit success - Unit: {Unit}", dataPointUnit);
+        else
+            _logger.LogError("InsertDataPointUnit failed with error {Error}", res.ErrorMessage);
+        return res;
     }
 
     public async Task<Results> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct)
     {
         var stmt = new BulkInsertDataPointsStmt(dataPoints);
-        return await _exec.ExecuteWithRetry(stmt, ct);
+        var res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertDataPoints success - Num data points: {NumDataPoints}", dataPoints.Count);
+        else
+            _logger.LogError("BulkInsertDataPoints failed with error {Error}", res.ErrorMessage);
+        return res;
     }
 
     #endregion
@@ -200,7 +230,7 @@ public sealed class DbmService : IDisposable, IDbmService
         }
         else
         {
-            _logger.LogWarning("GetSubmissions failed with error {Error}", res.ErrorMessage);
+            _logger.LogError("GetSubmissions failed with error {Error}", res.ErrorMessage);
             return GenericResults<IReadOnlyCollection<Submission>>.FailureResult(res.ErrorMessage);
         }
     }
@@ -213,9 +243,18 @@ public sealed class DbmService : IDisposable, IDbmService
         if (res.IsError && res.FailureReason is DbStmtFailureReason.Duplicate)
         {
             // Nothing got written. Retry the batch one by one (slow)
+            _logger.LogWarning("BulkInsertSubmissions failed due to duplicates, retrying one by one. {NumSubmissions} to insert",
+                batch.Count);
             res = await RetryInsertSubmissions(batch, ct);
         }
-
+        else if (res.IsError)
+        {
+            _logger.LogError("BulkInsertSubmissions failed with error {Error}", res.ErrorMessage);
+        }
+        else
+        {
+            _logger.LogInformation("BulkInsertSubmissions success - Num submissions: {NumSubmissions}", batch.Count);
+        }
         return res;
     }
 

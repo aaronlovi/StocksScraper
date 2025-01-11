@@ -1,11 +1,17 @@
+-------------------------------------------------------------------------------
+
 create or replace function now_utc() returns timestamp as $$
    select now() at time zone 'utc';
 $$ language sql;
+
+-------------------------------------------------------------------------------
 
 create table if not exists generator (
     last_reserved bigint not null
 );
 insert into generator (last_reserved) values (1);
+
+-------------------------------------------------------------------------------
 
 create table if not exists companies (
     company_id bigint not null,
@@ -20,6 +26,8 @@ comment on column companies.data_source is 'Source of the data, currently ''EDGA
 create index idx_companies_cik on companies (cik);
 create index idx_companies_data_source on companies (data_source);
 
+-------------------------------------------------------------------------------
+
 create table if not exists company_names (
     name_id bigint not null,
     company_id bigint not null,
@@ -32,6 +40,8 @@ comment on column company_names.company_id is 'Foreign key to the company table'
 comment on column company_names.name is 'Name of the company, limited to 200 characters';
 create index idx_company_names_company_id on company_names (company_id);
 
+-------------------------------------------------------------------------------
+
 create table if not exists data_point_units (
     data_point_unit_id bigint not null,
     data_point_unit_name varchar(100) not null,
@@ -40,6 +50,8 @@ create table if not exists data_point_units (
 comment on table data_point_units is 'Table containing units of measurement for stock data.';
 comment on column data_point_units.data_point_unit_id is 'Unique identifier for the unit';
 comment on column data_point_units.data_point_unit_name is 'Name of the unit, limited to 100 characters';
+
+-------------------------------------------------------------------------------
 
 create table if not exists data_points (
     data_point_id bigint not null,
@@ -61,3 +73,5 @@ comment on column data_points.start_date is 'Start date of the data point';
 comment on column data_points.end_date is 'End date of the data point';
 comment on column data_points.value is 'Value of the data point';
 comment on column data_points.filed_date is 'Date the data point was filed';
+
+-------------------------------------------------------------------------------

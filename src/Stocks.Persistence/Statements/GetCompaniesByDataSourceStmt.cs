@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿#pragma warning disable IDE0290 // Use primary constructor
+
+using System.Collections.Generic;
 using Npgsql;
 using Stocks.DataModels;
 

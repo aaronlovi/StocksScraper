@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
+using Stocks.EDGARScraper.Enums;
 using Stocks.Shared;
 
 namespace EDGARScraper;
@@ -24,15 +25,11 @@ internal class XBRLFileParser
 
     private ulong Cik => _xbrlJson?.Cik ?? 0;
 
-    internal XBRLFileParser(
-        string content,
-        Dictionary<ulong, ulong> companyIdsByCiks,
-        Dictionary<ulong, List<Submission>> submissionsByCompanyId,
-        IServiceProvider svp)
+    internal XBRLFileParser(string content, ParseBulkXbrlArchiveContext parserContext, IServiceProvider svp)
     {
         _content = content;
-        _companyIdsByCiks = companyIdsByCiks;
-        _submissionsByCompanyId = submissionsByCompanyId;
+        _companyIdsByCiks = parserContext.CompanyIdsByCik;
+        _submissionsByCompanyId = parserContext.SubmissionsByCompanyId;
         _dataPoints = [];
         _submissionsByFilingReference = [];
         _filingReferencesWithNoSubmissions = [];
@@ -41,7 +38,7 @@ internal class XBRLFileParser
 
     internal IEnumerable<DataPoint> DataPoints => _dataPoints.Values.SelectMany(x => x.Values.SelectMany(y => y.Values));
 
-    internal Results Parse()
+    internal XBRLParserResult Parse()
     {
         try
         {
@@ -49,21 +46,21 @@ internal class XBRLFileParser
             if (_xbrlJson is null)
             {
                 _logger.LogWarning("Parse - Failed to deserialize XBRL JSON.");
-                return Results.FailureResult("Failed to deserialize XBRL JSON.");
+                return XBRLParserResult.FailedToDeserializeXbrlJson();
             }
 
             if (!_companyIdsByCiks.TryGetValue(Cik, out _companyId))
             {
                 _logger.LogWarning("Parse - Failed to find company ID for CIK {Cik}, aborting", Cik);
-                return Results.FailureResult($"Failed to find company ID for CIK {Cik}, aborting");
+                return XBRLParserResult.FailedToFindCompanyIdForCIK(Cik);
             }
             
             using var logContext = CreateLogContext();
 
             if (!_submissionsByCompanyId.TryGetValue(_companyId, out List<Submission>? submissions))
             {
-                _logger.LogWarning("Parse - Failed to find submissions for company ID {_companyId}, aborting", _companyId);
-                return Results.FailureResult($"Failed to find submissions for company ID {_companyId}, aborting");
+                _logger.LogInformation("Parse - Failed to find submissions for company ID {_companyId}, aborting", _companyId);
+                return XBRLParserResult.FailedToFindSubmissions(_companyId);
             }
 
             foreach (Submission submission in submissions)
@@ -72,12 +69,12 @@ internal class XBRLFileParser
             foreach ((string factName, Fact fact) in _xbrlJson.Facts.UsGaap)
                 ProcessFact(factName, fact);
 
-            return Results.Success;
+            return XBRLParserResult.SuccessResult();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Parse - Exception occurred");
-            return Results.FailureResult(ex.Message);
+            return XBRLParserResult.GeneralFault(ex.Message);
         }
 
         // Local helper methods

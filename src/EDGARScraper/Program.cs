@@ -150,7 +150,7 @@ internal class Program
                     .AddSingleton<PostgresExecutor>()
                     .AddSingleton<DbMigrations>()
                     .AddTransient<Func<string, ParseBulkXbrlArchiveContext, XBRLFileParser>>(
-                        sp => (content, context) => new XBRLFileParser(content, context.CompanyIdsByCik, context.SubmissionsByCompanyId, sp));
+                        sp => (content, context) => new XBRLFileParser(content, context, sp));
 
                 if (DoesConfigContainConnectionString(context.Configuration))
                     services.AddSingleton<IDbmService, DbmService>();
@@ -523,13 +523,11 @@ internal class Program
             string fileContent = zipReader.ExtractFileContent(context.CurrentFileName);
             context.TotalLength += fileContent.Length;
 
-            var parserFactory = _svp!.GetRequiredService<Func<string, ParseBulkXbrlArchiveContext, XBRLFileParser>>();
-            XBRLFileParser parser = parserFactory(fileContent, context);
-            Results res = parser.Parse();
+            XBRLFileParser parser = CreateParser(fileContent);
+            XBRLParserResult res = parser.Parse();
             if (res.IsError)
             {
-                _logger.LogWarning("ParseOneFileXBRL - Failed to parse {FileName}. Error: {ErrMsg}",
-                    context.CurrentFileName, res.ErrorMessage);
+                LogParseFailure(res);
                 return;
             }
 
@@ -539,6 +537,23 @@ internal class Program
         catch (Exception ex)
         {
             _logger.LogError(ex, "ParseOneFileXBRL - Failed to process {FileName}", context.CurrentFileName);
+        }
+
+        // Local helper methods
+
+        XBRLFileParser CreateParser(string fileContent)
+        {
+            var parserFactory = _svp!.GetRequiredService<Func<string, ParseBulkXbrlArchiveContext, XBRLFileParser>>();
+            return parserFactory(fileContent, context);
+        }
+
+        void LogParseFailure(XBRLParserResult res)
+        {
+            const string msgTemplate = "ParseOneFileXBRL - Failed to parse {FileName}. Error: {ErrMsg}";
+            if (res.IsWarningLevel)
+                _logger.LogWarning(msgTemplate, context.CurrentFileName, res.ErrorMessage);
+            else
+                _logger.LogInformation(msgTemplate, context.CurrentFileName, res.ErrorMessage);
         }
     }
 

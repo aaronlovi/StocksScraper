@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Npgsql;
+using NpgsqlTypes;
 using Stocks.DataModels;
 
 namespace Stocks.Persistence;
@@ -18,8 +19,8 @@ internal sealed class BulkInsertCompaniesStmt : BulkInsertDbStmtBase<Company>
 
     protected override async Task WriteItemAsync(NpgsqlBinaryImporter writer, Company company)
     {
-        await writer.WriteAsync((long)company.CompanyId, NpgsqlTypes.NpgsqlDbType.Bigint);
-        await writer.WriteAsync((long)company.Cik, NpgsqlTypes.NpgsqlDbType.Bigint);
-        await writer.WriteAsync(company.DataSource, NpgsqlTypes.NpgsqlDbType.Varchar);
+        await writer.WriteAsync((long)company.CompanyId, NpgsqlDbType.Bigint);
+        await writer.WriteAsync((long)company.Cik, NpgsqlDbType.Bigint);
+        await writer.WriteAsync(company.DataSource, NpgsqlDbType.Varchar);
     }
 }

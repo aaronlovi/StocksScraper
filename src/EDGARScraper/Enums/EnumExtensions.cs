@@ -13,6 +13,7 @@ internal static class EnumExtensions
         {
             XBRLFileParserFailureReason.Invalid => false,
             XBRLFileParserFailureReason.FailedToFindSubmissions => false,
+            XBRLFileParserFailureReason.CikIsZero => false,
 
             XBRLFileParserFailureReason.GeneralFault => true,
             XBRLFileParserFailureReason.FailedToDeserializeXbrlJson => true,

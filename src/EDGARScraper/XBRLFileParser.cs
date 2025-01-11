@@ -50,10 +50,16 @@ internal class XBRLFileParser
                 return XBRLParserResult.FailedToDeserializeXbrlJson();
             }
 
+            if (Cik == 0)
+            {
+                _logger.LogInformation("Parse - CIK is 0, aborting");
+                return XBRLParserResult.FailureResult("CIK is 0", XBRLFileParserFailureReason.CikIsZero);
+            }
+
             if (!_companyIdsByCiks.TryGetValue(Cik, out _companyId))
             {
                 _logger.LogWarning("Parse - Failed to find company ID for CIK {Cik}, aborting", Cik);
-                return XBRLParserResult.FailedToFindCompanyIdForCIK(Cik);
+                return XBRLParserResult.CikIsZero();
             }
             
             using var logContext = CreateLogContext();

@@ -30,6 +30,9 @@ internal record XBRLParserResult : Results
     internal static XBRLParserResult FailedToFindSubmissions(ulong companyId) =>
         FailureResult($"Failed to find submissions for company ID {companyId}, aborting", XBRLFileParserFailureReason.FailedToFindSubmissions);
 
+    internal static XBRLParserResult CikIsZero() =>
+        FailureResult("CIK is 0", XBRLFileParserFailureReason.CikIsZero);
+
     internal static XBRLParserResult GeneralFault(string errorMessage) =>
         FailureResult(errorMessage, XBRLFileParserFailureReason.GeneralFault);
 }

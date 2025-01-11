@@ -7,4 +7,5 @@ internal enum XBRLFileParserFailureReason
     FailedToDeserializeXbrlJson,
     FailedToFindCompanyIdForCIK,
     FailedToFindSubmissions,
+    CikIsZero,
 }

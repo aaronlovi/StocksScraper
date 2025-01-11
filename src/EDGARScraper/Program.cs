@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -55,9 +56,11 @@ internal class Program
 
             if (args.Length == 0)
             {
-                Console.WriteLine("Please provide a command-line switch: --fetch, --parse, or --download");
+                _logger.LogWarning("Please provide a command-line switch: --fetch, --parse, or --download");
                 return 2;
             }
+
+            _logger.LogInformation("Command line: {CommandLine}", string.Join(" ", args));
 
             _svp = host.Services;
             _dbm = _svp.GetRequiredService<IDbmService>();

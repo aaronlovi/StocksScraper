@@ -119,9 +119,8 @@ internal class Program
     {
         var host = Host.CreateDefaultBuilder(args)
             .ConfigureAppConfiguration((context, config) =>
-            {
-                config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-            })
+                config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            )
             .ConfigureWebHostDefaults(webBuilder => { webBuilder.UseStartup<TStartup>(); })
             .ConfigureServices((context, services) => {
 

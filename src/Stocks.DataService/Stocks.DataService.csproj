@@ -6,4 +6,9 @@
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Stocks.Persistence\Stocks.Persistence.csproj" />
+    <ProjectReference Include="..\Utilities\Stocks.Shared.csproj" />
+  </ItemGroup>
+
 </Project>

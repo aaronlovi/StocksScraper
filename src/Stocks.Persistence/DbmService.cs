@@ -243,7 +243,7 @@ public sealed class DbmService : IDisposable, IDbmService
         if (res.IsError && res.FailureReason is DbStmtFailureReason.Duplicate)
         {
             // Nothing got written. Retry the batch one by one (slow)
-            _logger.LogWarning("BulkInsertSubmissions failed due to duplicates, retrying one by one. {NumSubmissions} to insert",
+            _logger.LogInformation("BulkInsertSubmissions failed due to duplicates, retrying one by one. {NumSubmissions} to insert",
                 batch.Count);
             res = await RetryInsertSubmissions(batch, ct);
         }

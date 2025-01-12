@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Npgsql;
 using Stocks.DataModels;
+using Stocks.Persistence.Statements;
 
 namespace Stocks.Persistence;
 

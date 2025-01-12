@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Npgsql;
+using Stocks.Persistence.Statements;
 
 namespace Stocks.Persistence;
 

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Microsoft.Extensions.Logging;
 
 namespace Stocks.Shared;
 
@@ -9,6 +8,7 @@ public static class LogUtils
 {
     public const string CikContext = "CIK";
     public const string CompanyIdContext = "CompanyId";
+    public const string ReqIdContext = "ReqId";
 
     private const int DefaultMaxItems = 5;
 

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
+using Stocks.Persistence.Statements;
 using Stocks.Shared;
 
 namespace Stocks.Persistence;
@@ -123,20 +124,37 @@ public sealed class DbmService : IDisposable, IDbmService
 
     #region Companies
 
-    public async Task<GenericResults<IReadOnlyCollection<Company>>> GetCompaniesByDataSource(
+    public async Task<GenericResults<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(
         string dataSource, CancellationToken ct)
     {
-        var stmt = new GetCompaniesByDataSourceStmt(dataSource);
-        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        var stmt = new GetAllCompaniesByDataSourceStmt(dataSource);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess)
         {
-            _logger.LogInformation("GetCompaniesByDataSource success - Num companies: {NumCompanies}", stmt.Companies.Count);
+            _logger.LogInformation("GetAllCompaniesByDataSource success - Num companies: {NumCompanies}", stmt.Companies.Count);
             return GenericResults<IReadOnlyCollection<Company>>.SuccessResult(stmt.Companies);
         }
         else
         {
-            _logger.LogWarning("GetCompaniesByDataSource failed with error {Error}", res.ErrorMessage);
+            _logger.LogWarning("GetAllCompaniesByDataSource failed with error {Error}", res.ErrorMessage);
             return GenericResults<IReadOnlyCollection<Company>>.FailureResult(res.ErrorMessage);
+        }
+    }
+
+    public async Task<GenericResults<PagedCompanies>> GetPagedCompaniesByDataSource(
+        string dataSource, PaginationRequest pagination, CancellationToken ct)
+    {
+        var stmt = new GetPagedCompaniesByDataSourceStmt(dataSource, pagination);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess)
+        {
+            _logger.LogInformation("GetCompaniesByDataSource success - Num companies: {NumCompanies}", stmt.Companies.Count);
+            return GenericResults<PagedCompanies>.SuccessResult(stmt.GetPagedCompanies());
+        }
+        else
+        {
+            _logger.LogWarning("GetCompaniesByDataSource failed with error {Error}", res.ErrorMessage);
+            return GenericResults<PagedCompanies>.FailureResult(res.ErrorMessage);
         }
     }
 
@@ -180,7 +198,7 @@ public sealed class DbmService : IDisposable, IDbmService
     public async Task<GenericResults<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct)
     {
         var stmt = new GetAllDataPointUnitsStmt();
-        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess)
         {
             _logger.LogInformation("GetDataPointUnits success - Num units: {NumUnits}", stmt.Units.Count);
@@ -222,7 +240,7 @@ public sealed class DbmService : IDisposable, IDbmService
     public async Task<GenericResults<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct)
     {
         var stmt = new GetAllSubmissionsStmt();
-        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess)
         {
             _logger.LogInformation("GetSubmissions success - Num submissions: {NumSubmissions}", stmt.Submissions.Count);

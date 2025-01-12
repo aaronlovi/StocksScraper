@@ -11,6 +11,7 @@ using Stocks.Shared;
 using Stocks.Persistence;
 
 using ILogger = Microsoft.Extensions.Logging.ILogger;
+using Stocks.DataService.RawDataService;
 
 namespace Stocks.DataService;
 
@@ -68,6 +69,8 @@ internal class Program
 
                 if (DoesConfigContainConnectionString(context.Configuration))
                     services.AddSingleton<IDbmService, DbmService>();
+
+                services.AddHostedService<RawDataQueryService>();
 
                 services.AddGrpc();
             })

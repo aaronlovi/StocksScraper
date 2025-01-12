@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using NpgsqlTypes;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Statements;
 
 internal static class DbUtils
 {
@@ -179,7 +179,7 @@ internal abstract class NonQueryBatchedDbStmtBase(string _className) : IPostgres
         catch (PostgresException ex)
         {
             string errMsg = $"{_className} failed - {ex.Message}";
-            DbStmtFailureReason failureReason = (ex.SqlState == "23505") ? DbStmtFailureReason.Duplicate : DbStmtFailureReason.Other;
+            DbStmtFailureReason failureReason = ex.SqlState == "23505" ? DbStmtFailureReason.Duplicate : DbStmtFailureReason.Other;
             return DbStmtResult.StatementFailure(errMsg, failureReason);
         }
         catch (Exception ex)
@@ -226,7 +226,7 @@ internal abstract class BulkInsertDbStmtBase<T>(string _className, IReadOnlyColl
         catch (PostgresException ex)
         {
             string errMsg = $"{_className} failed - {ex.Message}";
-            DbStmtFailureReason failureReason = (ex.SqlState == "23505")
+            DbStmtFailureReason failureReason = ex.SqlState == "23505"
                 ? DbStmtFailureReason.Duplicate
                 : DbStmtFailureReason.Other;
             return DbStmtResult.StatementFailure(errMsg, failureReason);

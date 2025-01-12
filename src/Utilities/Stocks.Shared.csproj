@@ -1,5 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+	
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<Protobuf Include="Protos/*.proto" ProtoRoot="Protos" GrpcServices="Both" />
+		<Content Include="Protos/*.proto">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+	
 </Project>

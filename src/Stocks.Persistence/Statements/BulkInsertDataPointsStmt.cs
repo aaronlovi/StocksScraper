@@ -6,6 +6,7 @@ using Elastic.Channels.Buffers;
 using Npgsql;
 using NpgsqlTypes;
 using Stocks.DataModels;
+using Stocks.Persistence.Statements;
 
 namespace Stocks.Persistence;
 

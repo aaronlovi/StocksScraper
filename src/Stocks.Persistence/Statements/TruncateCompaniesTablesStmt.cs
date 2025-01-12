@@ -1,4 +1,6 @@
-﻿namespace Stocks.Persistence;
+﻿using Stocks.Persistence.Statements;
+
+namespace Stocks.Persistence;
 
 internal sealed class TruncateCompaniesTablesStmt : NonQueryBatchedDbStmtBase
 {

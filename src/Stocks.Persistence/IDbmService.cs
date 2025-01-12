@@ -19,7 +19,10 @@ public interface IDbmService
 
     // Companies
 
-    Task<GenericResults<IReadOnlyCollection<Company>>> GetCompaniesByDataSource(string dataSource, CancellationToken ct);
+    Task<GenericResults<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(
+        string dataSource, CancellationToken ct);
+    Task<GenericResults<PagedCompanies>> GetPagedCompaniesByDataSource(
+        string dataSource, PaginationRequest pagination, CancellationToken ct);
     Task<Results> EmptyCompaniesTables(CancellationToken ct);
     Task<Results> BulkInsertCompanies(List<Company> companies, CancellationToken ct);
     Task<Results> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct);

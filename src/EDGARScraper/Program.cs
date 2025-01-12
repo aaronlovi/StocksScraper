@@ -297,7 +297,7 @@ internal class Program
         var context = new ParseBulkEdgarSubmissionsContext(_svp!);
 
         GenericResults<IReadOnlyCollection<Company>> companyResults =
-            await _dbm!.GetCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
+            await _dbm!.GetAllCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
         if (companyResults.IsError)
         {
             _logger.LogError("ParseBulkEdgarSubmissionsList - Failed to get companies. Error: {Error}", companyResults.ErrorMessage);
@@ -431,7 +431,7 @@ internal class Program
         var context = new ParseBulkXbrlArchiveContext(_svp!);
 
         GenericResults<IReadOnlyCollection<Company>> companyResults =
-            await _dbm!.GetCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
+            await _dbm!.GetAllCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
         if (companyResults.IsError)
         {
             _logger.LogError("ParseBulkXbrlArchive - Failed to get companies. Error: {Error}", companyResults.ErrorMessage);

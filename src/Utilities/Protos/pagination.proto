@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+option csharp_namespace = "Stocks.Protocols";
+
+message PaginationRequest {
+    uint32 page_number = 1;     // Page number for pagination
+    uint32 page_size = 2;       // Number of items per page
+}
+
+message PaginationResponse {
+    uint32 current_page = 1;    // Current page number
+    uint32 total_items = 2;     // Total number of items available
+    uint32 total_pages = 3;     // Total number of pages
+}

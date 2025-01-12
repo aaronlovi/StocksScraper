@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Npgsql;
 using Stocks.DataModels;
+using Stocks.Persistence.Statements;
 
 namespace Stocks.Persistence;
 

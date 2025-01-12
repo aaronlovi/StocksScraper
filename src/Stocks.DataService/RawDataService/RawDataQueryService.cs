@@ -45,6 +45,11 @@ internal class RawDataQueryService : BackgroundService
 
             switch (inputBase)
             {
+                case GetCompanyByIdInputs getCompanyByIdInputs:
+                {
+                    ProcessGetCompanyById(getCompanyByIdInputs, stoppingToken);
+                    break;
+                }
                 case GetCompaniesMetadataInputs getAllCompanyMetadataInputs:
                 {
                     ProcessGetCompaniesMetadata(getAllCompanyMetadataInputs, stoppingToken);
@@ -61,6 +66,59 @@ internal class RawDataQueryService : BackgroundService
         _logger.LogInformation("RawDataQueryService - Exiting main loop");
     }
 
+    private void ProcessGetCompanyById(GetCompanyByIdInputs inputs, CancellationToken stoppingToken)
+    {
+        _ = Task.Run(async () =>
+        {
+            using var reqIdContext = _logger.BeginScope(new Dictionary<string, long> { [LogUtils.ReqIdContext] = inputs.ReqId });
+            using var thisRequestCts = Utilities.CreateLinkedTokenSource(inputs.CancellationTokenSource, stoppingToken);
+
+            try
+            {
+                GenericResults<Company> res = await _dbm.GetCompanyById(inputs.CompanyId, thisRequestCts.Token);
+                LogResults(res);
+                GetCompaniesDataReply reply = CreateCompaniesDataReply(res);
+                inputs.Completed.SetResult(reply);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ProcessGetCompanyById - Error processing query");
+                inputs.Completed.SetException(ex);
+            }
+        }, stoppingToken);
+
+        // Local helper methods
+
+        void LogResults(GenericResults<Company> res)
+        {
+            if (res.IsSuccess)
+                _logger.LogInformation("ProcessGetCompanyById Success - {CompanyId}", res.Data!.CompanyId);
+            else
+                _logger.LogInformation("ProcessGetCompanyById Failed - {Error}", res.ErrorMessage);
+        }
+
+        static GetCompaniesDataReply CreateCompaniesDataReply(GenericResults<Company> res)
+        {
+            Company? company = res.Data;
+            var reply = new GetCompaniesDataReply
+            {
+                Success = res.IsSuccess,
+                ErrorMessage = res.ErrorMessage,
+                Pagination = ProtosUtils.CreateEmptyPaginationResponse(),
+            };
+            if (company != null)
+            {
+                reply.CompaniesList.Add(new GetCompaniesDataReplyItem
+                {
+                    CompanyId = (long)company.CompanyId,
+                    Cik = (long)company.Cik,
+                    DataSource = company.DataSource,
+                });
+            }
+            return reply;
+        }
+    }
+
     private void ProcessGetCompaniesMetadata(GetCompaniesMetadataInputs inputs, CancellationToken stoppingToken)
     {
         _ = Task.Run(async () =>
@@ -72,7 +130,7 @@ internal class RawDataQueryService : BackgroundService
             {
                 GenericResults<PagedCompanies> res = await _dbm.GetPagedCompaniesByDataSource(inputs.DataSource, inputs.Pagination, thisRequestCts.Token);
                 LogResults(res);
-                GetStocksDataReply reply = CreateStocksDataReply(res);
+                GetCompaniesDataReply reply = CreateCompaniesDataReply(res);
                 inputs.Completed.SetResult(reply);
             }
             catch (Exception ex)
@@ -93,14 +151,14 @@ internal class RawDataQueryService : BackgroundService
                 _logger.LogInformation("ProcessGetCompaniesMetadata Failed - {Error}", res.ErrorMessage);
         }
 
-        static GetStocksDataReply CreateStocksDataReply(GenericResults<PagedCompanies> res)
+        static GetCompaniesDataReply CreateCompaniesDataReply(GenericResults<PagedCompanies> res)
         {
             PagedCompanies? pagedCompanies = res.Data;
             DataModels.PaginationResponse? paginationResponse = res.Data?.Pagination;
             Protocols.PaginationResponse? protosPaginationResponse = res.IsSuccess
                 ? paginationResponse?.ToProtosPaginationResponse()
                 : ProtosUtils.CreateEmptyPaginationResponse();
-            var reply = new GetStocksDataReply
+            var reply = new GetCompaniesDataReply
             {
                 Success = res.IsSuccess,
                 ErrorMessage = res.ErrorMessage,
@@ -109,7 +167,7 @@ internal class RawDataQueryService : BackgroundService
 
             foreach (Company company in res.Data?.Companies ?? [])
             {
-                reply.StocksData.Add(new GetStocksDataReplyItem
+                reply.CompaniesList.Add(new GetCompaniesDataReplyItem
                 {
                     CompanyId = (long)company.CompanyId,
                     Cik = (long)company.Cik,

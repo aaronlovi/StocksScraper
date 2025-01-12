@@ -55,6 +55,15 @@ internal abstract class RawDataQueryInputBase : IDisposable
     }
 }
 
+internal class GetCompanyByIdInputs : RawDataQueryInputBase
+{
+    public GetCompanyByIdInputs(long reqId, ulong companyId, CancellationTokenSource? cancellationTokenSource)
+        : base(reqId, cancellationTokenSource)
+        => CompanyId = companyId;
+
+    public ulong CompanyId { get; init; }
+}
+
 internal class GetCompaniesMetadataInputs : RawDataQueryInputBase
 {
     public GetCompaniesMetadataInputs(

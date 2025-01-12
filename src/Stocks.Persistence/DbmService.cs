@@ -124,6 +124,22 @@ public sealed class DbmService : IDisposable, IDbmService
 
     #region Companies
 
+    public async Task<GenericResults<Company>> GetCompanyById(ulong companyId, CancellationToken ct)
+    {
+        var stmt = new GetCompanyByIdStmt(companyId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess)
+        {
+            _logger.LogInformation("GetCompanyById success - Company: {Company}", stmt.Company);
+            return GenericResults<Company>.SuccessResult(stmt.Company);
+        }
+        else
+        {
+            _logger.LogWarning("GetCompanyById failed with error {Error}", res.ErrorMessage);
+            return GenericResults<Company>.FailureResult(res.ErrorMessage);
+        }
+    }
+
     public async Task<GenericResults<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(
         string dataSource, CancellationToken ct)
     {

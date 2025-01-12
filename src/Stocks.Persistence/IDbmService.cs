@@ -19,6 +19,7 @@ public interface IDbmService
 
     // Companies
 
+    Task<GenericResults<Company>> GetCompanyById(ulong companyId, CancellationToken ct);
     Task<GenericResults<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(
         string dataSource, CancellationToken ct);
     Task<GenericResults<PagedCompanies>> GetPagedCompaniesByDataSource(

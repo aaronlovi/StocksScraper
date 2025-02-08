@@ -136,12 +136,7 @@ internal class RawDataQueryProcessor : BackgroundService
         try
         {
             GenericResults<PagedCompanies> res = await _dbm.GetPagedCompaniesByDataSource(inputs.DataSource, inputs.Pagination, thisRequestCts.Token);
-
-            if (res.IsSuccess)
-                _logger.LogInformation("ProcessGetCompaniesMetadata Success - {NumItems}", res.Data!.NumItems);
-            else
-                _logger.LogInformation("ProcessGetCompaniesMetadata Failed - {Error}", res.ErrorMessage);
-
+            LogResults(res);
             GetCompaniesDataReply reply = CreateCompaniesDataReply(res);
             inputs.Completed.SetResult(reply);
         }
@@ -153,13 +148,13 @@ internal class RawDataQueryProcessor : BackgroundService
 
         // Local helper methods
 
-        //void LogResults(GenericResults<PagedCompanies> res)
-        //{
-        //    if (res.IsSuccess)
-        //        _logger.LogInformation("ProcessGetCompaniesMetadata Success - {NumItems}", res.Data!.NumItems);
-        //    else
-        //        _logger.LogInformation("ProcessGetCompaniesMetadata Failed - {Error}", res.ErrorMessage);
-        //}
+        void LogResults(GenericResults<PagedCompanies> res)
+        {
+            if (res.IsSuccess)
+                _logger.LogInformation("ProcessGetCompaniesMetadata Success - {NumItems}", res.Data!.NumItems);
+            else
+                _logger.LogInformation("ProcessGetCompaniesMetadata Failed - {Error}", res.ErrorMessage);
+        }
 
         GetCompaniesDataReply CreateCompaniesDataReply(GenericResults<PagedCompanies> res)
         {

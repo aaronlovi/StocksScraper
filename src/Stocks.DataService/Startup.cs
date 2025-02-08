@@ -40,7 +40,7 @@ internal class Startup(IConfiguration _config)
                 // In this case, incoming HTTP requests are routed to gRPC endpoints,
                 // which are configured in ReportingHostConfig.ConfigureEndpoints
                 var builders = new List<GrpcServiceEndpointConventionBuilder>();
-                builders.AddRange(ReportingHostConfig.ConfigureEndpoints(endpoints));
+                builders.AddRange(GrpcHostConfig.ConfigureEndpoints(endpoints));
             });
     }
 

@@ -16,17 +16,17 @@ using SharedConstants = Stocks.Shared.Constants;
 
 namespace Stocks.DataService.RawDataService;
 
-internal class RawDataQueryService : BackgroundService
+internal class RawDataQueryProcessor : BackgroundService
 {
     private readonly IServiceProvider _svp;
-    private readonly ILogger<RawDataQueryService> _logger;
+    private readonly ILogger<RawDataQueryProcessor> _logger;
     private readonly Channel<RawDataQueryInputBase> _inputChannel;
     private readonly IDbmService _dbm;
 
-    public RawDataQueryService(IServiceProvider svp)
+    public RawDataQueryProcessor(IServiceProvider svp)
     {
         _svp = svp;
-        _logger = _svp.GetRequiredService<ILogger<RawDataQueryService>>();
+        _logger = _svp.GetRequiredService<ILogger<RawDataQueryProcessor>>();
         _inputChannel = Channel.CreateUnbounded<RawDataQueryInputBase>();
         _dbm = _svp.GetRequiredService<IDbmService>();
 
@@ -41,25 +41,32 @@ internal class RawDataQueryService : BackgroundService
 
         await foreach (RawDataQueryInputBase inputBase in _inputChannel.Reader.ReadAllAsync(stoppingToken))
         {
-            _logger.LogInformation("RawDataQueryService - Got a message {Input}", inputBase);
-
-            switch (inputBase)
+            try
             {
-                case GetCompanyByIdInputs getCompanyByIdInputs:
+                _logger.LogInformation("RawDataQueryService - Got a message {Input}", inputBase);
+
+                switch (inputBase)
                 {
-                    ProcessGetCompanyById(getCompanyByIdInputs, stoppingToken);
-                    break;
+                    case GetCompanyByIdInputs getCompanyByIdInputs:
+                    {
+                        ProcessGetCompanyById(getCompanyByIdInputs, stoppingToken);
+                        break;
+                    }
+                    case GetCompaniesMetadataInputs getAllCompanyMetadataInputs:
+                    {
+                        ProcessGetCompaniesMetadata(getAllCompanyMetadataInputs, stoppingToken);
+                        break;
+                    }
+                    default:
+                    {
+                        _logger.LogError("RawDataQueryService main loop - Invalid request type received, dropping input");
+                        break;
+                    }
                 }
-                case GetCompaniesMetadataInputs getAllCompanyMetadataInputs:
-                {
-                    ProcessGetCompaniesMetadata(getAllCompanyMetadataInputs, stoppingToken);
-                    break;
-                }
-                default:
-                {
-                    _logger.LogError("RawDataQueryService main loop - Invalid request type received, dropping input");
-                    break;
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RawDataQueryService - Error processing input");
             }
         }
 
@@ -70,9 +77,8 @@ internal class RawDataQueryService : BackgroundService
     {
         _ = Task.Run(async () =>
         {
-            using var reqIdContext = _logger.BeginScope(new Dictionary<string, long> { [LogUtils.ReqIdContext] = inputs.ReqId });
+            using var reqIdLogContext = _logger.BeginScope("RequestId: {RequestId}", inputs.ReqId);
             using var thisRequestCts = Utilities.CreateLinkedTokenSource(inputs.CancellationTokenSource, stoppingToken);
-
             try
             {
                 GenericResults<Company> res = await _dbm.GetCompanyById(inputs.CompanyId, thisRequestCts.Token);
@@ -97,13 +103,12 @@ internal class RawDataQueryService : BackgroundService
                 _logger.LogInformation("ProcessGetCompanyById Failed - {Error}", res.ErrorMessage);
         }
 
-        static GetCompaniesDataReply CreateCompaniesDataReply(GenericResults<Company> res)
+        GetCompaniesDataReply CreateCompaniesDataReply(GenericResults<Company> res)
         {
             Company? company = res.Data;
             var reply = new GetCompaniesDataReply
             {
-                Success = res.IsSuccess,
-                ErrorMessage = res.ErrorMessage,
+                Response = new Protocols.StandardResponse { RequestId = inputs.ReqId, Success = res.IsSuccess, ErrorMessage = res.ErrorMessage },
                 Pagination = ProtosUtils.CreateEmptyPaginationResponse(),
             };
             if (company != null)
@@ -121,37 +126,42 @@ internal class RawDataQueryService : BackgroundService
 
     private void ProcessGetCompaniesMetadata(GetCompaniesMetadataInputs inputs, CancellationToken stoppingToken)
     {
-        _ = Task.Run(async () =>
+        _ = Task.Run(async () => await ProcessGetCompaniesMetadataTask(inputs, stoppingToken), stoppingToken);
+    }
+
+    private async Task ProcessGetCompaniesMetadataTask(GetCompaniesMetadataInputs inputs, CancellationToken stoppingToken)
+    {
+        using var reqIdLogContext = _logger.BeginScope("RequestId: {RequestId}", inputs.ReqId);
+        using var thisRequestCts = Utilities.CreateLinkedTokenSource(inputs.CancellationTokenSource, stoppingToken);
+        try
         {
-            using var reqIdContext = _logger.BeginScope(new Dictionary<string, long> { [LogUtils.ReqIdContext] = inputs.ReqId });
-            using var thisRequestCts = Utilities.CreateLinkedTokenSource(inputs.CancellationTokenSource, stoppingToken);
+            GenericResults<PagedCompanies> res = await _dbm.GetPagedCompaniesByDataSource(inputs.DataSource, inputs.Pagination, thisRequestCts.Token);
 
-            try
-            {
-                GenericResults<PagedCompanies> res = await _dbm.GetPagedCompaniesByDataSource(inputs.DataSource, inputs.Pagination, thisRequestCts.Token);
-                LogResults(res);
-                GetCompaniesDataReply reply = CreateCompaniesDataReply(res);
-                inputs.Completed.SetResult(reply);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "ProcessGetCompaniesMetadata - Error processing query");
-                inputs.Completed.SetException(ex);
-            }
-
-        }, stoppingToken);
-
-        // Local helper methods
-
-        void LogResults(GenericResults<PagedCompanies> res)
-        {
             if (res.IsSuccess)
                 _logger.LogInformation("ProcessGetCompaniesMetadata Success - {NumItems}", res.Data!.NumItems);
             else
                 _logger.LogInformation("ProcessGetCompaniesMetadata Failed - {Error}", res.ErrorMessage);
+
+            GetCompaniesDataReply reply = CreateCompaniesDataReply(res);
+            inputs.Completed.SetResult(reply);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ProcessGetCompaniesMetadata - Error processing query");
+            inputs.Completed.SetException(ex);
         }
 
-        static GetCompaniesDataReply CreateCompaniesDataReply(GenericResults<PagedCompanies> res)
+        // Local helper methods
+
+        //void LogResults(GenericResults<PagedCompanies> res)
+        //{
+        //    if (res.IsSuccess)
+        //        _logger.LogInformation("ProcessGetCompaniesMetadata Success - {NumItems}", res.Data!.NumItems);
+        //    else
+        //        _logger.LogInformation("ProcessGetCompaniesMetadata Failed - {Error}", res.ErrorMessage);
+        //}
+
+        GetCompaniesDataReply CreateCompaniesDataReply(GenericResults<PagedCompanies> res)
         {
             PagedCompanies? pagedCompanies = res.Data;
             DataModels.PaginationResponse? paginationResponse = res.Data?.Pagination;
@@ -160,8 +170,7 @@ internal class RawDataQueryService : BackgroundService
                 : ProtosUtils.CreateEmptyPaginationResponse();
             var reply = new GetCompaniesDataReply
             {
-                Success = res.IsSuccess,
-                ErrorMessage = res.ErrorMessage,
+                Response = new StandardResponse { RequestId = inputs.ReqId, Success = res.IsSuccess, ErrorMessage = res.ErrorMessage },
                 Pagination = protosPaginationResponse,
             };
 
@@ -183,7 +192,7 @@ internal class RawDataQueryService : BackgroundService
 
     private static async Task StartHeartbeat(IServiceProvider svp, CancellationToken ct)
     {
-        ILogger logger = svp.GetRequiredService<ILogger<RawDataQueryService>>();
+        ILogger logger = svp.GetRequiredService<ILogger<RawDataQueryProcessor>>();
         while (!ct.IsCancellationRequested)
         {
             logger.LogInformation("RawDataQueryService heartbeat");

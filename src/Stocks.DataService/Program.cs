@@ -65,14 +65,13 @@ internal class Program
                 services
                     .AddHttpClient()
                     .AddSingleton<PostgresExecutor>()
-                    .AddSingleton<DbMigrations>();
+                    .AddSingleton<DbMigrations>()
+                    .AddSingleton<RawDataQueryProcessor>();
 
                 if (DoesConfigContainConnectionString(context.Configuration))
                     services.AddSingleton<IDbmService, DbmService>();
 
-                services.AddHostedService<RawDataQueryService>();
-
-                services.AddGrpc();
+                services.AddHostedService(p => p.GetRequiredService<RawDataQueryProcessor>());
             })
             .ConfigureLogging((context, builder) => builder.ClearProviders())
             .UseSerilog((context, LoggerConfiguration) =>

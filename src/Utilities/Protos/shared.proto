@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+option csharp_namespace = "Stocks.Protocols";
+
+message StandardResponse {
+	string request_id = 1;
+	bool success = 2;
+	string error_message = 3;
+}

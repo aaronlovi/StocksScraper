@@ -2,18 +2,23 @@ syntax = "proto3";
 
 option csharp_namespace = "Stocks.Protocols";
 
+import "shared.proto";
 import "pagination.proto";
 
+service RawDataService {
+    rpc GetCompaniesData(GetCompaniesDataRequest) returns (GetCompaniesDataReply);
+}
+
 message GetCompaniesDataRequest {
-    string dataSource = 1;
-    PaginationRequest pagination = 2;
+    string request_id = 1;
+    string dataSource = 2;
+    PaginationRequest pagination = 3;
 }
 
 message GetCompaniesDataReply {
-    bool success = 1;
-    string error_message = 2;
-    repeated GetCompaniesDataReplyItem companies_list = 3;
-	PaginationResponse pagination = 4;
+    StandardResponse response = 1; 
+    repeated GetCompaniesDataReplyItem companies_list = 2;
+	PaginationResponse pagination = 3;
 }
 
 message GetCompaniesDataReplyItem {

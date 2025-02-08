@@ -12,14 +12,14 @@ internal abstract class RawDataQueryInputBase : IDisposable
 {
     private bool _isDisposed;
 
-    public RawDataQueryInputBase(long reqId, CancellationTokenSource? cancellationTokenSource)
+    public RawDataQueryInputBase(string reqId, CancellationTokenSource? cancellationTokenSource)
     {
         ReqId = reqId;
         Completed = new();
         CancellationTokenSource = cancellationTokenSource;
     }
 
-    public long ReqId { get; }
+    public string ReqId { get; }
     [JsonIgnore] public TaskCompletionSource<object?> Completed { get; init; }
     [JsonIgnore] public CancellationTokenSource? CancellationTokenSource { get; init; }
 
@@ -57,7 +57,7 @@ internal abstract class RawDataQueryInputBase : IDisposable
 
 internal class GetCompanyByIdInputs : RawDataQueryInputBase
 {
-    public GetCompanyByIdInputs(long reqId, ulong companyId, CancellationTokenSource? cancellationTokenSource)
+    public GetCompanyByIdInputs(string reqId, ulong companyId, CancellationTokenSource? cancellationTokenSource)
         : base(reqId, cancellationTokenSource)
         => CompanyId = companyId;
 
@@ -67,7 +67,7 @@ internal class GetCompanyByIdInputs : RawDataQueryInputBase
 internal class GetCompaniesMetadataInputs : RawDataQueryInputBase
 {
     public GetCompaniesMetadataInputs(
-        long reqId,
+        string reqId,
         string dataSource,
         PaginationRequest paginationRequest,
         CancellationTokenSource? cancellationTokenSource)

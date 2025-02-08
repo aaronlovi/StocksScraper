@@ -65,8 +65,8 @@ LIMIT @limit OFFSET @offset";
 
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() => [
         new NpgsqlParameter<string>("data_source", _dataSource),
-        new NpgsqlParameter<uint>("limit", _pagination.PageSize),
-        new NpgsqlParameter<uint>("offset", (_pagination.PageNumber - 1) * _pagination.PageSize) ];
+        new NpgsqlParameter<int>("limit", (int)_pagination.PageSize) { NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Integer },
+        new NpgsqlParameter<int>("offset", (int)((_pagination.PageNumber - 1) * _pagination.PageSize)) { NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Integer } ];
 
     protected override bool ProcessCurrentRow(NpgsqlDataReader reader)
     {

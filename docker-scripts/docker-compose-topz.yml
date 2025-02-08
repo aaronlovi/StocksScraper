@@ -1,0 +1,8 @@
+  # Run topz as a sidecar container (in the below case to elasticsearch)
+  # The route is http://localhost:8080/topz
+  topz-elasticsearch:
+    image: brendanburns/topz:db0fa58
+    command: /server --addr=0.0.0.0:8080
+    ports:
+      - "8080:8080"
+    pid: "container:elasticsearch"

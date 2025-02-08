@@ -67,7 +67,6 @@ services:
     networks:
       - stocks-data-network
 
-
 volumes:
   postgres-data:
     driver: local

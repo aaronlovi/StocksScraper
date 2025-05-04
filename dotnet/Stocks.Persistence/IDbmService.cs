@@ -6,8 +6,7 @@ using Stocks.Shared;
 
 namespace Stocks.Persistence;
 
-public interface IDbmService
-{
+public interface IDbmService {
     // Utilities
 
     Task<Results> DropAllTables(CancellationToken ct);

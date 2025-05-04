@@ -8,8 +8,7 @@ namespace EDGARScraper;
 /// <summary>
 /// This helper class is used by the main startup config. This allows to keep registered classes as 'internal'.
 /// </summary>
-public static class ReportingHostConfig
-{
+public static class ReportingHostConfig {
     public static void ConfigureServices(IServiceCollection _) { }
 
     /// <summary>

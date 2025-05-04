@@ -4,10 +4,8 @@ using System.Threading.Tasks;
 
 namespace Stocks.Shared;
 
-public static class SemaphoreSlimExtensions
-{
-    public static async Task<IDisposable> AcquireAsync(this SemaphoreSlim semaphore)
-    {
+public static class SemaphoreSlimExtensions {
+    public static async Task<IDisposable> AcquireAsync(this SemaphoreSlim semaphore) {
         await semaphore.WaitAsync();
         return new SemaphoreGuard(semaphore);
     }

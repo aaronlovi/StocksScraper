@@ -1,7 +1,6 @@
 ﻿namespace Stocks.EDGARScraper.Enums;
 
-internal enum XBRLFileParserFailureReason
-{
+internal enum XBRLFileParserFailureReason {
     Invalid = 0,
     GeneralFault,
     FailedToDeserializeXbrlJson,

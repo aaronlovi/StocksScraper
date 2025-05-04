@@ -12,8 +12,7 @@ public record DataPoint(
     decimal Value,
     DataPointUnit Units,
     DateOnly FiledDate,
-    ulong SubmissionId)
-{
+    ulong SubmissionId) {
     public DateTime FiledTimeUtc => FiledDate.AsUtcTime();
     public DateTime StartTimeUtc => DatePair.StartDate.AsUtcTime();
     public DateTime EndTimeUtc => DatePair.EndDate.AsUtcTime();

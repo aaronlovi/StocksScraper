@@ -7,20 +7,16 @@ using NpgsqlTypes;
 
 namespace Stocks.Persistence.Statements;
 
-internal static class DbUtils
-{
-    static internal NpgsqlParameter CreateNullableDateTimeParam(string paramName, DateTimeOffset? nullableDate)
-    {
-        var param = new NpgsqlParameter(paramName, NpgsqlDbType.TimestampTz)
-        {
+internal static class DbUtils {
+    internal static NpgsqlParameter CreateNullableDateTimeParam(string paramName, DateTimeOffset? nullableDate) {
+        var param = new NpgsqlParameter(paramName, NpgsqlDbType.TimestampTz) {
             Value = nullableDate?.UtcDateTime ?? (object)DBNull.Value
         };
         return param;
     }
 }
 
-internal abstract class DbStmtBase
-{
+internal abstract class DbStmtBase {
     protected abstract IReadOnlyCollection<NpgsqlParameter> GetBoundParameters();
 }
 
@@ -38,8 +34,7 @@ internal abstract class DbStmtBase
 /// and execution of the reader loop, allowing derived classes to focus on the
 /// specifics of their respective queries.
 /// </remarks>
-internal abstract class QueryDbStmtBase(string _sql, string _className) : DbStmtBase, IPostgresStatement
-{
+internal abstract class QueryDbStmtBase(string _sql, string _className) : DbStmtBase, IPostgresStatement {
     /// <summary>
     /// Executes the SQL query defined in the derived class against the provided NpgsqlConnection.
     /// </summary>
@@ -56,23 +51,20 @@ internal abstract class QueryDbStmtBase(string _sql, string _className) : DbStmt
     /// This method handles exceptions by clearing any results and returning a failure result,
     /// ensuring that the caller can gracefully handle errors.
     /// </remarks>
-    public async Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct)
-    {
+    public async Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct) {
         ClearResults();
 
-        try
-        {
+        try {
             using var cmd = new NpgsqlCommand(_sql, conn);
             foreach (NpgsqlParameter boundParam in GetBoundParameters())
-                cmd.Parameters.Add(boundParam);
+                _ = cmd.Parameters.Add(boundParam);
             await cmd.PrepareAsync(ct);
-            using var reader = await cmd.ExecuteReaderAsync(ct);
+            using NpgsqlDataReader reader = await cmd.ExecuteReaderAsync(ct);
 
             BeforeRowProcessing(reader);
 
             int numRows = 0;
-            while (await reader.ReadAsync(ct))
-            {
+            while (await reader.ReadAsync(ct)) {
                 ++numRows;
                 if (!ProcessCurrentRow(reader))
                     break;
@@ -81,9 +73,7 @@ internal abstract class QueryDbStmtBase(string _sql, string _className) : DbStmt
             AfterLastRowProcessing();
 
             return DbStmtResult.StatementSuccess(numRows);
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             ClearResults();
             string errMsg = $"{_className} failed - {ex.Message}";
             return DbStmtResult.StatementFailure(errMsg);
@@ -141,98 +131,77 @@ internal abstract class QueryDbStmtBase(string _sql, string _className) : DbStmt
     protected abstract bool ProcessCurrentRow(NpgsqlDataReader reader);
 }
 
-internal abstract class NonQueryDbStmtBase(string _sql, string _className) : DbStmtBase, IPostgresStatement
-{
-    public async Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct)
-    {
-        try
-        {
+internal abstract class NonQueryDbStmtBase(string _sql, string _className) : DbStmtBase, IPostgresStatement {
+    public async Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct) {
+        try {
             using var cmd = new NpgsqlCommand(_sql, conn);
             foreach (NpgsqlParameter boundParam in GetBoundParameters())
                 _ = cmd.Parameters.Add(boundParam);
             await cmd.PrepareAsync(ct);
             int numRows = await cmd.ExecuteNonQueryAsync(ct);
             return DbStmtResult.StatementSuccess(numRows);
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             string errMsg = $"{_className} failed - {ex.Message}";
             return DbStmtResult.StatementFailure(errMsg);
         }
     }
 }
 
-internal abstract class NonQueryBatchedDbStmtBase(string _className) : IPostgresStatement
-{
+internal abstract class NonQueryBatchedDbStmtBase(string _className) : IPostgresStatement {
     private readonly List<NpgsqlBatchCommand> _commands = [];
 
-    public async Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct)
-    {
-        try
-        {
+    public async Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct) {
+        try {
             using var batch = new NpgsqlBatch(conn);
             foreach (NpgsqlBatchCommand cmd in _commands)
                 batch.BatchCommands.Add(cmd);
             int numRows = await batch.ExecuteNonQueryAsync(ct);
             return DbStmtResult.StatementSuccess(numRows);
-        }
-        catch (PostgresException ex)
-        {
+        } catch (PostgresException ex) {
             string errMsg = $"{_className} failed - {ex.Message}";
             DbStmtFailureReason failureReason = ex.SqlState == "23505" ? DbStmtFailureReason.Duplicate : DbStmtFailureReason.Other;
             return DbStmtResult.StatementFailure(errMsg, failureReason);
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             string errMsg = $"{_className} failed - {ex.Message}";
             return DbStmtResult.StatementFailure(errMsg);
         }
     }
 
-    protected void AddCommandToBatch(string sql, IReadOnlyCollection<NpgsqlParameter> boundParams)
-    {
+    protected void AddCommandToBatch(string sql, IReadOnlyCollection<NpgsqlParameter> boundParams) {
         var cmd = new NpgsqlBatchCommand(sql);
         foreach (NpgsqlParameter boundParam in boundParams)
-            cmd.Parameters.Add(boundParam);
+            _ = cmd.Parameters.Add(boundParam);
         _commands.Add(cmd);
     }
 }
 
 internal abstract class BulkInsertDbStmtBase<T>(string _className, IReadOnlyCollection<T> _items)
     : IPostgresStatement
-    where T : class
-{
+    where T : class {
     protected abstract string GetCopyCommand();
     protected abstract Task WriteItemAsync(NpgsqlBinaryImporter writer, T item);
 
-    public async Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct)
-    {
+    public async Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct) {
         T? failedItem = default;
 
-        try
-        {
-            using var writer = conn.BeginBinaryImport(GetCopyCommand());
+        try {
+            using NpgsqlBinaryImporter writer = conn.BeginBinaryImport(GetCopyCommand());
 
-            foreach (T item in _items)
-            {
+            foreach (T item in _items) {
                 failedItem = item;
                 await writer.StartRowAsync(ct);
                 await WriteItemAsync(writer, item);
             }
 
-            await writer.CompleteAsync(ct);
+            _ = await writer.CompleteAsync(ct);
             return DbStmtResult.StatementSuccess(_items.Count);
-        }
-        catch (PostgresException ex)
-        {
+        } catch (PostgresException ex) {
             string errMsg = $"{_className} failed - {ex.Message}";
             DbStmtFailureReason failureReason = ex.SqlState == "23505"
                 ? DbStmtFailureReason.Duplicate
                 : DbStmtFailureReason.Other;
             return DbStmtResult.StatementFailure(errMsg, failureReason);
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             string failedItemStr = failedItem?.ToString() ?? "NULL";
             string errMsg = $"{_className} failed - {ex.Message}. Item: {failedItemStr}";
             return DbStmtResult.StatementFailure(errMsg);

@@ -4,8 +4,7 @@ using System.Threading.Tasks;
 
 namespace Stocks.Shared;
 
-public static class Utilities
-{
+public static class Utilities {
     /// <summary>
     /// Safely performs division, returning a default value when the divisor is zero.
     /// </summary>
@@ -29,8 +28,7 @@ public static class Utilities
     /// Safely disposes of the provided object if it implements IDisposable.
     /// </summary>
     /// <param name="o">The object to dispose. If the object is null or does not implement IDisposable, the method does nothing.</param>
-    public static void SafeDispose(object? o)
-    {
+    public static void SafeDispose(object? o) {
         if (o is IDisposable d)
             d.Dispose();
     }
@@ -42,8 +40,7 @@ public static class Utilities
     /// <param name="cts">The CancellationTokenSource to link. If null, a new CancellationTokenSource is created that is only linked to the provided CancellationToken.</param>
     /// <param name="ct">The CancellationToken to link.</param>
     /// <returns>A CancellationTokenSource that is linked to the provided CancellationToken and, if provided, CancellationTokenSource.</returns>
-    public static CancellationTokenSource CreateLinkedTokenSource(CancellationTokenSource? cts, CancellationToken ct)
-    {
+    public static CancellationTokenSource CreateLinkedTokenSource(CancellationTokenSource? cts, CancellationToken ct) {
         return cts is not null
             ? CancellationTokenSource.CreateLinkedTokenSource(ct, cts.Token)
             : CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -55,8 +52,7 @@ public static class Utilities
     /// <param name="startTime">The start time of the interval.</param>
     /// <param name="endTime">The end time of the interval. If null, the start time is used as the end time.</param>
     /// <returns>The time difference as a TimeSpan. If the calculated difference is less than or equal to zero, a TimeSpan representing one millisecond is returned.</returns>
-    public static TimeSpan CalculateTimeDifference(DateTime startTime, DateTime? endTime)
-    {
+    public static TimeSpan CalculateTimeDifference(DateTime startTime, DateTime? endTime) {
         TimeSpan difference = endTime.GetValueOrDefault(startTime) - startTime;
         return difference > TimeSpan.Zero ? difference : TimeSpan.FromMilliseconds(1);
     }
@@ -64,10 +60,9 @@ public static class Utilities
     /// <summary>
     /// Creates a task that completes when the provided CancellationToken is cancelled.
     /// </summary>
-    public static Task CreateCancellationTask(CancellationToken ct)
-    {
+    public static Task CreateCancellationTask(CancellationToken ct) {
         var tcs = new TaskCompletionSource<bool>();
-        ct.Register(() => tcs.SetResult(true));
+        _ = ct.Register(() => tcs.SetResult(true));
         return tcs.Task;
     }
 

@@ -6,23 +6,20 @@ using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace Stocks.Shared;
 
-public class HostingUtils
-{
-    public static ILogger GetBootstrapLogger<T>()
-    {
+public class HostingUtils {
+    public static ILogger GetBootstrapLogger<T>() {
         Log.Logger = new LoggerConfiguration()
             .WriteTo.Console()
             .CreateBootstrapLogger();
 
         var serviceCollection = new ServiceCollection();
-        serviceCollection.AddLogging(builder =>
-        {
-            builder.ClearProviders();
-            builder.AddSerilog(Log.Logger);
+        _ = serviceCollection.AddLogging(builder => {
+            _ = builder.ClearProviders();
+            _ = builder.AddSerilog(Log.Logger);
         });
 
-        var serviceProvider = serviceCollection.BuildServiceProvider();
-        var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+        ServiceProvider serviceProvider = serviceCollection.BuildServiceProvider();
+        ILoggerFactory loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
         return loggerFactory.CreateLogger<T>();
     }
 }

@@ -4,8 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace Stocks.Shared.JsonUtils;
 
-public class StringToUlongConverter : JsonConverter<ulong>
-{
+public class StringToUlongConverter : JsonConverter<ulong> {
     public override ulong Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
         ulong.Parse(reader.GetString() ?? throw new JsonException("Invalid value for ulong conversion."));
 

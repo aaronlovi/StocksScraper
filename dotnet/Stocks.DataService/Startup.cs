@@ -10,8 +10,7 @@ namespace Stocks.DataService;
 /// 1. Application Initialization
 /// When the application starts, the Startup class is instantiated and configured.
 /// </summary>
-internal class Startup(IConfiguration _config)
-{
+internal class Startup(IConfiguration _config) {
     /// <summary>
     /// 2. Service Configuration
     /// The ConfigureServices method is called by the runtime.
@@ -19,9 +18,8 @@ internal class Startup(IConfiguration _config)
     /// These services are then available throughout the application
     /// </summary>
     /// <param name="services"></param>
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddGrpc();
+    public void ConfigureServices(IServiceCollection services) {
+        _ = services.AddGrpc();
 
         VerifyCriticalConfiguration();
     }
@@ -31,12 +29,10 @@ internal class Startup(IConfiguration _config)
     /// The Configure method is called by the runtime to set up the request processing pipeline.
     /// This method defines how the application will respond to HTTP requests.
     /// </summary>
-    public static void Configure(IApplicationBuilder app)
-    {
-        app.
+    public static void Configure(IApplicationBuilder app) {
+        _ = app.
             UseRouting().
-            UseEndpoints(endpoints =>
-            {
+            UseEndpoints(endpoints => {
                 // In this case, incoming HTTP requests are routed to gRPC endpoints,
                 // which are configured in ReportingHostConfig.ConfigureEndpoints
                 var builders = new List<GrpcServiceEndpointConventionBuilder>();
@@ -46,22 +42,15 @@ internal class Startup(IConfiguration _config)
 
     #region PRIVATE HELPER METHODS
 
-    private void VerifyCriticalConfiguration()
-    {
-        VerifyConfigurationItem("DatabaseSchema");
-    }
+    private void VerifyCriticalConfiguration() => VerifyConfigurationItem("DatabaseSchema");
 
-    private void VerifyConfigurationItem(string key, string? section = null)
-    {
+    private void VerifyConfigurationItem(string key, string? section = null) {
         string? value;
-        if (section is not null)
-        {
+        if (section is not null) {
             value = _config.GetSection(section)[key];
             if (string.IsNullOrEmpty(value))
                 throw new Exception($"Missing '{key}' in '{section}' section of app configuration");
-        }
-        else
-        {
+        } else {
             value = _config[key];
             if (string.IsNullOrEmpty(value))
                 throw new Exception($"Missing '{key}' in app configuration");

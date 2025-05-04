@@ -7,8 +7,7 @@ using Stocks.DataModels;
 
 namespace EDGARScraper;
 
-internal class ParseBulkEdgarSubmissionsContext(IServiceProvider svp)
-{
+internal class ParseBulkEdgarSubmissionsContext(IServiceProvider svp) {
     private readonly ILogger<ParseBulkEdgarSubmissionsContext> _logger = svp.GetRequiredService<ILogger<ParseBulkEdgarSubmissionsContext>>();
 
     public int NumFiles { get; set; }
@@ -21,8 +20,7 @@ internal class ParseBulkEdgarSubmissionsContext(IServiceProvider svp)
     public Dictionary<ulong, ulong> CompanyIdsByCiks { get; init; } = [];
     public SubmissionJsonConverter JsonConverter { get; init; } = new(svp);
 
-    public void LogProgress()
-    {
+    public void LogProgress() {
         _logger.LogInformation("Processed {NumFiles} files; {NumSubmissions} submissions; Total length: {TotalLength} bytes",
             NumFiles, NumSubmissions, TotalLength);
     }

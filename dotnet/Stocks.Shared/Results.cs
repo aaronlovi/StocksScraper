@@ -1,11 +1,9 @@
 ﻿namespace Stocks.Shared;
 
-public record Results
-{
+public record Results {
     public static readonly Results Success = new(true);
 
-    public Results(bool success, string errorMessage = "")
-    {
+    public Results(bool success, string errorMessage = "") {
         IsSuccess = success;
         ErrorMessage = errorMessage;
     }
@@ -19,10 +17,8 @@ public record Results
     public static Results FailureResult(string errorMessage) => new(false, errorMessage);
 }
 
-public record GenericResults<T>
-{
-    public GenericResults(bool success, string errorMessage = "", T? data = default)
-    {
+public record GenericResults<T> {
+    public GenericResults(bool success, string errorMessage = "", T? data = default) {
         IsSuccess = success;
         ErrorMessage = errorMessage;
         Data = data;

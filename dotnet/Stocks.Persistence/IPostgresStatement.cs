@@ -4,7 +4,6 @@ using Npgsql;
 
 namespace Stocks.Persistence;
 
-public interface IPostgresStatement
-{
+public interface IPostgresStatement {
     Task<DbStmtResult> Execute(NpgsqlConnection conn, CancellationToken ct);
 }

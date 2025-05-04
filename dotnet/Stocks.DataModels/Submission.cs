@@ -11,7 +11,6 @@ public record Submission(
     FilingType FilingType,
     FilingCategory FilingCategory,
     DateOnly ReportDate,
-    DateTime? AcceptanceTime)
-{
+    DateTime? AcceptanceTime) {
     public DateTime ReportTime => ReportDate.AsUtcTime();
 }

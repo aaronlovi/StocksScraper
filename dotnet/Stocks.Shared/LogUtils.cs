@@ -4,8 +4,7 @@ using System.Text;
 
 namespace Stocks.Shared;
 
-public static class LogUtils
-{
+public static class LogUtils {
     public const string CikContext = "CIK";
     public const string CompanyIdContext = "CompanyId";
     public const string ReqIdContext = "ReqId";
@@ -23,8 +22,7 @@ public static class LogUtils
     /// <remarks>
     /// If an item in the collection is null, "null" is included in the string representation for that item.
     /// </remarks>
-    public static string GetLogStr<T>(IReadOnlyCollection<T> list, int maxItems = DefaultMaxItems)
-    {
+    public static string GetLogStr<T>(IReadOnlyCollection<T> list, int maxItems = DefaultMaxItems) {
         if (maxItems < 0)
             throw new ArgumentOutOfRangeException(nameof(maxItems), "The maximum number of items must be non-negative.");
 
@@ -32,22 +30,20 @@ public static class LogUtils
             return "[]";
 
         var sb = new StringBuilder();
-        sb.Append('[');
+        _ = sb.Append('[');
 
         int i = 0;
-        foreach (var item in list)
-        {
-            if (i >= maxItems)
-            {
-                sb.Append($", and {list.Count - maxItems} more...");
+        foreach (T? item in list) {
+            if (i >= maxItems) {
+                _ = sb.Append($", and {list.Count - maxItems} more...");
                 break;
             }
             if (i > 0)
-                sb.Append(',');
-            sb.Append(item?.ToString() ?? "null");
+                _ = sb.Append(',');
+            _ = sb.Append(item?.ToString() ?? "null");
             ++i;
         }
-        sb.Append(']');
+        _ = sb.Append(']');
 
         return sb.ToString();
     }

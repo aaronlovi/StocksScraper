@@ -3,12 +3,10 @@ using Stocks.Shared;
 
 namespace EDGARScraper;
 
-internal record XBRLParserResult : Results
-{
+internal record XBRLParserResult : Results {
     internal XBRLParserResult(
         bool success, string errorMessage = "", XBRLFileParserFailureReason reason = XBRLFileParserFailureReason.Invalid)
-        : base(success, errorMessage)
-    {
+        : base(success, errorMessage) {
         Reason = reason;
     }
 

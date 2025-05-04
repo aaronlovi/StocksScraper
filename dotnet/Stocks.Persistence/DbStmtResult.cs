@@ -4,11 +4,9 @@ namespace Stocks.Persistence;
 
 public enum DbStmtFailureReason { Invalid, Duplicate, Other }
 
-public record DbStmtResult : Results
-{
+public record DbStmtResult : Results {
     private DbStmtResult(bool success, string errMsg, int numRows, DbStmtFailureReason failureReason)
-        : base(success, errMsg)
-    {
+        : base(success, errMsg) {
         NumRows = numRows;
         FailureReason = failureReason;
     }

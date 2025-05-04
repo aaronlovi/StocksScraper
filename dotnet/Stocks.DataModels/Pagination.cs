@@ -2,12 +2,10 @@
 
 namespace Stocks.DataModels;
 
-public record PaginationRequest
-{
+public record PaginationRequest {
     public const uint DefaultMaxPageSize = 100;
 
-    public PaginationRequest(uint pageNumber, uint pageSize, uint maxPageSize = DefaultMaxPageSize)
-    {
+    public PaginationRequest(uint pageNumber, uint pageSize, uint maxPageSize = DefaultMaxPageSize) {
         if (pageNumber == 0)
             throw new ArgumentOutOfRangeException(nameof(pageNumber), "Page number must be greater than 0.");
         if (pageSize == 0)

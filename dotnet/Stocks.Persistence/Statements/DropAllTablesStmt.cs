@@ -1,11 +1,9 @@
 ﻿using System.Collections.Generic;
 using Npgsql;
-using Stocks.Persistence.Statements;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Statements;
 
-internal sealed class DropAllTablesStmt : NonQueryDbStmtBase
-{
+internal sealed class DropAllTablesStmt : NonQueryDbStmtBase {
     private const string sql = @"
 DROP TABLE changelog;
 DROP TABLE companies;

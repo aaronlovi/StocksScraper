@@ -10,19 +10,16 @@ using Stocks.DataModels.Enums;
 
 namespace Stocks.DataModels;
 
-public class SubmissionJsonConverter
-{
+public class SubmissionJsonConverter {
     private readonly ILogger<SubmissionJsonConverter> _logger;
 
-    public SubmissionJsonConverter(IServiceProvider svp)
-    {
+    public SubmissionJsonConverter(IServiceProvider svp) {
         _logger = svp.GetRequiredService<ILogger<SubmissionJsonConverter>>();
     }
 
-    public IReadOnlyCollection<Submission> ToSubmissions(FilingsDetails submissionJson)
-    {
+    public IReadOnlyCollection<Submission> ToSubmissions(FilingsDetails submissionJson) {
         int count = submissionJson.AccessionNumbersList.Count;
-        if (submissionJson.FilingDatesList.Count != count ||
+        return submissionJson.FilingDatesList.Count != count ||
             submissionJson.ReportDatesList.Count != count ||
             submissionJson.AcceptanceDateTimesList.Count != count ||
             submissionJson.ActsList.Count != count ||
@@ -34,30 +31,27 @@ public class SubmissionJsonConverter
             submissionJson.IsXbrlList.Count != count ||
             submissionJson.IsInlineXbrlList.Count != count ||
             submissionJson.PrimaryDocumentsList.Count != count ||
-            submissionJson.PrimaryDocDescriptionsList.Count != count)
-        {
-            return [];
-        }
-
-        return GetSubmissions(submissionJson);
+            submissionJson.PrimaryDocDescriptionsList.Count != count
+            ? []
+            : (IReadOnlyCollection<Submission>)GetSubmissions(submissionJson);
     }
 
-    private List<Submission> GetSubmissions(FilingsDetails submissionJson)
-    {
+    private List<Submission> GetSubmissions(FilingsDetails submissionJson) {
         var retVal = new List<Submission>();
 
-        for (int i = 0; i < submissionJson.AccessionNumbersList.Count; i++)
-        {
-            try
-            {
+        for (int i = 0; i < submissionJson.AccessionNumbersList.Count; i++) {
+            try {
                 FilingType filingType = submissionJson.GetFilingTypeAtIndex(i);
-                if (filingType is FilingType.Invalid) continue;
+                if (filingType is FilingType.Invalid)
+                    continue;
 
                 FilingCategory filingCategory = submissionJson.GetFilingCategoryAtIndex(i);
-                if (filingCategory is FilingCategory.Invalid) continue;
+                if (filingCategory is FilingCategory.Invalid)
+                    continue;
 
                 bool res = DateOnly.TryParseExact(submissionJson.ReportDatesList[i], "yyyy-MM-dd", out DateOnly reportDate);
-                if (!res) continue;
+                if (!res)
+                    continue;
 
                 bool parsedAcceptanceRes = DateTime.TryParse(
                     submissionJson.AcceptanceDateTimesList[i],
@@ -74,9 +68,7 @@ public class SubmissionJsonConverter
                     filingCategory,
                     reportDate,
                     acceptanceTime));
-            }
-            catch (Exception ex)
-            {
+            } catch (Exception ex) {
                 _logger.LogError(ex, "GetSubmissions failed");
             }
         }

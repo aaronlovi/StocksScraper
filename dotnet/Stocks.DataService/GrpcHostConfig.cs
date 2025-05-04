@@ -9,8 +9,7 @@ namespace Stocks.DataService;
 /// <summary>
 /// This helper class is used by the main startup config. This allows to keep registered classes as 'internal'.
 /// </summary>
-internal static class GrpcHostConfig
-{
+internal static class GrpcHostConfig {
     public static void ConfigureServices(IServiceCollection _) { }
 
     /// <summary>
@@ -19,5 +18,5 @@ internal static class GrpcHostConfig
     /// in the <see cref="RawDataGrpcService"/> class.
     /// </summary>
     public static IEnumerable<GrpcServiceEndpointConventionBuilder> ConfigureEndpoints(IEndpointRouteBuilder endpoints)
-    => [ endpoints.MapGrpcService<RawDataGrpcService>() ];
+    => [endpoints.MapGrpcService<RawDataGrpcService>()];
 }

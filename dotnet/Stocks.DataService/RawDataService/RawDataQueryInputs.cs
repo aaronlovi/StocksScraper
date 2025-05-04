@@ -8,12 +8,10 @@ using Stocks.DataModels;
 
 namespace Stocks.DataService.RawData;
 
-internal abstract class RawDataQueryInputBase : IDisposable
-{
+internal abstract class RawDataQueryInputBase : IDisposable {
     private bool _isDisposed;
 
-    public RawDataQueryInputBase(string reqId, CancellationTokenSource? cancellationTokenSource)
-    {
+    public RawDataQueryInputBase(string reqId, CancellationTokenSource? cancellationTokenSource) {
         ReqId = reqId;
         Completed = new();
         CancellationTokenSource = cancellationTokenSource;
@@ -23,12 +21,11 @@ internal abstract class RawDataQueryInputBase : IDisposable
     [JsonIgnore] public TaskCompletionSource<object?> Completed { get; init; }
     [JsonIgnore] public CancellationTokenSource? CancellationTokenSource { get; init; }
 
-    protected virtual void Dispose(bool disposing)
-    {
-        if (_isDisposed) return;
+    protected virtual void Dispose(bool disposing) {
+        if (_isDisposed)
+            return;
 
-        if (disposing)
-        {
+        if (disposing) {
             // Dispose managed state (managed objects)
             CancellationTokenSource?.Dispose();
         }
@@ -47,32 +44,29 @@ internal abstract class RawDataQueryInputBase : IDisposable
     //     Dispose(disposing: false);
     // }
 
-    public void Dispose()
-    {
+    public void Dispose() {
         // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
 }
 
-internal class GetCompanyByIdInputs : RawDataQueryInputBase
-{
+internal class GetCompanyByIdInputs : RawDataQueryInputBase {
     public GetCompanyByIdInputs(string reqId, ulong companyId, CancellationTokenSource? cancellationTokenSource)
-        : base(reqId, cancellationTokenSource)
-        => CompanyId = companyId;
+        : base(reqId, cancellationTokenSource) {
+        CompanyId = companyId;
+    }
 
     public ulong CompanyId { get; init; }
 }
 
-internal class GetCompaniesMetadataInputs : RawDataQueryInputBase
-{
+internal class GetCompaniesMetadataInputs : RawDataQueryInputBase {
     public GetCompaniesMetadataInputs(
         string reqId,
         string dataSource,
         PaginationRequest paginationRequest,
         CancellationTokenSource? cancellationTokenSource)
-        : base(reqId, cancellationTokenSource)
-    {
+        : base(reqId, cancellationTokenSource) {
         DataSource = dataSource;
         Pagination = paginationRequest;
     }

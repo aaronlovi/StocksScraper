@@ -1,7 +1,6 @@
 ﻿namespace Stocks.DataModels.Enums;
 
-public enum FilingCategory
-{
+public enum FilingCategory {
     Invalid = 0,
     Annual = 1,
     Quarterly = 2,

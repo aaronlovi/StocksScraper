@@ -1,12 +1,10 @@
 ﻿using System.Collections.Generic;
 using Npgsql;
 using Stocks.DataModels;
-using Stocks.Persistence.Statements;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Statements;
 
-internal sealed class GetAllDataPointUnitsStmt : QueryDbStmtBase
-{
+internal sealed class GetAllDataPointUnitsStmt : QueryDbStmtBase {
     private const string sql = "SELECT data_point_unit_id, data_point_unit_name FROM data_point_units";
 
     private readonly List<DataPointUnit> _dataPointUnits;
@@ -15,16 +13,17 @@ internal sealed class GetAllDataPointUnitsStmt : QueryDbStmtBase
     private static int _dataPointUnitNameIndex = -1;
 
     public GetAllDataPointUnitsStmt()
-        : base(sql, nameof(GetAllDataPointUnitsStmt))
-        => _dataPointUnits = [];
+        : base(sql, nameof(GetAllDataPointUnitsStmt)) {
+        _dataPointUnits = [];
+    }
 
     public IReadOnlyCollection<DataPointUnit> Units => _dataPointUnits;
 
-    protected override void BeforeRowProcessing(NpgsqlDataReader reader)
-    {
+    protected override void BeforeRowProcessing(NpgsqlDataReader reader) {
         base.BeforeRowProcessing(reader);
 
-        if (_dataPointUnitIdIndex != -1) return;
+        if (_dataPointUnitIdIndex != -1)
+            return;
 
         _dataPointUnitIdIndex = reader.GetOrdinal("data_point_unit_id");
         _dataPointUnitNameIndex = reader.GetOrdinal("data_point_unit_name");
@@ -34,8 +33,7 @@ internal sealed class GetAllDataPointUnitsStmt : QueryDbStmtBase
 
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() => [];
 
-    protected override bool ProcessCurrentRow(NpgsqlDataReader reader)
-    {
+    protected override bool ProcessCurrentRow(NpgsqlDataReader reader) {
         var dataPointUnit = new DataPointUnit(
             (ulong)reader.GetInt64(_dataPointUnitIdIndex),
             reader.GetString(_dataPointUnitNameIndex));

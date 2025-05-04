@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Migrations;
 
 /// <summary>
 /// Handles database migrations for the application.
@@ -16,14 +16,12 @@ namespace Stocks.Persistence;
 /// and are located in the "Migrations" directory.
 /// The connection string and database schema are provided via the application's configuration.
 /// </remarks>
-public class DbMigrations
-{
+public class DbMigrations {
     private readonly ILogger<DbMigrations> _logger;
     private readonly string _connectionString;
     private readonly string _databaseSchema;
 
-    public DbMigrations(IServiceProvider svp)
-    {
+    public DbMigrations(IServiceProvider svp) {
         _logger = svp.GetRequiredService<ILogger<DbMigrations>>();
         IConfiguration config = svp.GetRequiredService<IConfiguration>();
 
@@ -36,13 +34,10 @@ public class DbMigrations
             throw new InvalidOperationException("Database schema is empty");
     }
 
-    public void Up()
-    {
-        try
-        {
+    public void Up() {
+        try {
             using var connection = new NpgsqlConnection(_connectionString);
-            var evolve = new Evolve(connection, msg => _logger.LogInformation("Evolve: {msg}", msg))
-            {
+            var evolve = new Evolve(connection, msg => _logger.LogInformation("Evolve: {msg}", msg)) {
                 EmbeddedResourceAssemblies = [typeof(DbMigrations).Assembly],
                 // EmbeddedResourceFilters = new[] { "dbm-persistence" },
                 Schemas = [_databaseSchema],
@@ -54,9 +49,7 @@ public class DbMigrations
             // Reload types to get proper introspection
             connection.Open();
             connection.ReloadTypes();
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             _logger.LogError(ex, "Database migration failed");
             throw;
         }

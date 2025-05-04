@@ -7,8 +7,7 @@ using Stocks.DataModels;
 
 namespace EDGARScraper;
 
-internal class ParseBulkXbrlArchiveContext(IServiceProvider svp)
-{
+internal class ParseBulkXbrlArchiveContext(IServiceProvider svp) {
     private readonly ILogger<ParseBulkXbrlArchiveContext> _logger = svp.GetRequiredService<ILogger<ParseBulkXbrlArchiveContext>>();
 
     public int NumFiles { get; set; }
@@ -22,8 +21,7 @@ internal class ParseBulkXbrlArchiveContext(IServiceProvider svp)
     public Dictionary<string, DataPointUnit> UnitsByUnitName { get; init; } = [];
     public Dictionary<ulong, List<Submission>> SubmissionsByCompanyId { get; init; } = [];
 
-    public void LogProgress()
-    {
+    public void LogProgress() {
         _logger.LogInformation("Processed {NumFiles} files; {NumDataPoints} data points; {NumDataPointUnits} data point units; Total length: {TotalLength} bytes",
             NumFiles, NumDataPoints, NumDataPointUnits, TotalLength);
     }

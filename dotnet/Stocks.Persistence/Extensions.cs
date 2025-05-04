@@ -1,24 +1,24 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Npgsql;
 using NpgsqlTypes;
 
 namespace Stocks.Persistence;
 
-internal static class Extensions
-{
+internal static class Extensions {
     internal static void WriteNullable<T>(this NpgsqlBinaryImporter writer, T? obj, NpgsqlDbType type)
-        where T : class
-    {
-        if (obj is null) writer.WriteNull();
-        else writer.Write(obj, type);
+        where T : class {
+        if (obj is null)
+            writer.WriteNull();
+        else
+            writer.Write(obj, type);
     }
 
     internal static void WriteNullable<T>(this NpgsqlBinaryImporter writer, T? obj, NpgsqlDbType type)
-        where T : struct
-    {
-        if (obj.HasValue) writer.Write(obj.Value, type);
-        else writer.WriteNull();
+        where T : struct {
+        if (obj.HasValue)
+            writer.Write(obj.Value, type);
+        else
+            writer.WriteNull();
     }
 
     internal static Task WriteNullableAsync<T>(this NpgsqlBinaryImporter writer, T? obj, NpgsqlDbType type)

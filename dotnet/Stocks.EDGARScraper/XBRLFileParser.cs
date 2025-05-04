@@ -12,8 +12,7 @@ using Stocks.Shared;
 
 namespace EDGARScraper;
 
-internal class XBRLFileParser
-{
+internal class XBRLFileParser {
     private ulong _companyId;
     private XbrlJson? _xbrlJson;
     private readonly string _content;
@@ -26,8 +25,7 @@ internal class XBRLFileParser
 
     private ulong Cik => _xbrlJson?.Cik ?? 0;
 
-    internal XBRLFileParser(string content, ParseBulkXbrlArchiveContext parserContext, IServiceProvider svp)
-    {
+    internal XBRLFileParser(string content, ParseBulkXbrlArchiveContext parserContext, IServiceProvider svp) {
         _content = content;
         _companyIdsByCiks = parserContext.CompanyIdsByCik;
         _submissionsByCompanyId = parserContext.SubmissionsByCompanyId;
@@ -39,33 +37,27 @@ internal class XBRLFileParser
 
     internal IEnumerable<DataPoint> DataPoints => _dataPoints.Values.SelectMany(x => x.Values.SelectMany(y => y.Values));
 
-    internal XBRLParserResult Parse()
-    {
-        try
-        {
+    internal XBRLParserResult Parse() {
+        try {
             _xbrlJson = JsonSerializer.Deserialize<XbrlJson>(_content, Conventions.DefaultOptions);
-            if (_xbrlJson is null)
-            {
+            if (_xbrlJson is null) {
                 _logger.LogWarning("Parse - Failed to deserialize XBRL JSON.");
                 return XBRLParserResult.FailedToDeserializeXbrlJson();
             }
 
-            if (Cik == 0)
-            {
+            if (Cik == 0) {
                 _logger.LogInformation("Parse - CIK is 0, aborting");
                 return XBRLParserResult.FailureResult("CIK is 0", XBRLFileParserFailureReason.CikIsZero);
             }
 
-            if (!_companyIdsByCiks.TryGetValue(Cik, out _companyId))
-            {
+            if (!_companyIdsByCiks.TryGetValue(Cik, out _companyId)) {
                 _logger.LogWarning("Parse - Failed to find company ID for CIK {Cik}, aborting", Cik);
                 return XBRLParserResult.CikIsZero();
             }
-            
-            using var logContext = CreateLogContext();
 
-            if (!_submissionsByCompanyId.TryGetValue(_companyId, out List<Submission>? submissions))
-            {
+            using IDisposable? logContext = CreateLogContext();
+
+            if (!_submissionsByCompanyId.TryGetValue(_companyId, out List<Submission>? submissions)) {
                 _logger.LogInformation("Parse - Failed to find submissions for company ID {_companyId}, aborting", _companyId);
                 return XBRLParserResult.FailedToFindSubmissions(_companyId);
             }
@@ -77,24 +69,20 @@ internal class XBRLFileParser
                 ProcessFact(factName, fact);
 
             return XBRLParserResult.SuccessResult();
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             _logger.LogError(ex, "Parse - Exception occurred");
             return XBRLParserResult.GeneralFault(ex.Message);
         }
 
         // Local helper methods
 
-        IDisposable? CreateLogContext() => _logger.BeginScope(new Dictionary<string, object>
-        {
+        IDisposable? CreateLogContext() => _logger.BeginScope(new Dictionary<string, object> {
             [LogUtils.CikContext] = Cik,
             [LogUtils.CompanyIdContext] = _companyId
         });
     }
 
-    private void ProcessFact(string factName, Fact fact)
-    {
+    private void ProcessFact(string factName, Fact fact) {
         Dictionary<string, Dictionary<DatePair, DataPoint>> unitsDataPoints =
             _dataPoints.GetOrCreateEntry(factName);
 
@@ -106,26 +94,22 @@ internal class XBRLFileParser
         string factName,
         Dictionary<string, Dictionary<DatePair, DataPoint>> unitsDataPoints,
         string unitName,
-        List<Unit> units)
-    {
+        List<Unit> units) {
         Dictionary<DatePair, DataPoint> dataPointsByDatePair =
             unitsDataPoints.GetOrCreateEntry(unitName);
 
-        foreach (Unit unitData in units)
-        {
-            if (!VerifyFilingReference(unitData)) continue;
+        foreach (Unit unitData in units) {
+            if (!VerifyFilingReference(unitData))
+                continue;
 
             ProcessUnitItemForFact(factName, unitName, dataPointsByDatePair, unitData);
         }
 
         // Local helper methods
 
-        bool VerifyFilingReference(Unit unitData)
-        {
-            if (_submissionsByFilingReference.TryGetValue(unitData.FilingReference, out Submission? submission))
-            {
-                if (submission.FilingCategory is FilingCategory.Other)
-                {
+        bool VerifyFilingReference(Unit unitData) {
+            if (_submissionsByFilingReference.TryGetValue(unitData.FilingReference, out Submission? submission)) {
+                if (submission.FilingCategory is FilingCategory.Other) {
                     _logger.LogDebug("ProcessUnitsForFact - Skipping data point with filing reference {FilingReference} because it has a filing category of 'Other'. Filing category: {FilingCategory}",
                         unitData.FilingReference, submission.FilingCategory);
                     return false;
@@ -134,8 +118,7 @@ internal class XBRLFileParser
                 return true;
             }
 
-            if (_filingReferencesWithNoSubmissions.Add(unitData.FilingReference))
-            {
+            if (_filingReferencesWithNoSubmissions.Add(unitData.FilingReference)) {
                 _logger.LogWarning("ProcessUnitsForFact - Failed to find submission for filing reference {FilingReference}",
                     unitData.FilingReference);
             }
@@ -145,18 +128,15 @@ internal class XBRLFileParser
     }
 
     private void ProcessUnitItemForFact(
-        string factName, string unit, Dictionary<DatePair, DataPoint> dataPointsByDatePair, Unit unitData)
-    {
+        string factName, string unit, Dictionary<DatePair, DataPoint> dataPointsByDatePair, Unit unitData) {
         DatePair datePair = unitData.DatePair;
 
         if (dataPointsByDatePair.TryGetValue(datePair, out DataPoint? existingDataPoint)
-            && unitData.FiledDate <= existingDataPoint.FiledDate)
-        {
+            && unitData.FiledDate <= existingDataPoint.FiledDate) {
             return;
         }
 
-        if (!_submissionsByFilingReference.TryGetValue(unitData.FilingReference, out Submission? submission))
-        {
+        if (!_submissionsByFilingReference.TryGetValue(unitData.FilingReference, out Submission? submission)) {
             _logger.LogWarning("ProcessUnitItemForFact - Failed to find submission for filing reference {FilingReference}",
                 unitData.FilingReference);
             return;

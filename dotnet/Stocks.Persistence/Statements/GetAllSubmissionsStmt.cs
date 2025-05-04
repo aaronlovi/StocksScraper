@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using Npgsql;
 using Stocks.DataModels;
 using Stocks.DataModels.Enums;
-using Stocks.Persistence.Statements;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Statements;
 
-internal sealed class GetAllSubmissionsStmt : QueryDbStmtBase
-{
+internal sealed class GetAllSubmissionsStmt : QueryDbStmtBase {
     private const string sql = "SELECT submission_id, company_id, filing_reference, filing_type, filing_category, report_date, acceptance_datetime"
         + " FROM submissions";
 
@@ -23,16 +21,17 @@ internal sealed class GetAllSubmissionsStmt : QueryDbStmtBase
     private static int _acceptanceDatetimeIndex = -1;
 
     public GetAllSubmissionsStmt()
-        : base(sql, nameof(GetAllSubmissionsStmt))
-        => _submissions = [];
+        : base(sql, nameof(GetAllSubmissionsStmt)) {
+        _submissions = [];
+    }
 
     public IReadOnlyCollection<Submission> Submissions => _submissions;
 
-    protected override void BeforeRowProcessing(NpgsqlDataReader reader)
-    {
+    protected override void BeforeRowProcessing(NpgsqlDataReader reader) {
         base.BeforeRowProcessing(reader);
 
-        if (_submissionIdIndex != -1) return;
+        if (_submissionIdIndex != -1)
+            return;
 
         _submissionIdIndex = reader.GetOrdinal("submission_id");
         _companyIdIndex = reader.GetOrdinal("company_id");
@@ -47,9 +46,8 @@ internal sealed class GetAllSubmissionsStmt : QueryDbStmtBase
 
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() => [];
 
-    protected override bool ProcessCurrentRow(NpgsqlDataReader reader)
-    {
-        DateOnly reportDate = DateOnly.FromDateTime(reader.GetDateTime(_reportDateIndex));
+    protected override bool ProcessCurrentRow(NpgsqlDataReader reader) {
+        var reportDate = DateOnly.FromDateTime(reader.GetDateTime(_reportDateIndex));
         DateTime? acceptanceTime = reader.GetNullableValueType<DateTime>(_acceptanceDatetimeIndex);
 
         var item = new Submission(

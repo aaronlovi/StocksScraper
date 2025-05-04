@@ -1,12 +1,10 @@
 ﻿using System.Collections.Generic;
 using Npgsql;
 using Stocks.DataModels;
-using Stocks.Persistence.Statements;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Statements;
 
-internal sealed class InsertDataPointUnitStmt(DataPointUnit _unit) : NonQueryDbStmtBase(sql, nameof(InsertDataPointUnitStmt))
-{
+internal sealed class InsertDataPointUnitStmt(DataPointUnit _unit) : NonQueryDbStmtBase(sql, nameof(InsertDataPointUnitStmt)) {
     private const string sql = "INSERT INTO data_point_units (data_point_unit_id, data_point_unit_name)"
         + " VALUES (@unitId, @unitName)";
 

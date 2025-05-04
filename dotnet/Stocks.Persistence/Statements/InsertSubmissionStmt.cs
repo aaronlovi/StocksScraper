@@ -2,12 +2,10 @@
 using System.Collections.Generic;
 using Npgsql;
 using Stocks.DataModels;
-using Stocks.Persistence.Statements;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Statements;
 
-internal sealed class InsertSubmissionStmt : NonQueryDbStmtBase
-{
+internal sealed class InsertSubmissionStmt : NonQueryDbStmtBase {
     private const string sql = "INSERT INTO submissions (submission_id, company_id, filing_reference, filing_type, filing_category, report_date, acceptance_datetime)"
         + " VALUES (@submission_id, @company_id, @filing_reference, @filing_type, @filing_category, @report_date, @acceptance_datetime)";
 
@@ -15,11 +13,10 @@ internal sealed class InsertSubmissionStmt : NonQueryDbStmtBase
 
     public Submission? Submission { get; set; }
 
-    protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters()
-    {
-        if (Submission is null) throw new InvalidOperationException("Submission is not set.");
-
-        return [
+    protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() {
+        return Submission is null
+            ? throw new InvalidOperationException("Submission is not set.")
+            : [
             new NpgsqlParameter<long>("submission_id", (long)Submission.SubmissionId),
             new NpgsqlParameter<long>("company_id", (long)Submission.CompanyId),
             new NpgsqlParameter<string>("filing_reference", Submission.FilingReference),

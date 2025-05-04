@@ -1,10 +1,8 @@
 ﻿namespace Stocks.DataModels.Enums;
 
-public static class EnumExtensions
-{
+public static class EnumExtensions {
     public static FilingType ToFilingType(this string coreType) =>
-        coreType switch
-        {
+        coreType switch {
             "10-K" => FilingType.TenK,
             "10-Q" => FilingType.TenQ,
             "8-K" => FilingType.EightK,
@@ -25,8 +23,7 @@ public static class EnumExtensions
         };
 
     public static FilingCategory ToFilingCategory(this string coreType) =>
-        coreType switch
-        {
+        coreType switch {
             "10-K" => FilingCategory.Annual,
             "10-K/A" => FilingCategory.Annual,
             "20-F" => FilingCategory.Annual,

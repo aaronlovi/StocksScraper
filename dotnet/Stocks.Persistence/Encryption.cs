@@ -5,10 +5,8 @@ using System.Security.Cryptography;
 
 namespace Stocks.Persistence;
 
-public static class Encryption
-{
-    public static byte[] Encrypt(string password, long salt, byte[] payload)
-    {
+public static class Encryption {
+    public static byte[] Encrypt(string password, long salt, byte[] payload) {
         if (string.IsNullOrEmpty(password))
             throw new ArgumentOutOfRangeException(nameof(password));
         if (salt == 0)
@@ -34,8 +32,7 @@ public static class Encryption
         return ms.ToArray();
     }
 
-    public static byte[] Decrypt(string password, long salt, byte[] encrypted)
-    {
+    public static byte[] Decrypt(string password, long salt, byte[] encrypted) {
         if (string.IsNullOrEmpty(password))
             throw new ArgumentOutOfRangeException(nameof(password));
         if (salt == 0)

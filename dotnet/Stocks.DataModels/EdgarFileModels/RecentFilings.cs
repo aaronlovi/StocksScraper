@@ -9,8 +9,7 @@ namespace Stocks.DataModels.EdgarFileModels;
 /// <summary>
 /// Contained in a "submissions" file
 /// </summary>
-public record RecentFilingsContainer
-{
+public record RecentFilingsContainer {
     [JsonPropertyName("cik")] public ulong Cik { get; init; }
     [JsonPropertyName("filings")] public RecentFilings Filings { get; init; } = new();
 }
@@ -18,16 +17,14 @@ public record RecentFilingsContainer
 /// <summary>
 /// Contained in a "submissions" file
 /// </summary>
-public record RecentFilings
-{
+public record RecentFilings {
     [JsonPropertyName("recent")] public FilingsDetails Recent { get; init; } = new();
 }
 
 /// <summary>
 /// Contained in a "submissions" file
 /// </summary>
-public record FilingsDetails
-{
+public record FilingsDetails {
     [JsonPropertyName("accessionNumber")] public List<string> AccessionNumbersList { get; init; } = [];
     [JsonPropertyName("filingDate")] public List<string> FilingDatesList { get; init; } = [];
     [JsonPropertyName("reportDate")] public List<string> ReportDatesList { get; init; } = [];
@@ -43,24 +40,22 @@ public record FilingsDetails
     [JsonPropertyName("primaryDocument")] public List<string> PrimaryDocumentsList { get; init; } = [];
     [JsonPropertyName("primaryDocDescription")] public List<string> PrimaryDocDescriptionsList { get; init; } = [];
 
-    public FilingType GetFilingTypeAtIndex(int index)
-    {
+    public FilingType GetFilingTypeAtIndex(int index) {
         if (index < 0 || index > FormsList.Count || index > CoreTypesList.Count)
             throw new ArgumentOutOfRangeException(nameof(index));
 
-        FilingType filingType = FormsList[index].ToFilingType();
+        var filingType = FormsList[index].ToFilingType();
 
-        return filingType is not FilingType.Invalid 
-            ? filingType 
+        return filingType is not FilingType.Invalid
+            ? filingType
             : CoreTypesList[index].ToFilingType();
     }
 
-    public FilingCategory GetFilingCategoryAtIndex(int index)
-    {
+    public FilingCategory GetFilingCategoryAtIndex(int index) {
         if (index < 0 || index > CoreTypesList.Count)
             throw new ArgumentOutOfRangeException(nameof(index));
 
-        FilingCategory filingCategory = FormsList[index].ToFilingCategory();
+        var filingCategory = FormsList[index].ToFilingCategory();
 
         return filingCategory is not FilingCategory.Invalid
             ? filingCategory

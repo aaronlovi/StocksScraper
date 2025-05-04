@@ -2,8 +2,7 @@
 
 namespace Stocks.DataModels.EdgarFileModels;
 
-public record XbrlJson
-{
+public record XbrlJson {
     [JsonPropertyName("cik")]
     [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
     public ulong Cik { get; init; }

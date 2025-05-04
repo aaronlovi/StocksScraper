@@ -1,0 +1,53 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Files", "Solution Files", "{861B639E-5EAB-4BF9-A416-9F0EC4020512}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		Directory.Build.props = Directory.Build.props
+		NuGet.config = NuGet.config
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.Persistence", "Stocks.Persistence\Stocks.Persistence.csproj", "{4CB3BD47-4871-40BE-8A48-C1A6BC885183}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.DataService", "Stocks.DataService\Stocks.DataService.csproj", "{38C65915-E6C2-4A73-A47B-18FCCE3A523C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.DataModels", "Stocks.DataModels\Stocks.DataModels.csproj", "{1B8AB971-CE2C-0DF7-7FC0-F21366105907}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.Shared", "Stocks.Shared\Stocks.Shared.csproj", "{6DAE6028-DE63-0EC2-8B67-223378ABC0EA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.EDGARScraper", "Stocks.EDGARScraper\Stocks.EDGARScraper.csproj", "{5DEFAEFD-E676-22E1-1275-613B6CA302C0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CB3BD47-4871-40BE-8A48-C1A6BC885183}.Release|Any CPU.Build.0 = Release|Any CPU
+		{38C65915-E6C2-4A73-A47B-18FCCE3A523C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{38C65915-E6C2-4A73-A47B-18FCCE3A523C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{38C65915-E6C2-4A73-A47B-18FCCE3A523C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{38C65915-E6C2-4A73-A47B-18FCCE3A523C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B8AB971-CE2C-0DF7-7FC0-F21366105907}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B8AB971-CE2C-0DF7-7FC0-F21366105907}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B8AB971-CE2C-0DF7-7FC0-F21366105907}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B8AB971-CE2C-0DF7-7FC0-F21366105907}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6DAE6028-DE63-0EC2-8B67-223378ABC0EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6DAE6028-DE63-0EC2-8B67-223378ABC0EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6DAE6028-DE63-0EC2-8B67-223378ABC0EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6DAE6028-DE63-0EC2-8B67-223378ABC0EA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5DEFAEFD-E676-22E1-1275-613B6CA302C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5DEFAEFD-E676-22E1-1275-613B6CA302C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5DEFAEFD-E676-22E1-1275-613B6CA302C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5DEFAEFD-E676-22E1-1275-613B6CA302C0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

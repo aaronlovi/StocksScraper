@@ -5,7 +5,7 @@ using Stocks.Shared.Models;
 namespace EDGARScraper;
 
 internal record XBRLParserResult : Result {
-    internal static readonly new XBRLParserResult Success = new(ErrorCodes.None);
+    internal static new readonly XBRLParserResult Success = new(ErrorCodes.None);
 
     internal XBRLParserResult(
         ErrorCodes errorCode, string errorMessage = "", XBRLFileParserFailureReason reason = XBRLFileParserFailureReason.Invalid)

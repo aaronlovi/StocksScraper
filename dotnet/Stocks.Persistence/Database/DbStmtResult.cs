@@ -1,7 +1,7 @@
 ﻿using Stocks.Shared;
 using Stocks.Shared.Models;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Database;
 
 public record DbStmtResult : Result {
     private DbStmtResult(int numRows, ErrorCodes errorCode, string errMsg = "")

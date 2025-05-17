@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using Stocks.Shared.Models;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Database;
 
 public class PostgresExecutor : IDisposable {
     private readonly ILogger<PostgresExecutor> _logger;

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Npgsql;
 
-namespace Stocks.Persistence.Statements;
+namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class ReserveIdRangeStmt(long _numIds) : QueryDbStmtBase(sql, nameof(ReserveIdRangeStmt)) {
     private const string sql = "UPDATE generator SET last_reserved = last_reserved + @numToGet RETURNING last_reserved";

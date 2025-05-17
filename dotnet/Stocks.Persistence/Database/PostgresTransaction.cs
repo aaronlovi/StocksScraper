@@ -1,7 +1,7 @@
 ﻿using System;
 using Npgsql;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Database;
 
 public sealed class PostgresTransaction(NpgsqlConnection _connection, NpgsqlTransaction _transaction, SemaphoreLocker _limiter) : IDisposable {
     public NpgsqlConnection Connection => _connection;

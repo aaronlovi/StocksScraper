@@ -6,12 +6,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
-using Stocks.Persistence.Migrations;
-using Stocks.Persistence.Statements;
+using Stocks.Persistence.Database.Migrations;
+using Stocks.Persistence.Database.Statements;
 using Stocks.Shared;
 using Stocks.Shared.Models;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Database;
 
 public sealed class DbmService : IDisposable, IDbmService {
     public const string StocksDataConnectionStringName = "stocks-data";
@@ -90,7 +90,7 @@ public sealed class DbmService : IDisposable, IDbmService {
 
         // Update in blocks
         const uint BLOCK_SIZE = 65536;
-        uint idRange = count - (count % BLOCK_SIZE) + BLOCK_SIZE;
+        uint idRange = count - count % BLOCK_SIZE + BLOCK_SIZE;
         var stmt = new ReserveIdRangeStmt(idRange);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct, 0);
 
@@ -272,9 +272,8 @@ public sealed class DbmService : IDisposable, IDbmService {
         // Local helper methods
 
         void ProcessSubmissionResult(ref int successCount, ref int failureCount, Submission submission, DbStmtResult res) {
-            if (res.IsSuccess) {
-                successCount++;
-            } else {
+            if (res.IsSuccess)                 successCount++;
+else {
                 failureCount++;
                 _logger.LogWarning("BulkInsertSubmissions failed to insert submission {Submission} with error {Error}",
                     submission, res);

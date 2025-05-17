@@ -6,11 +6,11 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<None Remove="Migrations\*.sql" />
+		<None Remove="Database\Migrations\*.sql" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<EmbeddedResource Include="Migrations\*.sql" />
+		<EmbeddedResource Include="Database\Migrations\*.sql" />
 	</ItemGroup>
 
 	<ItemGroup>

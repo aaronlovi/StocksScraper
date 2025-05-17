@@ -1,4 +1,4 @@
-﻿namespace Stocks.Persistence.Statements;
+﻿namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class TruncateCompaniesTablesStmt : NonQueryBatchedDbStmtBase {
     private const string TruncateCompaniesSql = "TRUNCATE TABLE companies";

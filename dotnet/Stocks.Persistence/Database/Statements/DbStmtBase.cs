@@ -6,7 +6,7 @@ using Npgsql;
 using NpgsqlTypes;
 using Stocks.Shared.Models;
 
-namespace Stocks.Persistence.Statements;
+namespace Stocks.Persistence.Database.Statements;
 
 internal static class DbUtils {
     internal static NpgsqlParameter CreateNullableDateTimeParam(string paramName, DateTimeOffset? nullableDate) {

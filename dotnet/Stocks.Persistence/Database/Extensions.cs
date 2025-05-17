@@ -2,7 +2,7 @@
 using Npgsql;
 using NpgsqlTypes;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Database;
 
 internal static class Extensions {
     internal static void WriteNullable<T>(this NpgsqlBinaryImporter writer, T? obj, NpgsqlDbType type)

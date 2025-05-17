@@ -2,7 +2,7 @@
 using Npgsql;
 using Stocks.DataModels;
 
-namespace Stocks.Persistence.Statements;
+namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class InsertDataPointUnitStmt(DataPointUnit _unit) : NonQueryDbStmtBase(sql, nameof(InsertDataPointUnitStmt)) {
     private const string sql = "INSERT INTO data_point_units (data_point_unit_id, data_point_unit_name)"

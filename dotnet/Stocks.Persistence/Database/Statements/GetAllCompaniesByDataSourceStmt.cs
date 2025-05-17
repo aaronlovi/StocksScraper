@@ -2,7 +2,7 @@
 using Npgsql;
 using Stocks.DataModels;
 
-namespace Stocks.Persistence.Statements;
+namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class GetAllCompaniesByDataSourceStmt : QueryDbStmtBase {
     private const string sql = @"

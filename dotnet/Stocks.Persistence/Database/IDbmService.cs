@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Stocks.DataModels;
 using Stocks.Shared;
 
-namespace Stocks.Persistence;
+namespace Stocks.Persistence.Database;
 
 public interface IDbmService {
     // Utilities

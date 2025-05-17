@@ -5,7 +5,7 @@ using Npgsql;
 using NpgsqlTypes;
 using Stocks.DataModels;
 
-namespace Stocks.Persistence.Statements;
+namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class BulkInsertDataPointsStmt : BulkInsertDbStmtBase<DataPoint> {
     public BulkInsertDataPointsStmt(IReadOnlyCollection<DataPoint> dataPoints)

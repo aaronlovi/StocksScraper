@@ -5,7 +5,7 @@ using Npgsql;
 using NpgsqlTypes;
 using Stocks.DataModels;
 
-namespace Stocks.Persistence.Statements;
+namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class BulkInsertCompaniesStmt : BulkInsertDbStmtBase<Company> {
     public BulkInsertCompaniesStmt(IReadOnlyCollection<Company> companies)

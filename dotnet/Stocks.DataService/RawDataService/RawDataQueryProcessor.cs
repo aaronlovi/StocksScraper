@@ -7,7 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
 using Stocks.DataService.RawData;
-using Stocks.Persistence;
+using Stocks.Persistence.Database;
 using Stocks.Protocols;
 using Stocks.Shared;
 using Stocks.Shared.ProtosExtensions;

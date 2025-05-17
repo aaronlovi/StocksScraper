@@ -2,7 +2,7 @@
 using Npgsql;
 using Stocks.DataModels;
 
-namespace Stocks.Persistence.Statements;
+namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class GetAllDataPointUnitsStmt : QueryDbStmtBase {
     private const string sql = "SELECT data_point_unit_id, data_point_unit_name FROM data_point_units";

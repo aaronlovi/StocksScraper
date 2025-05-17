@@ -4,7 +4,7 @@ using Npgsql;
 using Stocks.DataModels;
 using Stocks.DataModels.Enums;
 
-namespace Stocks.Persistence.Statements;
+namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class GetAllSubmissionsStmt : QueryDbStmtBase {
     private const string sql = "SELECT submission_id, company_id, filing_reference, filing_type, filing_category, report_date, acceptance_datetime"

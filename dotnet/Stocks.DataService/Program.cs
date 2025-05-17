@@ -8,8 +8,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Stocks.DataService.RawDataService;
-using Stocks.Persistence;
-using Stocks.Persistence.Migrations;
+using Stocks.Persistence.Database;
+using Stocks.Persistence.Database.Migrations;
 using Stocks.Shared;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 

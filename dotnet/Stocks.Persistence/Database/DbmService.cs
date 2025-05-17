@@ -90,7 +90,7 @@ public sealed class DbmService : IDisposable, IDbmService {
 
         // Update in blocks
         const uint BLOCK_SIZE = 65536;
-        uint idRange = count - count % BLOCK_SIZE + BLOCK_SIZE;
+        uint idRange = count - (count % BLOCK_SIZE) + BLOCK_SIZE;
         var stmt = new ReserveIdRangeStmt(idRange);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct, 0);
 
@@ -272,8 +272,9 @@ public sealed class DbmService : IDisposable, IDbmService {
         // Local helper methods
 
         void ProcessSubmissionResult(ref int successCount, ref int failureCount, Submission submission, DbStmtResult res) {
-            if (res.IsSuccess)                 successCount++;
-else {
+            if (res.IsSuccess) {
+                successCount++;
+            } else {
                 failureCount++;
                 _logger.LogWarning("BulkInsertSubmissions failed to insert submission {Submission} with error {Error}",
                     submission, res);

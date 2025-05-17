@@ -17,7 +17,7 @@ using Stocks.DataModels.EdgarFileModels;
 using Stocks.Persistence;
 using Stocks.Persistence.Migrations;
 using Stocks.Shared;
-
+using Stocks.Shared.Models;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace EDGARScraper;
@@ -249,8 +249,8 @@ internal class Program {
     private static void BulkInsertCompanies(IReadOnlyCollection<Company> companies, List<Task> tasks) {
         var batch = new List<Company>(companies);
         tasks.Add(Task.Run(async () => {
-            Results res = await _dbm!.BulkInsertCompanies(batch, CancellationToken.None);
-            if (res.IsError)
+            Result res = await _dbm!.BulkInsertCompanies(batch, CancellationToken.None);
+            if (res.IsFailure)
                 _logger.LogWarning("Failed to save batch of companies. Error: {Error}", res.ErrorMessage);
         }));
     }
@@ -258,8 +258,8 @@ internal class Program {
     private static void BulkInsertCompanyNames(IReadOnlyCollection<CompanyName> companyNames, List<Task> tasks) {
         var batch = new List<CompanyName>(companyNames);
         tasks.Add(Task.Run(async () => {
-            Results res = await _dbm!.BulkInsertCompanyNames(batch, CancellationToken.None);
-            if (res.IsError)
+            Result res = await _dbm!.BulkInsertCompanyNames(batch, CancellationToken.None);
+            if (res.IsFailure)
                 _logger.LogWarning("Failed to save batch of company names. Error: {Error}", res.ErrorMessage);
         }));
     }
@@ -271,14 +271,14 @@ internal class Program {
 
         var context = new ParseBulkEdgarSubmissionsContext(_svp!);
 
-        GenericResults<IReadOnlyCollection<Company>> companyResults =
+        Result<IReadOnlyCollection<Company>> companyResults =
             await _dbm!.GetAllCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
-        if (companyResults.IsError) {
+        if (companyResults.IsFailure) {
             _logger.LogError("ParseBulkEdgarSubmissionsList - Failed to get companies. Error: {Error}", companyResults.ErrorMessage);
             return;
         }
 
-        foreach (Company c in companyResults.Data!)
+        foreach (Company c in companyResults.Value!)
             context.CompanyIdsByCiks[c.Cik] = c.CompanyId;
 
         foreach (string fileName in zipReader.EnumerateFileNames()) {
@@ -375,8 +375,8 @@ internal class Program {
         var batch = new List<Submission>(submissionsBatch);
 
         tasks.Add(Task.Run(async () => {
-            Results res = await _dbm!.BulkInsertSubmissions(batch, CancellationToken.None);
-            if (res.IsError)
+            Result res = await _dbm!.BulkInsertSubmissions(batch, CancellationToken.None);
+            if (res.IsFailure)
                 _logger.LogWarning("Failed to save batch of submissions. Error: {Error}", res.ErrorMessage);
         }));
     }
@@ -388,34 +388,34 @@ internal class Program {
 
         var context = new ParseBulkXbrlArchiveContext(_svp!);
 
-        GenericResults<IReadOnlyCollection<Company>> companyResults =
+        Result<IReadOnlyCollection<Company>> companyResults =
             await _dbm!.GetAllCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
-        if (companyResults.IsError) {
+        if (companyResults.IsFailure) {
             _logger.LogError("ParseBulkXbrlArchive - Failed to get companies. Error: {Error}", companyResults.ErrorMessage);
             return;
         }
 
-        foreach (Company c in companyResults.Data!)
+        foreach (Company c in companyResults.Value!)
             context.CompanyIdsByCik[c.Cik] = c.CompanyId;
 
-        GenericResults<IReadOnlyCollection<DataPointUnit>> dpuResults =
+        Result<IReadOnlyCollection<DataPointUnit>> dpuResults =
             await _dbm!.GetDataPointUnits(CancellationToken.None);
-        if (dpuResults.IsError) {
+        if (dpuResults.IsFailure) {
             _logger.LogError("ParseBulkXbrlArchive - Failed to get data point units. Error: {Error}", dpuResults.ErrorMessage);
             return;
         }
 
-        foreach (DataPointUnit dpu in dpuResults.Data!)
+        foreach (DataPointUnit dpu in dpuResults.Value!)
             context.UnitsByUnitName[dpu.UnitName] = dpu;
 
-        GenericResults<IReadOnlyCollection<Submission>> submissionResults =
+        Result<IReadOnlyCollection<Submission>> submissionResults =
             await _dbm!.GetSubmissions(CancellationToken.None);
-        if (submissionResults.IsError) {
+        if (submissionResults.IsFailure) {
             _logger.LogError("ParseBulkXbrlArchive - Failed to get submissions. Error: {Error}", submissionResults.ErrorMessage);
             return;
         }
 
-        foreach (Submission s in submissionResults.Data!) {
+        foreach (Submission s in submissionResults.Value!) {
             List<Submission> companySubmissions = context.SubmissionsByCompanyId.GetOrCreateEntry(s.CompanyId);
             companySubmissions.Add(s);
         }
@@ -449,7 +449,7 @@ internal class Program {
 
             XBRLFileParser parser = CreateParser(fileContent);
             XBRLParserResult res = parser.Parse();
-            if (res.IsError) {
+            if (res.IsFailure) {
                 LogParseFailure(res);
                 return;
             }
@@ -483,8 +483,8 @@ internal class Program {
             return;
         }
 
-        GenericResults<Submission> findSubmissionForDataPointResults = CorrelateDataPointToSubmission(dp, submissions);
-        if (findSubmissionForDataPointResults.IsError) {
+        Result<Submission> findSubmissionForDataPointResults = CorrelateDataPointToSubmission(dp, submissions);
+        if (findSubmissionForDataPointResults.IsFailure) {
             _logger.LogWarning("ParseOneFileXBRL:ProcessDataPoint - Failed to find submission for data point. {CompanyId},{DataPoint}. Error: {Error}",
                 dp.CompanyId, dp, findSubmissionForDataPointResults.ErrorMessage);
             return;
@@ -507,13 +507,13 @@ internal class Program {
             context.NumDataPoints += BulkInsertDataPointsAndClearBatch(context.DataPointsBatch, context.Tasks);
     }
 
-    private static GenericResults<Submission> CorrelateDataPointToSubmission(DataPoint dp, List<Submission> submissions) {
+    private static Result<Submission> CorrelateDataPointToSubmission(DataPoint dp, List<Submission> submissions) {
         foreach (Submission submission in submissions) {
             if (dp.FilingReference == submission.FilingReference)
-                return GenericResults<Submission>.SuccessResult(submission);
+                return Result<Submission>.Success(submission);
         }
 
-        return GenericResults<Submission>.FailureResult("No matching submission found for the given data point.");
+        return Result<Submission>.Failure(ErrorCodes.NotFound, "No matching submission found for the given data point.");
     }
 
     private static int BulkInsertDataPointsAndClearBatch(List<DataPoint> dataPointsBatch, List<Task> tasks) {
@@ -529,8 +529,8 @@ internal class Program {
         var batch = new List<DataPoint>(dataPointsBatch);
 
         tasks.Add(Task.Run(async () => {
-            Results res = await _dbm!.BulkInsertDataPoints(batch, CancellationToken.None);
-            if (res.IsError)
+            Result res = await _dbm!.BulkInsertDataPoints(batch, CancellationToken.None);
+            if (res.IsFailure)
                 _logger.LogWarning("Failed to save batch of data points. Error: {Error}", res.ErrorMessage);
         }));
     }

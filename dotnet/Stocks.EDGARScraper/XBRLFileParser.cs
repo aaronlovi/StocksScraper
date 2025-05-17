@@ -47,7 +47,7 @@ internal class XBRLFileParser {
 
             if (Cik == 0) {
                 _logger.LogInformation("Parse - CIK is 0, aborting");
-                return XBRLParserResult.FailureResult("CIK is 0", XBRLFileParserFailureReason.CikIsZero);
+                return XBRLParserResult.Failure("CIK is 0", XBRLFileParserFailureReason.CikIsZero);
             }
 
             if (!_companyIdsByCiks.TryGetValue(Cik, out _companyId)) {
@@ -68,7 +68,7 @@ internal class XBRLFileParser {
             foreach ((string factName, Fact fact) in _xbrlJson.Facts.UsGaap)
                 ProcessFact(factName, fact);
 
-            return XBRLParserResult.SuccessResult();
+            return XBRLParserResult.Success;
         } catch (Exception ex) {
             _logger.LogError(ex, "Parse - Exception occurred");
             return XBRLParserResult.GeneralFault(ex.Message);

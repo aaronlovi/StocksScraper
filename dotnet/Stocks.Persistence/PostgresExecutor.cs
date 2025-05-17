@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using Stocks.Shared.Models;
 
 namespace Stocks.Persistence;
 
@@ -89,7 +90,7 @@ public class PostgresExecutor : IDisposable {
             //}
         }
 
-        return DbStmtResult.StatementFailure("Too many retries");
+        return DbStmtResult.StatementFailure(ErrorCodes.TooManyRetries, "Too many retries");
     }
 
 
@@ -143,7 +144,7 @@ public class PostgresExecutor : IDisposable {
             //}
         }
 
-        return DbStmtResult.StatementFailure("Too many retries");
+        return DbStmtResult.StatementFailure(ErrorCodes.TooManyRetries, "Too many retries");
     }
 
     public Task<DbStmtResult> ExecuteUnderTransactionWithRetry(

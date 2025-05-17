@@ -1,21 +1,16 @@
 ﻿using Stocks.Shared;
+using Stocks.Shared.Models;
 
 namespace Stocks.Persistence;
 
-public enum DbStmtFailureReason { Invalid, Duplicate, Other }
-
-public record DbStmtResult : Results {
-    private DbStmtResult(bool success, string errMsg, int numRows, DbStmtFailureReason failureReason)
-        : base(success, errMsg) {
+public record DbStmtResult : Result {
+    private DbStmtResult(int numRows, ErrorCodes errorCode, string errMsg = "")
+        : base(errorCode, errMsg, null) {
         NumRows = numRows;
-        FailureReason = failureReason;
     }
 
     public int NumRows { get; init; }
-    public DbStmtFailureReason FailureReason { get; init; }
 
-    public static DbStmtResult StatementSuccess(int numRows) => new(true, string.Empty, numRows, DbStmtFailureReason.Invalid);
-
-    public static DbStmtResult StatementFailure(string errMsg, DbStmtFailureReason failureReason = DbStmtFailureReason.Other)
-        => new(false, errMsg, 0, failureReason);
+    public static DbStmtResult StatementSuccess(int numRows) => new(numRows, ErrorCodes.None, string.Empty);
+    public static DbStmtResult StatementFailure(ErrorCodes errorCode, string errMsg) => new(0, errorCode, errMsg);
 }

@@ -9,6 +9,7 @@ using Stocks.DataModels;
 using Stocks.Persistence.Migrations;
 using Stocks.Persistence.Statements;
 using Stocks.Shared;
+using Stocks.Shared.Models;
 
 namespace Stocks.Persistence;
 
@@ -45,7 +46,7 @@ public sealed class DbmService : IDisposable, IDbmService {
 
     #region Utilities
 
-    public async Task<Results> DropAllTables(CancellationToken ct) {
+    public async Task<Result> DropAllTables(CancellationToken ct) {
         var stmt = new DropAllTablesStmt();
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
         if (res.IsSuccess)
@@ -110,45 +111,45 @@ public sealed class DbmService : IDisposable, IDbmService {
 
     #region Companies
 
-    public async Task<GenericResults<Company>> GetCompanyById(ulong companyId, CancellationToken ct) {
+    public async Task<Result<Company>> GetCompanyById(ulong companyId, CancellationToken ct) {
         var stmt = new GetCompanyByIdStmt(companyId);
         DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess) {
             _logger.LogInformation("GetCompanyById success - Company: {Company}", stmt.Company);
-            return GenericResults<Company>.SuccessResult(stmt.Company);
+            return Result<Company>.Success(stmt.Company);
         } else {
             _logger.LogWarning("GetCompanyById failed with error {Error}", res.ErrorMessage);
-            return GenericResults<Company>.FailureResult(res.ErrorMessage);
+            return Result<Company>.Failure(res);
         }
     }
 
-    public async Task<GenericResults<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(
+    public async Task<Result<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(
         string dataSource, CancellationToken ct) {
         var stmt = new GetAllCompaniesByDataSourceStmt(dataSource);
         DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess) {
             _logger.LogInformation("GetAllCompaniesByDataSource success - Num companies: {NumCompanies}", stmt.Companies.Count);
-            return GenericResults<IReadOnlyCollection<Company>>.SuccessResult(stmt.Companies);
+            return Result<IReadOnlyCollection<Company>>.Success(stmt.Companies);
         } else {
             _logger.LogWarning("GetAllCompaniesByDataSource failed with error {Error}", res.ErrorMessage);
-            return GenericResults<IReadOnlyCollection<Company>>.FailureResult(res.ErrorMessage);
+            return Result<IReadOnlyCollection<Company>>.Failure(res);
         }
     }
 
-    public async Task<GenericResults<PagedCompanies>> GetPagedCompaniesByDataSource(
+    public async Task<Result<PagedCompanies>> GetPagedCompaniesByDataSource(
         string dataSource, PaginationRequest pagination, CancellationToken ct) {
         var stmt = new GetPagedCompaniesByDataSourceStmt(dataSource, pagination);
         DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess) {
             _logger.LogInformation("GetCompaniesByDataSource success - Num companies: {NumCompanies}", stmt.Companies.Count);
-            return GenericResults<PagedCompanies>.SuccessResult(stmt.GetPagedCompanies());
+            return Result<PagedCompanies>.Success(stmt.GetPagedCompanies());
         } else {
             _logger.LogWarning("GetCompaniesByDataSource failed with error {Error}", res.ErrorMessage);
-            return GenericResults<PagedCompanies>.FailureResult(res.ErrorMessage);
+            return Result<PagedCompanies>.Failure(res);
         }
     }
 
-    public async Task<Results> EmptyCompaniesTables(CancellationToken ct) {
+    public async Task<Result> EmptyCompaniesTables(CancellationToken ct) {
         var stmt = new TruncateCompaniesTablesStmt();
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
         if (res.IsSuccess)
@@ -158,7 +159,7 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
-    public async Task<Results> BulkInsertCompanies(List<Company> companies, CancellationToken ct) {
+    public async Task<Result> BulkInsertCompanies(List<Company> companies, CancellationToken ct) {
         var stmt = new BulkInsertCompaniesStmt(companies);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
         if (res.IsSuccess)
@@ -168,7 +169,7 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
-    public async Task<Results> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct) {
+    public async Task<Result> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct) {
         var stmt = new BulkInsertCompanyNamesStmt(companyNames);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
         if (res.IsSuccess)
@@ -182,19 +183,19 @@ public sealed class DbmService : IDisposable, IDbmService {
 
     #region Data points
 
-    public async Task<GenericResults<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct) {
+    public async Task<Result<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct) {
         var stmt = new GetAllDataPointUnitsStmt();
         DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess) {
             _logger.LogInformation("GetDataPointUnits success - Num units: {NumUnits}", stmt.Units.Count);
-            return GenericResults<IReadOnlyCollection<DataPointUnit>>.SuccessResult(stmt.Units);
+            return Result<IReadOnlyCollection<DataPointUnit>>.Success(stmt.Units);
         } else {
             _logger.LogWarning("GetDataPointUnits failed with error {Error}", res.ErrorMessage);
-            return GenericResults<IReadOnlyCollection<DataPointUnit>>.FailureResult(res.ErrorMessage);
+            return Result<IReadOnlyCollection<DataPointUnit>>.Failure(res);
         }
     }
 
-    public async Task<Results> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct) {
+    public async Task<Result> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct) {
         var stmt = new InsertDataPointUnitStmt(dataPointUnit);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
         if (res.IsSuccess)
@@ -204,7 +205,7 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
-    public async Task<Results> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct) {
+    public async Task<Result> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct) {
         var stmt = new BulkInsertDataPointsStmt(dataPoints);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
         if (res.IsSuccess)
@@ -218,28 +219,28 @@ public sealed class DbmService : IDisposable, IDbmService {
 
     #region Company submissions
 
-    public async Task<GenericResults<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct) {
+    public async Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct) {
         var stmt = new GetAllSubmissionsStmt();
         DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess) {
             _logger.LogInformation("GetSubmissions success - Num submissions: {NumSubmissions}", stmt.Submissions.Count);
-            return GenericResults<IReadOnlyCollection<Submission>>.SuccessResult(stmt.Submissions);
+            return Result<IReadOnlyCollection<Submission>>.Success(stmt.Submissions);
         } else {
             _logger.LogError("GetSubmissions failed with error {Error}", res.ErrorMessage);
-            return GenericResults<IReadOnlyCollection<Submission>>.FailureResult(res.ErrorMessage);
+            return Result<IReadOnlyCollection<Submission>>.Failure(res);
         }
     }
 
-    public async Task<Results> BulkInsertSubmissions(List<Submission> batch, CancellationToken ct) {
+    public async Task<Result> BulkInsertSubmissions(List<Submission> batch, CancellationToken ct) {
         var stmt = new BulkInsertSubmissionsStmt(batch);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
 
-        if (res.IsError && res.FailureReason is DbStmtFailureReason.Duplicate) {
+        if (res.IsFailure && res.ErrorCode is ErrorCodes.Duplicate) {
             // Nothing got written. Retry the batch one by one (slow)
             _logger.LogInformation("BulkInsertSubmissions failed due to duplicates, retrying one by one. {NumSubmissions} to insert",
                 batch.Count);
             res = await RetryInsertSubmissions(batch, ct);
-        } else if (res.IsError) {
+        } else if (res.IsFailure) {
             _logger.LogError("BulkInsertSubmissions failed with error {Error}", res.ErrorMessage);
         } else {
             _logger.LogInformation("BulkInsertSubmissions success - Num submissions: {NumSubmissions}", batch.Count);
@@ -265,8 +266,8 @@ public sealed class DbmService : IDisposable, IDbmService {
             failureCount, successCount);
 
         return DbStmtResult.StatementFailure(
-            $"BulkInsertSubmissions failed to insert {failureCount} submissions, succeeded with {successCount}",
-            DbStmtFailureReason.Duplicate);
+            ErrorCodes.Duplicate,
+            $"BulkInsertSubmissions failed to insert {failureCount} submissions, succeeded with {successCount}");
 
         // Local helper methods
 

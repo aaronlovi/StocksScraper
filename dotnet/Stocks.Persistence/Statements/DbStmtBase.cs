@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using NpgsqlTypes;
+using Stocks.Shared.Models;
 
 namespace Stocks.Persistence.Statements;
 
@@ -76,7 +77,7 @@ internal abstract class QueryDbStmtBase(string _sql, string _className) : DbStmt
         } catch (Exception ex) {
             ClearResults();
             string errMsg = $"{_className} failed - {ex.Message}";
-            return DbStmtResult.StatementFailure(errMsg);
+            return DbStmtResult.StatementFailure(ErrorCodes.GenericError, errMsg);
         }
     }
 
@@ -142,7 +143,7 @@ internal abstract class NonQueryDbStmtBase(string _sql, string _className) : DbS
             return DbStmtResult.StatementSuccess(numRows);
         } catch (Exception ex) {
             string errMsg = $"{_className} failed - {ex.Message}";
-            return DbStmtResult.StatementFailure(errMsg);
+            return DbStmtResult.StatementFailure(ErrorCodes.GenericError, errMsg);
         }
     }
 }
@@ -159,11 +160,11 @@ internal abstract class NonQueryBatchedDbStmtBase(string _className) : IPostgres
             return DbStmtResult.StatementSuccess(numRows);
         } catch (PostgresException ex) {
             string errMsg = $"{_className} failed - {ex.Message}";
-            DbStmtFailureReason failureReason = ex.SqlState == "23505" ? DbStmtFailureReason.Duplicate : DbStmtFailureReason.Other;
-            return DbStmtResult.StatementFailure(errMsg, failureReason);
+            ErrorCodes failureReason = ex.SqlState == "23505" ? ErrorCodes.Duplicate : ErrorCodes.GenericError;
+            return DbStmtResult.StatementFailure(failureReason, errMsg);
         } catch (Exception ex) {
             string errMsg = $"{_className} failed - {ex.Message}";
-            return DbStmtResult.StatementFailure(errMsg);
+            return DbStmtResult.StatementFailure(ErrorCodes.GenericError, errMsg);
         }
     }
 
@@ -197,14 +198,14 @@ internal abstract class BulkInsertDbStmtBase<T>(string _className, IReadOnlyColl
             return DbStmtResult.StatementSuccess(_items.Count);
         } catch (PostgresException ex) {
             string errMsg = $"{_className} failed - {ex.Message}";
-            DbStmtFailureReason failureReason = ex.SqlState == "23505"
-                ? DbStmtFailureReason.Duplicate
-                : DbStmtFailureReason.Other;
-            return DbStmtResult.StatementFailure(errMsg, failureReason);
+            ErrorCodes failureReason = ex.SqlState == "23505"
+                ? ErrorCodes.Duplicate
+                : ErrorCodes.GenericError;
+            return DbStmtResult.StatementFailure(failureReason, errMsg);
         } catch (Exception ex) {
             string failedItemStr = failedItem?.ToString() ?? "NULL";
             string errMsg = $"{_className} failed - {ex.Message}. Item: {failedItemStr}";
-            return DbStmtResult.StatementFailure(errMsg);
+            return DbStmtResult.StatementFailure(ErrorCodes.GenericError, errMsg);
         }
     }
 }

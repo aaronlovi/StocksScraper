@@ -66,7 +66,7 @@ internal class RawDataQueryProcessor : BackgroundService {
             using IDisposable? reqIdLogContext = _logger.BeginScope("RequestId: {RequestId}", inputs.ReqId);
             using CancellationTokenSource thisRequestCts = Utilities.CreateLinkedTokenSource(inputs.CancellationTokenSource, stoppingToken);
             try {
-                GenericResults<Company> res = await _dbm.GetCompanyById(inputs.CompanyId, thisRequestCts.Token);
+                Result<Company> res = await _dbm.GetCompanyById(inputs.CompanyId, thisRequestCts.Token);
                 LogResults(res);
                 GetCompaniesDataReply reply = CreateCompaniesDataReply(res);
                 inputs.Completed.SetResult(reply);
@@ -78,15 +78,15 @@ internal class RawDataQueryProcessor : BackgroundService {
 
         // Local helper methods
 
-        void LogResults(GenericResults<Company> res) {
+        void LogResults(Result<Company> res) {
             if (res.IsSuccess)
-                _logger.LogInformation("ProcessGetCompanyById Success - {CompanyId}", res.Data!.CompanyId);
+                _logger.LogInformation("ProcessGetCompanyById Success - {CompanyId}", res.Value!.CompanyId);
             else
                 _logger.LogInformation("ProcessGetCompanyById Failed - {Error}", res.ErrorMessage);
         }
 
-        GetCompaniesDataReply CreateCompaniesDataReply(GenericResults<Company> res) {
-            Company? company = res.Data;
+        GetCompaniesDataReply CreateCompaniesDataReply(Result<Company> res) {
+            Company? company = res.Value;
             var reply = new GetCompaniesDataReply {
                 Response = new Protocols.StandardResponse { RequestId = inputs.ReqId, Success = res.IsSuccess, ErrorMessage = res.ErrorMessage },
                 Pagination = ProtosUtils.CreateEmptyPaginationResponse(),
@@ -108,7 +108,7 @@ internal class RawDataQueryProcessor : BackgroundService {
         using IDisposable? reqIdLogContext = _logger.BeginScope("RequestId: {RequestId}", inputs.ReqId);
         using CancellationTokenSource thisRequestCts = Utilities.CreateLinkedTokenSource(inputs.CancellationTokenSource, stoppingToken);
         try {
-            GenericResults<PagedCompanies> res = await _dbm.GetPagedCompaniesByDataSource(inputs.DataSource, inputs.Pagination, thisRequestCts.Token);
+            Result<PagedCompanies> res = await _dbm.GetPagedCompaniesByDataSource(inputs.DataSource, inputs.Pagination, thisRequestCts.Token);
             LogResults(res);
             GetCompaniesDataReply reply = CreateCompaniesDataReply(res);
             inputs.Completed.SetResult(reply);
@@ -119,16 +119,16 @@ internal class RawDataQueryProcessor : BackgroundService {
 
         // Local helper methods
 
-        void LogResults(GenericResults<PagedCompanies> res) {
+        void LogResults(Result<PagedCompanies> res) {
             if (res.IsSuccess)
-                _logger.LogInformation("ProcessGetCompaniesMetadata Success - {NumItems}", res.Data!.NumItems);
+                _logger.LogInformation("ProcessGetCompaniesMetadata Success - {NumItems}", res.Value!.NumItems);
             else
                 _logger.LogInformation("ProcessGetCompaniesMetadata Failed - {Error}", res.ErrorMessage);
         }
 
-        GetCompaniesDataReply CreateCompaniesDataReply(GenericResults<PagedCompanies> res) {
-            PagedCompanies? pagedCompanies = res.Data;
-            DataModels.PaginationResponse? paginationResponse = res.Data?.Pagination;
+        GetCompaniesDataReply CreateCompaniesDataReply(Result<PagedCompanies> res) {
+            PagedCompanies? pagedCompanies = res.Value;
+            DataModels.PaginationResponse? paginationResponse = res.Value?.Pagination;
             Protocols.PaginationResponse? protosPaginationResponse = res.IsSuccess
                 ? paginationResponse?.ToProtosPaginationResponse()
                 : ProtosUtils.CreateEmptyPaginationResponse();
@@ -137,7 +137,7 @@ internal class RawDataQueryProcessor : BackgroundService {
                 Pagination = protosPaginationResponse,
             };
 
-            foreach (Company company in res.Data?.Companies ?? []) {
+            foreach (Company company in res.Value?.Companies ?? []) {
                 reply.CompaniesList.Add(new GetCompaniesDataReplyItem {
                     CompanyId = (long)company.CompanyId,
                     Cik = (long)company.Cik,

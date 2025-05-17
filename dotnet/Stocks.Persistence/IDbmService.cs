@@ -9,7 +9,7 @@ namespace Stocks.Persistence;
 public interface IDbmService {
     // Utilities
 
-    Task<Results> DropAllTables(CancellationToken ct);
+    Task<Result> DropAllTables(CancellationToken ct);
 
     // Id generator
 
@@ -18,23 +18,23 @@ public interface IDbmService {
 
     // Companies
 
-    Task<GenericResults<Company>> GetCompanyById(ulong companyId, CancellationToken ct);
-    Task<GenericResults<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(
+    Task<Result<Company>> GetCompanyById(ulong companyId, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(
         string dataSource, CancellationToken ct);
-    Task<GenericResults<PagedCompanies>> GetPagedCompaniesByDataSource(
+    Task<Result<PagedCompanies>> GetPagedCompaniesByDataSource(
         string dataSource, PaginationRequest pagination, CancellationToken ct);
-    Task<Results> EmptyCompaniesTables(CancellationToken ct);
-    Task<Results> BulkInsertCompanies(List<Company> companies, CancellationToken ct);
-    Task<Results> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct);
+    Task<Result> EmptyCompaniesTables(CancellationToken ct);
+    Task<Result> BulkInsertCompanies(List<Company> companies, CancellationToken ct);
+    Task<Result> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct);
 
     // Data points and data point units
 
-    Task<GenericResults<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct);
-    Task<Results> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct);
-    Task<Results> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct);
+    Task<Result> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct);
+    Task<Result> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct);
 
     // Company submissions
 
-    Task<GenericResults<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct);
-    Task<Results> BulkInsertSubmissions(List<Submission> batch, CancellationToken none);
+    Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct);
+    Task<Result> BulkInsertSubmissions(List<Submission> batch, CancellationToken none);
 }

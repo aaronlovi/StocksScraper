@@ -40,7 +40,7 @@ comment on column taxonomy_types.taxonomy_type_name is 'Name of the taxonomy typ
 comment on column taxonomy_types.taxonomy_type_version is 'Version identifier for the taxonomy type. For us-gaap, this is typically a year (e.g., 2025, 2024). For other taxonomies, it may be a different versioning scheme.';
 
 insert into taxonomy_types values
-(1, 'us-gaap', 2005);
+(1, 'us-gaap', 2025);
 
 -------------------------------------------------------------------------------
 

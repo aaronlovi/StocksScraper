@@ -11,4 +11,5 @@ public enum ErrorCodes : int {
     [JsonPropertyName("VALIDATION_ERROR")] ValidationError = 5,
     [JsonPropertyName("CONCURRENCY_CONFLICT")] ConcurrencyConflict = 6,
     [JsonPropertyName("SERIALIZATION_ERROR")] SerializationError = 7,
+    [JsonPropertyName("PARSING_ERROR")] ParsingError = 8,
 }

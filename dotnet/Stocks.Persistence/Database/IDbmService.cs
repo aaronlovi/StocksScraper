@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Stocks.DataModels;
+using Stocks.Persistence.Database.DTO;
 using Stocks.Shared;
 
 namespace Stocks.Persistence.Database;
@@ -32,6 +33,7 @@ public interface IDbmService {
     Task<Result<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct);
     Task<Result> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct);
     Task<Result> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct);
+    Task<Result> BulkInsertTaxonomyConcepts(List<TaxonomyConceptDTO> taxonomyConcepts, CancellationToken ct);
 
     // Company submissions
 

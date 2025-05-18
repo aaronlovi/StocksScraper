@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
+using Stocks.Persistence.Database.DTO;
 using Stocks.Persistence.Database.Migrations;
 using Stocks.Persistence.Database.Statements;
 using Stocks.Shared;
@@ -212,6 +213,16 @@ public sealed class DbmService : IDisposable, IDbmService {
             _logger.LogInformation("BulkInsertDataPoints success - Num data points: {NumDataPoints}", dataPoints.Count);
         else
             _logger.LogError("BulkInsertDataPoints failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result> BulkInsertTaxonomyConcepts(List<TaxonomyConceptDTO> taxonomyConcepts, CancellationToken ct) {
+        var stmt = new BulkInsertTaxonomyConceptsStmt(taxonomyConcepts);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertTaxonomyConcepts success - Num concepts: {NumConcepts}", taxonomyConcepts.Count);
+        else
+            _logger.LogError("BulkInsertTaxonomyConcepts failed with error {Error}", res.ErrorMessage);
         return res;
     }
 

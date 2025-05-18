@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
+using Stocks.EDGARScraper.Services;
 using Stocks.Persistence.Database;
 using Stocks.Persistence.Database.Migrations;
 using Stocks.Shared;
@@ -22,7 +23,7 @@ using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace EDGARScraper;
 
-internal class Program {
+internal partial class Program {
     private const string DefaultPortStr = "7001";
     private const int ParseBulkEdgarSubmissionsBatchSize = 1000;
     private const int ParseBulkXbrlNumDataPointsBatchSize = 1000;
@@ -79,6 +80,11 @@ internal class Program {
                     await ParseBulkXbrlArchive();
                     break;
                 }
+                case "--load-taxonomy-concepts": {
+                    UsGaap2025TaxonomyConceptsFileProcessor processor = _svp.GetRequiredService<UsGaap2025TaxonomyConceptsFileProcessor>();
+                    _ = await processor.Process();
+                    break;
+                }
                 default:
                 _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
                 return 3;
@@ -117,6 +123,7 @@ internal class Program {
                     .AddHttpClient()
                     .AddSingleton<PostgresExecutor>()
                     .AddSingleton<DbMigrations>()
+                    .ConfigureTaxonomyConceptsFileProcessor(context)
                     .AddTransient<Func<string, ParseBulkXbrlArchiveContext, XBRLFileParser>>(
                         sp => (content, context) => new XBRLFileParser(content, context, sp));
 

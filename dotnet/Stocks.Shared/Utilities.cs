@@ -33,7 +33,6 @@ public static class Utilities {
             d.Dispose();
     }
 
-
     /// <summary>
     /// Creates a CancellationTokenSource that is linked to the provided CancellationToken and CancellationTokenSource.
     /// </summary>
@@ -68,4 +67,11 @@ public static class Utilities {
 
     public static bool EqualsInvariant(this string str, string other)
         => str.Equals(other, StringComparison.InvariantCulture);
+
+    /// <summary>
+    /// Checks if the given decimal value is an integer.
+    /// </summary>
+    /// <param name="value">The decimal value to check.</param>
+    /// <returns>True if the value is an integer; otherwise, false.</returns>
+    public static bool IsInteger(this decimal value) => value % 1 == 0;
 }

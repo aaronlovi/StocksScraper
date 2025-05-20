@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
-using Stocks.Persistence.Database.DTO;
+using Stocks.Persistence.Database.DTO.Taxonomies;
 using Stocks.Persistence.Database.Migrations;
 using Stocks.Persistence.Database.Statements;
 using Stocks.Shared;
@@ -216,7 +216,7 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
-    public async Task<Result> BulkInsertTaxonomyConcepts(List<TaxonomyConceptDTO> taxonomyConcepts, CancellationToken ct) {
+    public async Task<Result> BulkInsertTaxonomyConcepts(List<ConceptDetailsDTO> taxonomyConcepts, CancellationToken ct) {
         var stmt = new BulkInsertTaxonomyConceptsStmt(taxonomyConcepts);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
         if (res.IsSuccess)
@@ -224,6 +224,19 @@ public sealed class DbmService : IDisposable, IDbmService {
         else
             _logger.LogError("BulkInsertTaxonomyConcepts failed with error {Error}", res.ErrorMessage);
         return res;
+    }
+
+    public async Task<Result<IReadOnlyCollection<ConceptDetailsDTO>>> GetTaxonomyConceptsByTaxonomyType(
+        int taxonomyTypeId, CancellationToken ct) {
+        var stmt = new GetTaxonomyConceptsByTaxonomyTypeStmt(taxonomyTypeId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetTaxonomyConceptsByTaxonomyType success - Num concepts: {NumConcepts}", stmt.TaxonomyConcepts.Count);
+            return Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(stmt.TaxonomyConcepts);
+        } else {
+            _logger.LogWarning("GetTaxonomyConceptsByTaxonomyType failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<ConceptDetailsDTO>>.Failure(res);
+        }
     }
 
     #endregion

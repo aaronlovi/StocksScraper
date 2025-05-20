@@ -7,7 +7,8 @@
             //"commandLineArgs": "--parse-bulk-edgar-submissions-list"
             //"commandLineArgs": "--parse-bulk-xbrl-archive"
             //"commandLineArgs": "--run-all"
-            "commandLineArgs": "--load-taxonomy-concepts"
+            //"commandLineArgs": "--load-taxonomy-concepts"
+            "commandLineArgs": "--load-taxonomy-presentations"
         }
     }
 }

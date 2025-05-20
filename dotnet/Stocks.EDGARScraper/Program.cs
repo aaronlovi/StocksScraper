@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
-using Stocks.EDGARScraper.Services;
+using Stocks.EDGARScraper.Services.Taxonomies;
 using Stocks.Persistence.Database;
 using Stocks.Persistence.Database.Migrations;
 using Stocks.Shared;
@@ -81,7 +81,12 @@ internal partial class Program {
                     break;
                 }
                 case "--load-taxonomy-concepts": {
-                    UsGaap2025TaxonomyConceptsFileProcessor processor = _svp.GetRequiredService<UsGaap2025TaxonomyConceptsFileProcessor>();
+                    UsGaap2025ConceptsFileProcessor processor = _svp.GetRequiredService<UsGaap2025ConceptsFileProcessor>();
+                    _ = await processor.Process();
+                    break;
+                }
+                case "--load-taxonomy-presentations": {
+                    UsGaap2025PresentationFileProcessor processor = _svp.GetRequiredService<UsGaap2025PresentationFileProcessor>();
                     _ = await processor.Process();
                     break;
                 }

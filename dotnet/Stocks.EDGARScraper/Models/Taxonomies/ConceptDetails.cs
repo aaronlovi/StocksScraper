@@ -1,20 +1,21 @@
 ﻿using Stocks.DataModels.Enums;
-using Stocks.Persistence.Database.DTO;
+using Stocks.Persistence.Database.DTO.Taxonomies;
 using Stocks.Shared;
 using Stocks.Shared.Models;
 
-namespace Stocks.EDGARScraper.Models;
+namespace Stocks.EDGARScraper.Models.Taxonomies;
 
 /// <summary>
 /// Each concept represents a data point that can be reported in a filing.
 /// </summary>
+/// <param name="TaxonomyType">Corresponds to a taxonomy <see cref="TaxonomyTypes"/>, e.g. US-GAAP 2025.</param>
 /// <param name="PeriodType">Whether this is a duration or instant in time. Corresponds to a <see cref="TaxonomyPeriodTypes"/>.</param>
 /// <param name="Balance">Whether this is a credit, debit, or neither. Corresponds to a <see cref="TaxonomyBalanceTypes"/>.</param>
 /// <param name="Abstract">Whether or not this is an "abstract" concept. "Abstract" concepts are typically roll-up concepts, containing other concepts</param>
 /// <param name="Name">One-word name for the concept.</param>
 /// <param name="Label">Brief description of the concept.</param>
 /// <param name="Documentation">Long description of the concept.</param>
-internal record TaxonomyConcept(
+internal record ConceptDetails(
     TaxonomyTypes TaxonomyType,
     string PeriodType,
     string Balance,
@@ -23,20 +24,20 @@ internal record TaxonomyConcept(
     string Label,
     string Documentation) {
 
-    internal Result<TaxonomyConceptDTO> ToTaxonomyConceptDTO(long id) {
+    internal Result<ConceptDetailsDTO> ToConceptDetailsDTO(long id) {
         Result<TaxonomyPeriodTypes> parsePeriodTypeResult = ParsePeriodType();
         if (parsePeriodTypeResult.IsFailure)
-            return Result<TaxonomyConceptDTO>.Failure(parsePeriodTypeResult);
+            return Result<ConceptDetailsDTO>.Failure(parsePeriodTypeResult);
 
         Result<TaxonomyBalanceTypes> parseBalanceTypeResult = ParseBalanceType();
         if (parseBalanceTypeResult.IsFailure)
-            return Result<TaxonomyConceptDTO>.Failure(parseBalanceTypeResult);
+            return Result<ConceptDetailsDTO>.Failure(parseBalanceTypeResult);
 
         Result<bool> parseIsAbstractResult = ParseIsAbstract();
         if (parseIsAbstractResult.IsFailure)
-            return Result<TaxonomyConceptDTO>.Failure(parseIsAbstractResult);
+            return Result<ConceptDetailsDTO>.Failure(parseIsAbstractResult);
 
-        var dto = new TaxonomyConceptDTO(
+        var dto = new ConceptDetailsDTO(
             id,
             (int)TaxonomyType,
             (int)parsePeriodTypeResult.Value,
@@ -45,7 +46,7 @@ internal record TaxonomyConcept(
             Name.Trim(),
             Label.Trim(),
             Documentation.Trim());
-        return Result<TaxonomyConceptDTO>.Success(dto);
+        return Result<ConceptDetailsDTO>.Success(dto);
     }
 
     #region PRIVATE HELPER METHODS

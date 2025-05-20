@@ -91,10 +91,13 @@ public class UsGaap2025ConceptsFileProcessor {
             _logger.LogInformation("BulkInsertTaxonomyConcepts");
 
             Result result = await _dbm.BulkInsertTaxonomyConcepts(_conceptDetailsDtos, _ct);
-            _logger.LogInformation("Bulk inserted {Count} taxonomy concepts", _conceptDetailsDtos.Count);
-            return result;
+            if (result.IsFailure)
+                return Result.Failure(result);
         } catch (Exception ex) {
             return Result.Failure(ErrorCodes.GenericError, "BulkInsertTaxonomyConcepts - Error: " + ex.Message);
         }
+
+        _logger.LogInformation("Bulk inserted {Count} taxonomy concepts", _conceptDetailsDtos.Count);
+        return Result.Success;
     }
 }

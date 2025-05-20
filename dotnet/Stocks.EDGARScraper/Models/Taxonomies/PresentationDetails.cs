@@ -40,7 +40,8 @@ internal record PresentationDetails(
                 $"Concept name '{ConceptName}' not found in concept IDs dictionary.",
                 ConceptName);
         }
-        if (!conceptIdsByName.TryGetValue(ParentConceptName, out long parentConceptId)) {
+        if (!conceptIdsByName.TryGetValue(ParentConceptName, out long parentConceptId)
+            && !string.IsNullOrEmpty(ParentConceptName)) {
             return Result<PresentationDetailsDTO>.Failure(
                 ErrorCodes.ValidationError,
                 $"Parent concept name '{ParentConceptName}' not found in concept IDs dictionary.",
@@ -52,7 +53,8 @@ internal record PresentationDetails(
                 $"Invalid depth '{Depth}' for concept '{ConceptName}'.",
                 ConceptName);
         }
-        if (!decimal.TryParse(OrderInDepth, out decimal orderInDepth)) {
+        if (!decimal.TryParse(OrderInDepth, out decimal orderInDepth)
+            && !string.IsNullOrEmpty(OrderInDepth)) {
             return Result<PresentationDetailsDTO>.Failure(
                 ErrorCodes.ValidationError,
                 $"Invalid order in depth '{OrderInDepth}' for concept '{ConceptName}'.",
@@ -74,8 +76,4 @@ internal record PresentationDetails(
             parentPresentationId);
         return Result<PresentationDetailsDTO>.Success(dto);
     }
-
-    #region PRIVATE HELPER METHODS
-
-    #endregion
 }

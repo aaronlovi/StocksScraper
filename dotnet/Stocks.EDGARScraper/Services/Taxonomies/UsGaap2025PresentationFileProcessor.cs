@@ -42,6 +42,8 @@ public class UsGaap2025PresentationFileProcessor {
 
         return await GetConceptDetailsFromDb().
             Then(ParseRawPresentationDetailsFromFile).
+            Then(ConvertRawPresentationDetailsToDTOs).
+            Then(BulkInsertPresentationDetailDTOs).
             OnCompletion(
                 onSuccess: _ => _logger.LogInformation("Process - Success"),
                 onFailure: res => _logger.LogWarning("Process Failed - {Error}", res.ErrorMessage));
@@ -148,5 +150,57 @@ public class UsGaap2025PresentationFileProcessor {
             r.depth,
             r.order,
             parent);
+    }
+
+    private async Task<Result> ConvertRawPresentationDetailsToDTOs() {
+        _logger.LogInformation("ConvertRawPresentationDetailsToDTOs");
+
+        var presentationIdLookup = new Dictionary<PresentationDetails, long>();
+
+        try {
+            foreach (PresentationDetails rawPresentationDetails in _rawPresentationDetails) {
+                if (rawPresentationDetails.Depth == "0")
+                    presentationIdLookup.Clear();
+
+                if (!rawPresentationDetails.IsUsGaapPresentationDetail)
+                    continue;
+
+                long presentationId = (long)await _dbm.GetNextId64(_ct);
+                presentationIdLookup[rawPresentationDetails] = presentationId;
+
+                long parentPresentationId = 0;
+                if (rawPresentationDetails.ParentPresentationDetails is not null
+                    && presentationIdLookup.TryGetValue(rawPresentationDetails.ParentPresentationDetails!, out long parentId)) {
+                    parentPresentationId = parentId;
+                }
+
+                Result<PresentationDetailsDTO> result = rawPresentationDetails.ToPresentationDetailsDTO(
+                    presentationId, parentPresentationId, _conceptIdsByName);
+                if (result.IsFailure)
+                    return Result.Failure(result);
+                _presentationDetailsDtos.Add(result.Value!);
+            }
+        } catch (Exception ex) {
+            return Result.Failure(ErrorCodes.ParsingError, "ConvertRawPresentationDetailsToDTOs - Error: " + ex.Message);
+        }
+
+        _logger.LogInformation("ConvertRawPresentationDetailsToDTOs - Converted {Count} raw presentation details to DTOs",
+            _presentationDetailsDtos.Count);
+        return Result.Success;
+    }
+
+    private async Task<Result> BulkInsertPresentationDetailDTOs() {
+        try {
+            _logger.LogInformation("BulkInsertPresentationDetailDTOs");
+
+            Result result = await _dbm.BulkInsertTaxonomyPresentations(_presentationDetailsDtos, _ct);
+            if (result.IsFailure)
+                return Result.Failure(result);
+        } catch (Exception ex) {
+            return Result.Failure(ErrorCodes.ParsingError, "BulkInsertPresentationDetailDTOs - Error: " + ex.Message);
+        }
+
+        _logger.LogInformation("BulkInsertPresentationDetailDTOs - Inserted {Count} presentation details into database", _presentationDetailsDtos.Count);
+        return Result.Success;
     }
 }

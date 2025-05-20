@@ -239,6 +239,16 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
+    public async Task<Result> BulkInsertTaxonomyPresentations(List<PresentationDetailsDTO> taxonomyPresentations, CancellationToken ct) {
+        var stmt = new BulkInsertTaxonomyPresentationStmt(taxonomyPresentations);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertTaxonomyPresentations success - Num presentations: {NumPresentations}", taxonomyPresentations.Count);
+        else
+            _logger.LogError("BulkInsertTaxonomyPresentations failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
     #endregion
 
     #region Company submissions

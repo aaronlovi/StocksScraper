@@ -512,7 +512,7 @@ internal partial class Program {
         }
 
         ulong dpId = await _dbm!.GetNextId64(CancellationToken.None);
-        DataPoint dataPointToInsert = dp with { DataPointId = dpId, Units = dpu }; // With data point unit id populated
+        DataPoint dataPointToInsert = dp with { DataPointId = dpId, Units = dpu, TaxonomyConceptId = dp.TaxonomyConceptId };
         context.DataPointsBatch.Add(dataPointToInsert);
 
         if (context.DataPointsBatch.Count >= ParseBulkXbrlNumDataPointsBatchSize)

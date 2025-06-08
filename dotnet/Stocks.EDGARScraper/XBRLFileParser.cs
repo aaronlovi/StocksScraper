@@ -151,6 +151,8 @@ internal class XBRLFileParser {
             unitData.Value,
             new DataPointUnit(0, unit), // Data point unit ID is not known at this point
             unitData.FiledDate,
-            submission.SubmissionId);
+            submission.SubmissionId,
+            0L // taxonomy_concept_id placeholder, to be set in ETL
+        );
     }
 }

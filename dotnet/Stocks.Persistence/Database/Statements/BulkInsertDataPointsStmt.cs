@@ -1,5 +1,4 @@
-﻿
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Npgsql;
 using NpgsqlTypes;
@@ -12,7 +11,7 @@ internal sealed class BulkInsertDataPointsStmt : BulkInsertDbStmtBase<DataPoint>
         : base(nameof(BulkInsertDataPointsStmt), dataPoints) { }
 
     protected override string GetCopyCommand() => "COPY data_points"
-        + " (data_point_id, company_id, unit_id, fact_name, start_date, end_date, value, filed_date, submission_id)"
+        + " (data_point_id, company_id, unit_id, fact_name, start_date, end_date, value, filed_date, submission_id, taxonomy_concept_id)"
         + " FROM STDIN (FORMAT BINARY)";
 
     protected override async Task WriteItemAsync(NpgsqlBinaryImporter writer, DataPoint dataPoint) {
@@ -25,5 +24,6 @@ internal sealed class BulkInsertDataPointsStmt : BulkInsertDbStmtBase<DataPoint>
         await writer.WriteAsync(dataPoint.Value, NpgsqlDbType.Numeric);
         await writer.WriteAsync(dataPoint.FiledTimeUtc, NpgsqlDbType.Date);
         await writer.WriteAsync((long)dataPoint.SubmissionId, NpgsqlDbType.Bigint);
+        await writer.WriteAsync(dataPoint.TaxonomyConceptId, NpgsqlDbType.Bigint); // NEW: taxonomy_concept_id
     }
 }

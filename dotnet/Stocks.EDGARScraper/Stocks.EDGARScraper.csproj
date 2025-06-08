@@ -21,4 +21,8 @@
 	  <PackageReference Include="CsvHelper" Version="33.0.1" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Requirements\" />
+	</ItemGroup>
+
 </Project>

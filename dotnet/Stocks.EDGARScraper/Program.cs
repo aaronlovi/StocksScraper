@@ -406,10 +406,9 @@ internal partial class Program {
         // Load taxonomy concepts into a dictionary for fast lookup
         Result<IReadOnlyCollection<ConceptDetailsDTO>> taxonomyConceptsResult =
             await _dbm!.GetTaxonomyConceptsByTaxonomyType((int)TaxonomyTypes.US_GAAP_2025, default);
-        var taxonomyConceptIdByName = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         if (taxonomyConceptsResult.IsSuccess) {
             foreach (ConceptDetailsDTO concept in taxonomyConceptsResult.Value!) {
-                taxonomyConceptIdByName[concept.Name.Trim()] = concept.ConceptId;
+                context.TaxonomyConceptIdsByFactName[concept.Name.Trim()] = concept.ConceptId;
             }
         } else {
             _logger.LogError("Failed to load taxonomy concepts: {Error}", taxonomyConceptsResult.ErrorMessage);
@@ -459,7 +458,7 @@ internal partial class Program {
                 context.LogProgress();
 
             context.CurrentFileName = fileName;
-            await ParseOneFileXBRL(zipReader, context, taxonomyConceptIdByName, unmatchedFactNames);
+            await ParseOneFileXBRL(zipReader, context, unmatchedFactNames);
         }
 
         // Save any remaining objects
@@ -471,14 +470,17 @@ internal partial class Program {
 
         // Log unmatched fact_names at the end
         if (unmatchedFactNames.Count > 0) {
-            _logger.LogWarning("Unmatched fact_names (not inserted):\n" + string.Join("\n", unmatchedFactNames.Select(x => $"FactName: '{x.FactName}', CompanyId: {x.CompanyId}, File: {x.FileName}")));
+            foreach ((string FactName, ulong CompanyId, string FileName) in unmatchedFactNames) {
+                _logger.LogWarning("Unmatched fact_name (not inserted): FactName: '{FactName}', CompanyId: {CompanyId}, File: {FileName}",
+                    FactName, CompanyId, FileName);
+            }
         }
 
         context.LogProgress();
     }
 
     // Overload to pass taxonomyConceptIdByName and unmatchedFactNames
-    private static async Task ParseOneFileXBRL(ZipFileReader zipReader, ParseBulkXbrlArchiveContext context, Dictionary<string, long> taxonomyConceptIdByName, List<(string FactName, ulong CompanyId, string FileName)> unmatchedFactNames) {
+    private static async Task ParseOneFileXBRL(ZipFileReader zipReader, ParseBulkXbrlArchiveContext context, List<(string FactName, ulong CompanyId, string FileName)> unmatchedFactNames) {
         try {
             string fileContent = zipReader.ExtractFileContent(context.CurrentFileName);
             context.TotalLength += fileContent.Length;
@@ -493,7 +495,7 @@ internal partial class Program {
             foreach (DataPoint dp in parser.DataPoints) {
                 // Assign taxonomy_concept_id by matching fact_name
                 string factNameKey = dp.FactName.Trim();
-                if (taxonomyConceptIdByName.TryGetValue(factNameKey, out long conceptId)) {
+                if (context.TaxonomyConceptIdsByFactName.TryGetValue(factNameKey, out long conceptId)) {
                     DataPoint dpWithConcept = dp with { TaxonomyConceptId = conceptId };
                     await ProcessDataPoint(dpWithConcept, context);
                 } else {

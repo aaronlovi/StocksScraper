@@ -20,6 +20,7 @@ internal class ParseBulkXbrlArchiveContext(IServiceProvider svp) {
     public Dictionary<ulong, ulong> CompanyIdsByCik { get; init; } = [];
     public Dictionary<string, DataPointUnit> UnitsByUnitName { get; init; } = [];
     public Dictionary<ulong, List<Submission>> SubmissionsByCompanyId { get; init; } = [];
+    public Dictionary<string, long> TaxonomyConceptIdsByFactName { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void LogProgress() {
         _logger.LogInformation("Processed {NumFiles} files; {NumDataPoints} data points; {NumDataPointUnits} data point units; Total length: {TotalLength} bytes",

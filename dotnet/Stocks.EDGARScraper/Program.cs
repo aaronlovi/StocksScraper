@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq; // Add this for LINQ extension methods
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,8 +15,10 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
+using Stocks.DataModels.Enums;
 using Stocks.EDGARScraper.Services.Taxonomies;
 using Stocks.Persistence.Database;
+using Stocks.Persistence.Database.DTO.Taxonomies;
 using Stocks.Persistence.Database.Migrations;
 using Stocks.Shared;
 using Stocks.Shared.Models;
@@ -400,6 +403,21 @@ internal partial class Program {
 
         var context = new ParseBulkXbrlArchiveContext(_svp!);
 
+        // Load taxonomy concepts into a dictionary for fast lookup
+        Result<IReadOnlyCollection<ConceptDetailsDTO>> taxonomyConceptsResult =
+            await _dbm!.GetTaxonomyConceptsByTaxonomyType((int)TaxonomyTypes.US_GAAP_2025, default);
+        var taxonomyConceptIdByName = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        if (taxonomyConceptsResult.IsSuccess) {
+            foreach (ConceptDetailsDTO concept in taxonomyConceptsResult.Value!) {
+                taxonomyConceptIdByName[concept.Name.Trim()] = concept.ConceptId;
+            }
+        } else {
+            _logger.LogError("Failed to load taxonomy concepts: {Error}", taxonomyConceptsResult.ErrorMessage);
+            return;
+        }
+        // For collecting unmatched fact_names
+        var unmatchedFactNames = new List<(string FactName, ulong CompanyId, string FileName)>();
+
         Result<IReadOnlyCollection<Company>> companyResults =
             await _dbm!.GetAllCompaniesByDataSource(ModelsConstants.EdgarDataSource, CancellationToken.None);
         if (companyResults.IsFailure) {
@@ -441,7 +459,7 @@ internal partial class Program {
                 context.LogProgress();
 
             context.CurrentFileName = fileName;
-            await ParseOneFileXBRL(zipReader, context);
+            await ParseOneFileXBRL(zipReader, context, taxonomyConceptIdByName, unmatchedFactNames);
         }
 
         // Save any remaining objects
@@ -451,10 +469,16 @@ internal partial class Program {
 
         await Task.WhenAll(context.Tasks);
 
+        // Log unmatched fact_names at the end
+        if (unmatchedFactNames.Count > 0) {
+            _logger.LogWarning("Unmatched fact_names (not inserted):\n" + string.Join("\n", unmatchedFactNames.Select(x => $"FactName: '{x.FactName}', CompanyId: {x.CompanyId}, File: {x.FileName}")));
+        }
+
         context.LogProgress();
     }
 
-    private static async Task ParseOneFileXBRL(ZipFileReader zipReader, ParseBulkXbrlArchiveContext context) {
+    // Overload to pass taxonomyConceptIdByName and unmatchedFactNames
+    private static async Task ParseOneFileXBRL(ZipFileReader zipReader, ParseBulkXbrlArchiveContext context, Dictionary<string, long> taxonomyConceptIdByName, List<(string FactName, ulong CompanyId, string FileName)> unmatchedFactNames) {
         try {
             string fileContent = zipReader.ExtractFileContent(context.CurrentFileName);
             context.TotalLength += fileContent.Length;
@@ -466,8 +490,16 @@ internal partial class Program {
                 return;
             }
 
-            foreach (DataPoint dp in parser.DataPoints)
-                await ProcessDataPoint(dp, context);
+            foreach (DataPoint dp in parser.DataPoints) {
+                // Assign taxonomy_concept_id by matching fact_name
+                string factNameKey = dp.FactName.Trim();
+                if (taxonomyConceptIdByName.TryGetValue(factNameKey, out long conceptId)) {
+                    DataPoint dpWithConcept = dp with { TaxonomyConceptId = conceptId };
+                    await ProcessDataPoint(dpWithConcept, context);
+                } else {
+                    unmatchedFactNames.Add((dp.FactName, dp.CompanyId, context.CurrentFileName));
+                }
+            }
         } catch (Exception ex) {
             _logger.LogError(ex, "ParseOneFileXBRL - Failed to process {FileName}", context.CurrentFileName);
         }

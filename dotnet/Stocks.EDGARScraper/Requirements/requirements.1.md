@@ -2,10 +2,10 @@
 
 | ID | Requirement | Description | Status | Notes |
 |----|-------------|-------------|--------|-------|
-| 1  | Assign taxonomy_concept_id | When inserting data points, join fact_name (trimmed, case-insensitive) to taxonomy_concepts.name and set taxonomy_concept_id. | Not Started | Load all taxonomy_concepts into memory at start. |
-| 2  | Log unmatched fact_names | Collect all unmatched fact_names (with context) and log them together at the end of ETL. | Not Started | Do not insert unmatched data points. |
-| 3  | Migration: Drop taxonomy_presentation_id | Write an idempotent migration to drop taxonomy_presentation_id from data_points. | Not Started | Remove all code/DTO references to this column. |
-| 4  | Robustness & Logging | Ensure robust error handling and logging for all changes. | Not Started | Compatible with .NET 8 and current structure. |
+| 1  | Assign taxonomy_concept_id | When inserting data points, join fact_name (trimmed, case-insensitive) to taxonomy_concepts.name and set taxonomy_concept_id. | Complete | Implemented in ETL: concepts loaded at start, assigned before insert. |
+| 2  | Log unmatched fact_names | Collect all unmatched fact_names (with context) and log them together at the end of ETL. | Complete | Unmatched fact_names are collected and logged; unmatched data points are not inserted. |
+| 3  | Migration: Drop taxonomy_presentation_id | Write an idempotent migration to drop taxonomy_presentation_id from data_points. | Complete | No code/DTO references remain; confirm DB schema is updated. |
+| 4  | Robustness & Logging | Ensure robust error handling and logging for all changes. | Complete | Error handling and logging present throughout ETL. |
 
 - Update this table as requirements are implemented.
 - Each requirement should be implemented in a way that does not introduce regressions to other ETL or data loading operations.

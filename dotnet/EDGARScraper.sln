@@ -22,9 +22,24 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.EDGARScraper", "Stoc
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 	ProjectSection(SolutionItems) = preProject
+		.github\copilot-instructions.md = .github\copilot-instructions.md
 		project_fact_sheet.md = project_fact_sheet.md
 		project_instructions.md = project_instructions.md
-		.github\copilot-instructions.md = .github\copilot-instructions.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "decisions", "decisions", "{C9FAE450-07CC-4532-8385-F965E66150E2}"
+	ProjectSection(SolutionItems) = preProject
+		decisions\0001-database-technology-choice.md = decisions\0001-database-technology-choice.md
+		decisions\0002-distributed-caching-strategy.md = decisions\0002-distributed-caching-strategy.md
+		decisions\0003-logging-and-metrics-stack.md = decisions\0003-logging-and-metrics-stack.md
+		decisions\0004-testing-approach.md = decisions\0004-testing-approach.md
+		decisions\0005-project-requirements-documentation-process.md = decisions\0005-project-requirements-documentation-process.md
+		decisions\0006-no-real-time-data.md = decisions\0006-no-real-time-data.md
+		decisions\0007-no-user-auth.md = decisions\0007-no-user-auth.md
+		decisions\0008-api-protocol-choice.md = decisions\0008-api-protocol-choice.md
+		decisions\0009-migration-tooling.md = decisions\0009-migration-tooling.md
+		decisions\0010-folder-structure-for-adrs.md = decisions\0010-folder-structure-for-adrs.md
+		decisions\README.md = decisions\README.md
 	EndProjectSection
 EndProject
 Global
@@ -59,6 +74,7 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {861B639E-5EAB-4BF9-A416-9F0EC4020512}
+		{C9FAE450-07CC-4532-8385-F965E66150E2} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3C9A120B-42B4-4DF7-BF7F-E71348CCA998}

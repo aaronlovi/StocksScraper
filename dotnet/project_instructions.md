@@ -31,6 +31,7 @@ This document provides overarching instructions and best practices for working o
 ## Coding and Documentation Standards
 - Follow .NET 8 and C# best practices for code style, structure, and naming.
 - Prefer using the `Result`/`IResult` pattern (see `Stocks.Shared.Result`, `Stocks.Shared.IResult`, and the `Results.cs` file) for error handling instead of throwing exceptions, unless an exception is truly exceptional or unrecoverable.
+- Use record types or classes instead of tuples for method return values and complex data passing. Tuples are discouraged except for simple, local, and obvious cases, as records/classes provide better maintainability and self-documentation.
 - Use clear, descriptive commit messages and pull request descriptions.
 - Write concise, meaningful comments where necessary, but prefer self-explanatory code.
 - Keep documentation (including this file and the fact sheet) clear, concise, and up to date.

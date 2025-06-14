@@ -372,8 +372,13 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - [ ] Inspect DTOs and data access methods; document their properties here.
 - [x] Implement CLI argument parsing for all required switches.
 - [ ] Implement StatementPrinter class with support for CSV, HTML, and JSON output.
-- [ ] Implement/extend data access methods in IDbmService.
-- [ ] Implement error handling and logging.
+- [ ] Implement/extend data access methods in IDbmService:
+    - [ ] Add method to retrieve presentation hierarchy (PresentationDetailsDTO) for a taxonomy type.
+    - [ ] Add method to retrieve data points for a given CompanyId, SubmissionId, and TaxonomyConceptId.
+- [ ] Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
+- [ ] Implement recursive taxonomy traversal in StatementPrinter.TraverseConceptTree().
+- [ ] Implement output formatting in StatementPrinter.FormatOutput() for CSV, HTML, and JSON.
+- [ ] Add robust error handling and logging to StatementPrinter.
 - [ ] Add Gherkin/xUnit tests for all major scenarios.
 - [ ] Document sample outputs and update this requirements file as needed.
 - [ ] **Document and maintain output format extensibility:** When adding a new output format, extend the `StatementPrinter` class and update documentation and CLI validation accordingly.

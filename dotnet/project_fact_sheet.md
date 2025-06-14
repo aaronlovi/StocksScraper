@@ -52,6 +52,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - Error handling: Robust error handling and logging throughout ETL, data processing, caching, and persistence.
 - Automated and behavior-driven testing (xUnit and Gherkin/SpecFlow) is a standard requirement for most new features and changes. Contributors must provide tests or scenarios that prove new functionality works as intended, unless explicitly stated otherwise.
 - All features and projects must be broken down into a Kanban-style list of tasks, each estimated at 2 hours or less, before implementation begins.
+- At the end of each project, an Architecture Decision Record (ADR) summarizing key decisions must be produced using the MADR template.
 
 ## Out-of-scope
 - Real-time or intraday stock quotes/data (only daily/delayed data is planned)

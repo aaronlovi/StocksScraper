@@ -24,6 +24,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{02EA681E-C
 	ProjectSection(SolutionItems) = preProject
 		project_fact_sheet.md = project_fact_sheet.md
 		project_instructions.md = project_instructions.md
+		.github\copilot-instructions.md = .github\copilot-instructions.md
 	EndProjectSection
 EndProject
 Global

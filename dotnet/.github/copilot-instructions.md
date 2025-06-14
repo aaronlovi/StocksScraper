@@ -19,6 +19,7 @@ These instructions are for GitHub Copilot and AI agents working on this reposito
 
 ## Coding Standards
 - Follow .NET 8 and C# best practices for code style, structure, and naming.
+- Prefer using the `Result`/`IResult` pattern (see `Stocks.Shared.Result`, `Stocks.Shared.IResult`, and the `Results.cs` file) for error handling instead of throwing exceptions, unless an exception is truly exceptional or unrecoverable.
 - Keep all documentation, including ADRs, Kanban task lists, and test scenarios, clear, concise, and up to date.
 
 ---

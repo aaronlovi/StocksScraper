@@ -189,6 +189,18 @@ The prototype financial statement viewer will be a command-line tool integrated 
   - `GetTaxonomyConceptsByTaxonomyType`
   - `GetSubmissions`
 
+___
+
+## Implementation Context and Codebase Helpers
+
+### StatementPrinter Class
+
+- The `StatementPrinter` class is already scaffolded and located at `Stocks.EDGARScraper/Services/Statements/StatementPrinter.cs`.
+- **Fully qualified name:** `Stocks.EDGARScraper.Services.Statements.StatementPrinter`
+- This class is responsible for rendering financial statements and should be referenced for all related implementation work.
+- DTOs and data access interfaces are present in the `Stocks.Persistence` and `Stocks.DataModels` projects as described above.
+- CLI argument parsing and entry point logic are in `Stocks.EDGARScraper/Program.cs`.
+
 ---
 
 ## Output Format Examples
@@ -384,4 +396,3 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - **Presentation Tree**: The hierarchical structure that defines parent/child relationships between taxonomy concepts for display purposes.
 - **Submission**: A single SEC filing instance for a company, containing financial data for a specific period.
 - **Data Point**: A single reported value for a taxonomy concept, company, and submission (e.g., value of "Cash" for Q1 2019).
-- **StatementPrinter**: The class responsible

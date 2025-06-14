@@ -98,6 +98,7 @@ The prototype financial statement viewer will be a command-line tool integrated 
 ## DTOs and Data Structures
 
 ### ConceptDetailsDTO (namespace: Stocks.Persistence.Database.DTO.Taxonomies)
+
 - `long ConceptId`
 - `int TaxonomyTypeId`
 - `int PeriodTypeId`
@@ -108,6 +109,7 @@ The prototype financial statement viewer will be a command-line tool integrated 
 - `string Documentation`
 
 ### PresentationDetailsDTO (namespace: Stocks.Persistence.Database.DTO.Taxonomies)
+
 - `long PresentationId`
 - `long ConceptId`
 - `int Depth`
@@ -116,6 +118,7 @@ The prototype financial statement viewer will be a command-line tool integrated 
 - `long ParentPresentationId`
 
 ### DataPoint (namespace: Stocks.DataModels)
+
 - `ulong DataPointId`
 - `ulong CompanyId`
 - `string FactName`
@@ -132,14 +135,21 @@ The prototype financial statement viewer will be a command-line tool integrated 
 ## Output Format Examples
 
 ### CSV
-#### ConceptName,Label,Value,Depth,ParentConceptName
+
+```csv
+ConceptName,Label,Value,Depth,ParentConceptName
 Assets,Assets,350000,0,
 Current Assets,Current Assets,150000,1,Assets
 Cash and Cash Equivalents,Cash,100000,2,Current Assets
 Accounts Receivable,Receivables,50000,2,Current Assets
 Noncurrent Assets,Noncurrent Assets,200000,1,Assets
 Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
-### HTML<ul>
+```
+
+### HTML
+
+```html
+<ul>
   <li>Assets: 350000
     <ul>
       <li>Current Assets: 150000
@@ -156,8 +166,10 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
     </ul>
   </li>
 </ul>
+```
 
 ### JSON
+
 ```json
 {
   "ConceptName": "Assets",
@@ -184,6 +196,7 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
   ]
 }
 ```
+
 ---
 
 ## Error Handling
@@ -212,12 +225,74 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
 
 ## Testing
 
-- Add Gherkin-style scenarios or xUnit tests for:
-  - Listing available statements for a company.
-  - Displaying a statement in each output format.
-  - Handling missing company, concept, or data.
-  - Recursion limit enforcement.
-  - Date filtering.
+Below are concrete Gherkin scenarios for each major requirement. These scenarios should be automated using SpecFlow or a similar tool, or used as the basis for xUnit tests.
+
+### Scenario: List available statements for a company
+Given the EDGARScraper CLI is available
+And the database contains a company with CIK "00001234" and US-GAAP taxonomy concepts
+When I run "dotnet run --print-statement --cik 00001234 --list-statements"
+Then the output should include a list of available top-level statements or abstract concepts
+And the output should contain "Assets" and "Liabilities"
+
+### Scenario: Display a statement in CSV format
+Given the EDGARScraper CLI is available
+And the database contains a company with CIK "00001234" and a submission dated "2019-03-01"
+And the taxonomy contains the concept "Assets"
+When I run "dotnet run --print-statement --cik 00001234 --concept Assets --date 2019-03-01 --format csv"
+Then the output should be valid CSV
+And the output should include a row with "Assets" and its value
+
+### Scenario: Display a statement in HTML format
+Given the EDGARScraper CLI is available
+And the database contains a company with CIK "00001234" and a submission dated "2019-03-01"
+And the taxonomy contains the concept "Assets"
+When I run "dotnet run --print-statement --cik 00001234 --concept Assets --date 2019-03-01 --format html"
+Then the output should be valid HTML
+And the output should include an element with "Assets" and its value
+
+### Scenario: Display a statement in JSON format
+Given the EDGARScraper CLI is available
+And the database contains a company with CIK "00001234" and a submission dated "2019-03-01"
+And the taxonomy contains the concept "Assets"
+When I run "dotnet run --print-statement --cik 00001234 --concept Assets --date 2019-03-01 --format json"
+Then the output should be valid JSON
+And the output should include a property "ConceptName" with value "Assets"
+
+### Scenario: Handle missing company
+Given the EDGARScraper CLI is available
+And the database does not contain a company with CIK "99999999"
+When I run "dotnet run --print-statement --cik 99999999 --concept Assets --date 2019-03-01 --format csv"
+Then the error output should contain "ERROR: Company with CIK '99999999' not found."
+And the exit code should be non-zero
+
+### Scenario: Handle missing concept
+Given the EDGARScraper CLI is available
+And the database contains a company with CIK "00001234"
+But the taxonomy does not contain the concept "NonexistentConcept"
+When I run "dotnet run --print-statement --cik 00001234 --concept NonexistentConcept --date 2019-03-01 --format csv"
+Then the error output should contain "ERROR: Concept 'NonexistentConcept' not found in taxonomy."
+And the exit code should be non-zero
+
+### Scenario: Handle missing submission for date
+Given the EDGARScraper CLI is available
+And the database contains a company with CIK "00001234"
+But there is no submission for the date "1990-01-01"
+When I run "dotnet run --print-statement --cik 00001234 --concept Assets --date 1990-01-01 --format csv"
+Then the error output should contain "ERROR: No submission found for CIK '00001234' on or before 1990-01-01."
+And the exit code should be non-zero
+
+### Scenario: Recursion limit enforcement
+Given the EDGARScraper CLI is available
+And the taxonomy contains a deeply nested concept hierarchy under "Assets"
+When I run "dotnet run --print-statement --cik 00001234 --concept Assets --date 2019-03-01 --format csv --max-depth 2"
+Then the output should not include any concepts deeper than depth 2
+
+### Scenario: Date filtering
+Given the EDGARScraper CLI is available
+And the database contains a company with CIK "00001234"
+And there are submissions for "2018-12-31" and "2019-03-01"
+When I run "dotnet run --print-statement --cik 00001234 --concept Assets --date 2019-03-01 --format csv"
+Then the output should reflect data from the submission dated "2019-03-01"
 
 ---
 

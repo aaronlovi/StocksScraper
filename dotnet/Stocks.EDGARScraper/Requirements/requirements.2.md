@@ -59,6 +59,10 @@ The prototype financial statement viewer will be a command-line tool integrated 
       - `TraverseConceptTree()`: Recursively walks the taxonomy tree.
       - `FormatOutput()`: Handles output formatting for each supported format.
       - `ValidateParameters()`: Ensures all required parameters are present and valid.
+    
+    - **Output Format Extensibility:**
+      - The `StatementPrinter` class is designed for extensibility. To add a new output format, extend the `FormatOutput()` method (or use a strategy pattern or similar extension point) to support the new format. Document the new format and update CLI argument validation accordingly.
+      - This allows future developers to add formats such as XML, Markdown, or others with minimal changes to the core logic.
 
 - **Data Access:**
   - Uses `IDbmService` (see `Stocks.Persistence.Database.IDbmService`) for all database operations.
@@ -77,6 +81,7 @@ The prototype financial statement viewer will be a command-line tool integrated 
   - **CSV:** Columns: `ConceptName,Label,Value,Depth,ParentConceptName`
   - **HTML:** Nested `<ul>`/`<li>` or table structure for hierarchy.
   - **JSON:** Tree structure with children as arrays.
+  - **Extensibility:** New formats can be added by extending the `StatementPrinter` class as described above.
 
 ### Data Flow
 
@@ -359,6 +364,7 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - [ ] Implement error handling and logging.
 - [ ] Add Gherkin/xUnit tests for all major scenarios.
 - [ ] Document sample outputs and update this requirements file as needed.
+- [ ] **Document and maintain output format extensibility:** When adding a new output format, extend the `StatementPrinter` class and update documentation and CLI validation accordingly.
 
 ---
 

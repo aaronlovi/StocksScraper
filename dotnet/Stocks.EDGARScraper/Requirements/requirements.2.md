@@ -13,6 +13,81 @@
 
 ---
 
+## High-Level Design
+
+The prototype financial statement viewer will be a command-line tool integrated into the `Stocks.EDGARScraper` console application. It will allow users to display a company's financial statement (or any abstract taxonomy concept) as of a specific date, starting from any top-level/abstract taxonomy concept, and output the result as CSV.
+
+**Key Features:**
+- List all available statements or abstract concepts for a company.
+- Display a statement or concept hierarchy for a company and date, traversing the taxonomy presentation tree.
+- Output results in CSV format, suitable for further processing or analysis.
+- Robust error handling and logging.
+
+**User Flow:**
+1. User invokes the tool with command-line arguments specifying CIK, concept, date, and optional recursion depth.
+2. The tool resolves the company, loads taxonomy concepts and presentation hierarchy, and finds the relevant submission for the specified date.
+3. The tool recursively traverses the presentation tree from the selected concept, querying and outputting data points for each concept in the hierarchy.
+4. Output is written to stdout in CSV format.
+
+---
+
+## Technical Design
+
+### Main Components
+
+- **Command-Line Interface (CLI):**
+  - New switch: `--print-statement`
+  - Arguments: `--cik`, `--concept`, `--date`, `--max-depth`
+  - Entry point: `Program.cs` in `Stocks.EDGARScraper`
+
+- **StatementPrinter Class:**
+  - Encapsulates logic for loading concepts, traversing the presentation tree, querying data points, and outputting CSV.
+  - Accepts parameters for CIK, concept, date, and recursion depth.
+
+- **Data Access:**
+  - Uses `IDbmService` for all database operations.
+    - `GetAllCompaniesByDataSource` to resolve CIK to CompanyId.
+    - `GetTaxonomyConceptsByTaxonomyType` to load all concepts.
+    - (To be implemented) Query to load presentation hierarchy (children/parents).
+    - `GetSubmissions` to find the correct submission for the specified date.
+    - (To be implemented) Query to get data points for a given CompanyId, SubmissionId, and TaxonomyConceptId.
+
+- **Taxonomy Navigation:**
+  - Use `ConceptDetailsDTO` to identify abstract concepts and concept metadata.
+  - Use `PresentationDetailsDTO` to navigate parent/child relationships in the taxonomy presentation tree.
+  - Recursively traverse the tree, respecting the max depth.
+
+- **CSV Output:**
+  - Output columns: `ConceptName,Label,Value,Depth,ParentConceptName`
+  - Write to stdout.
+
+### Data Flow
+
+1. **Resolve Company:**  
+   Use `IDbmService.GetAllCompaniesByDataSource` to find the company by CIK.
+2. **Load Taxonomy Concepts:**  
+   Use `IDbmService.GetTaxonomyConceptsByTaxonomyType` to load all concepts for US-GAAP 2025.
+3. **List Abstract Concepts:**  
+   Filter concepts where `IsAbstract == true` for user selection.
+4. **Load Presentation Hierarchy:**  
+   (If not already available) Implement a query to get all `PresentationDetailsDTO` for the taxonomy, and build a parent/child map in memory.
+5. **Find Submission by Date:**  
+   Use `IDbmService.GetSubmissions` and filter by `CompanyId` and `ReportDate` to find the correct submission.
+6. **Traverse and Output:**  
+   Starting from the selected concept, recursively traverse children, querying for data points at each node, and outputting results as CSV.
+
+### Extensibility
+
+- New queries for presentation hierarchy and data points can be added to `Stocks.Persistence\Database\Statements\`.
+- The `StatementPrinter` class can be extended for additional output formats or filtering options.
+
+### Error Handling
+
+- If a company, concept, or submission is not found, log a warning and exit gracefully.
+- If a data point is missing for a concept, output an empty value and log a warning.
+
+---
+
 ## General Notes & Implementation Context
 
 - **Where to Implement:**

@@ -2,7 +2,7 @@
 
 | ID | Requirement | Description | Status | Acceptance Criteria | Notes |
 |----|-------------|-------------|--------|---------------------|-------|
-| 1  | List available statements | List all available balance sheets, income statements, cash flow statements, or any top-level/abstract taxonomy concept for a specific company. | Not Started | Output must list all available top-level/abstract concepts for the specified company and match sample format. | Use command-line args to specify company (by CIK or name) and statement type or concept. |
+| 1  | List available statements | List all available balance sheets, income statements, cash flow statements, or any top-level/abstract taxonomy concept for a specific company. | Complete | Output must list all available top-level/abstract concepts for the specified company and match sample format. | Use command-line args to specify company (by CIK or name) and statement type or concept. |
 | 2  | Display statement hierarchy | Display a specific statement or any abstract taxonomy concept for a company, starting from the selected concept. | Not Started | Output must show the full hierarchy for the selected concept, matching the requested format and sample output. | Recursively traverse taxonomy presentation tree, output as CSV, HTML, or JSON. |
 | 3  | Output format | Output should be in CSV, HTML, or JSON format, suitable for piping to file, further processing, or human viewing. | Not Started | Output must match the selected format (CSV, HTML, or JSON) and include all required columns/fields. | Columns: Concept Name, Label, Value, Depth, Parent Concept, etc. |
 | 4  | Recursion limit | Implement a reasonable recursion limit to avoid runaway output. | Not Started | Output must not include concepts deeper than the specified max depth. | Configurable, default to 10 levels. |
@@ -353,6 +353,10 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Add Gherkin/xUnit tests for all major scenarios.
 - Document sample outputs and update this requirements file as needed.
 - Document and maintain output format extensibility: When adding a new output format, extend the StatementPrinter class and update documentation and CLI validation accordingly.
+- Write Gherkin/xUnit tests for listing available statements (requirement 1), including normal and edge cases (e.g., company not found, no abstract concepts).
+- Write Gherkin/xUnit tests for CLI argument validation (requirement 10), including missing/invalid arguments and usage output.
+- Write xUnit tests for CLI integration (requirement 5), ensuring the --print-statement switch is recognized and routed correctly.
+- Write xUnit tests for data access methods used in statement listing (requirement 1/6), ensuring correct data is returned or errors are handled.
 
 ### Ready
 - Implement GetTaxonomyPresentationsByTaxonomyType in DbmService: Implement the actual database query to retrieve all PresentationDetailsDTO for a given taxonomy type.
@@ -363,9 +367,9 @@ Then the output should reflect data from the submission dated "2019-03-01"
 ### In Progress
 - Implement CLI argument parsing for all required switches.
 - Implement StatementPrinter class with support for CSV, HTML, and JSON output (hierarchy mode).
-- Create GetTaxonomyPresentationsByTaxonomyTypeStmt for querying all PresentationDetailsDTO for a taxonomy type.
-- Create GetDataPointsForSubmissionStmt for querying all DataPoint records for a company and submission.
 
 ### Done
 - Inspect DTOs and data access methods; document their properties here.
 - Implement StatementPrinter class with support for CSV output for --list-statements.
+- Create GetTaxonomyPresentationsByTaxonomyTypeStmt for querying all PresentationDetailsDTO for a taxonomy type.
+- Create GetDataPointsForSubmissionStmt for querying all DataPoint records for a company and submission.

@@ -27,6 +27,7 @@ This document provides overarching instructions and best practices for working o
 - Ensure that new functionality is covered by tests that prove requirements are met.
 - Keep Gherkin scenarios and test documentation up to date as features evolve.
 - All code changes must pass a successful compilation/build phase before being considered complete or merged.
+- After completing any work, the AI agent must check the requirements and Kanban lists for any items that should be marked complete or have their status changed, and ask the project owner for permission to update the requirements document accordingly.
 
 ## Coding and Documentation Standards
 - Follow .NET 8 and C# best practices for code style, structure, and naming.
@@ -45,6 +46,7 @@ This document provides overarching instructions and best practices for working o
 - For all tasks, write Gherkin-style scenarios or xUnit tests to prove the feature works, unless the user explicitly specifies otherwise.
 - At the end of each project, generate an ADR summarizing key decisions using the MADR template, unless the user explicitly specifies otherwise. Store ADRs in a `decisions` folder with a running `README.md` linking to each ADR.
 - When in doubt, ask the user if the fact sheet or instructions should be updated.
+- **After completing any work, the AI agent must check the requirements and Kanban lists for any items that should be marked complete or have their status changed, and ask the project owner for permission to update the requirements document accordingly.**
 
 ## Collaboration
 - Communicate any major changes, questions, or uncertainties to the project owner.

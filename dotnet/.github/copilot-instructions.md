@@ -18,6 +18,7 @@ These instructions are for GitHub Copilot and AI agents working on this reposito
 - For all tasks, write or update Gherkin-style scenarios or xUnit tests to prove the feature works, unless the user explicitly states otherwise.
 - At the end of each project, generate an Architecture Decision Record (ADR) summarizing key decisions using the MADR template. Store ADRs in a `decisions` folder with a running `README.md` linking to each ADR.
 - Proactively suggest updates to the fact sheet and instructions when changes affect project purpose, user stories, architecture, tech stack, or cross-cutting rules.
+- After completing any work, the AI agent must check the requirements and Kanban lists for any items that should be marked complete or have their status changed, and ask the project owner for permission to update the requirements document accordingly.
 
 ## Coding Standards
 - Follow .NET 8 and C# best practices for code style, structure, and naming.

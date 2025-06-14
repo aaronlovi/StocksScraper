@@ -56,6 +56,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - At the end of each project, an Architecture Decision Record (ADR) summarizing key decisions must be produced using the MADR template.
 - Data structures: Prefer record types or classes over tuples for returning or passing multiple values. Tuples should be avoided for anything beyond trivial, local use, to improve code maintainability and clarity.
 - Glossary: All requirements documents must include a Glossary section at the bottom, defining key domain and project-specific terms.
+- After completing any work, the AI agent must check the requirements and Kanban lists for any items that should be marked complete or have their status changed, and ask the project owner for permission to update the requirements document accordingly.
 
 ## Requirements & Project Planning Process
 - At the start of every project or major feature, requirements documents must be created or updated using a standard template (see requirements.1.md and requirements.2.md for examples).

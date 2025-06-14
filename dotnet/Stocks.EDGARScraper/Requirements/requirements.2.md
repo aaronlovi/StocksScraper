@@ -7,7 +7,7 @@
 | 3  | Output format | Output should be in CSV, HTML, or JSON format, suitable for piping to file, further processing, or human viewing. | Not Started | Output must match the selected format (CSV, HTML, or JSON) and include all required columns/fields. | Columns: Concept Name, Label, Value, Depth, Parent Concept, etc. |
 | 4  | Recursion limit | Implement a reasonable recursion limit to avoid runaway output. | Not Started | Output must not include concepts deeper than the specified max depth. | Configurable, default to 10 levels. |
 | 5  | Integration | Integrate as a new command in Stocks.EDGARScraper (console app). | Not Started | New command-line switch (--print-statement) must be available and functional. | Add new command-line switch, e.g. --print-statement. |
-| 6  | Data access | Use IDbmService for all data access. | Not Started | All data must be loaded via IDbmService methods. | Use GetTaxonomyConceptsByTaxonomyType, GetAllCompaniesByDataSource, GetSubmissions, etc. |
+| 6  | Data access | Use `IDbmService` (see `Stocks.Persistence.Database.IDbmService`) for all data access. | Not Started | All data must be loaded via `IDbmService` methods. | Use `GetTaxonomyConceptsByTaxonomyType`, `GetAllCompaniesByDataSource`, `GetSubmissions`, etc. |
 | 7  | Robustness | Handle errors gracefully; log and continue where possible. | Not Started | Errors must be logged to stderr, and the tool must not crash on missing data. | Prototype quality, but avoid crashes. |
 | 8  | Filter by date | Allow user to specify a date to select the set of data points (e.g., display balance sheet as of 2019-03-01). | Not Started | Output must reflect data as of the specified date. | Use command-line arg to filter by report date. |
 | 9  | Output format switch | Allow user to select output format via CLI (csv, html, json). | Not Started | Output must match the format specified by the --format argument. | Use --format argument. |
@@ -48,7 +48,7 @@ The prototype financial statement viewer will be a command-line tool integrated 
     - Encapsulates all logic for rendering a financial statement or taxonomy concept hierarchy for a company.
     - Responsibilities:
       - Accepts parameters for CIK, concept, date, recursion depth, and output format (CSV, HTML, JSON).
-      - Loads taxonomy concepts and presentation hierarchy from the database using IDbmService.
+      - Loads taxonomy concepts and presentation hierarchy from the database using `IDbmService` (see `Stocks.Persistence.Database.IDbmService`).
       - Finds the relevant company and submission for the specified CIK and date.
       - Recursively traverses the taxonomy presentation tree starting from the selected concept, respecting the max depth.
       - Queries data points for each concept in the hierarchy.
@@ -61,7 +61,7 @@ The prototype financial statement viewer will be a command-line tool integrated 
       - `ValidateParameters()`: Ensures all required parameters are present and valid.
 
 - **Data Access:**
-  - Uses `IDbmService` for all database operations.
+  - Uses `IDbmService` (see `Stocks.Persistence.Database.IDbmService`) for all database operations.
     - `GetAllCompaniesByDataSource` to resolve CIK to CompanyId.
     - `GetTaxonomyConceptsByTaxonomyType` to load all concepts.
     - (To be implemented) Query to load presentation hierarchy (children/parents).
@@ -69,8 +69,8 @@ The prototype financial statement viewer will be a command-line tool integrated 
     - (To be implemented) Query to get data points for a given CompanyId, SubmissionId, and TaxonomyConceptId.
 
 - **Taxonomy Navigation:**
-  - Use `ConceptDetailsDTO` to identify abstract concepts and concept metadata.
-  - Use `PresentationDetailsDTO` to navigate parent/child relationships in the taxonomy presentation tree.
+  - Use `ConceptDetailsDTO` (see `Stocks.Persistence.Database.DTO.Taxonomies.ConceptDetailsDTO`) to identify abstract concepts and concept metadata.
+  - Use `PresentationDetailsDTO` (see `Stocks.Persistence.Database.DTO.Taxonomies.PresentationDetailsDTO`) to navigate parent/child relationships in the taxonomy presentation tree.
   - Recursively traverse the tree, respecting the max depth.
 
 - **Output Formats:**
@@ -87,9 +87,9 @@ The prototype financial statement viewer will be a command-line tool integrated 
 3. **List Abstract Concepts:**  
    Filter concepts where `IsAbstract == true` for user selection.
 4. **Load Presentation Hierarchy:**  
-   (If not already available) Implement a query to get all `PresentationDetailsDTO` for the taxonomy, and build a parent/child map in memory.
+   (If not already available) Implement a query to get all `PresentationDetailsDTO` (see `Stocks.Persistence.Database.DTO.Taxonomies.PresentationDetailsDTO`) for the taxonomy, and build a parent/child map in memory.
 5. **Find Submission by Date:**  
-   Use `IDbmService.GetSubmissions` and filter by `CompanyId` and `ReportDate` to find the correct submission.
+   Use `IDbmService.GetSubmissions` to find the correct submission for the specified date.
 6. **Traverse and Output:**  
    Starting from the selected concept, recursively traverse children, querying for data points at each node, and outputting results in the selected format.
 
@@ -97,38 +97,92 @@ The prototype financial statement viewer will be a command-line tool integrated 
 
 ## DTOs and Data Structures
 
-### ConceptDetailsDTO (namespace: Stocks.Persistence.Database.DTO.Taxonomies)
+### ConceptDetailsDTO
+- **File:** `Stocks.Persistence/Database/DTO/Taxonomies/ConceptDetailsDTO.cs`
+- **Namespace:** `Stocks.Persistence.Database.DTO.Taxonomies`
+- **Definition:**
 
-- `long ConceptId`
-- `int TaxonomyTypeId`
-- `int PeriodTypeId`
-- `int BalanceTypeId`
-- `bool IsAbstract`
-- `string Name`
-- `string Label`
-- `string Documentation`
+```csharp
+  public record ConceptDetailsDTO(
+    long ConceptId, int TaxonomyTypeId, int PeriodTypeId, int BalanceTypeId, bool IsAbstract, string Name, string Label, string Documentation);
+```
 
-### PresentationDetailsDTO (namespace: Stocks.Persistence.Database.DTO.Taxonomies)
+- **Properties:**
+  - long ConceptId
+  - int TaxonomyTypeId
+  - int PeriodTypeId
+  - int BalanceTypeId
+  - bool IsAbstract
+  - string Name
+  - string Label
+  - string Documentation
 
-- `long PresentationId`
-- `long ConceptId`
-- `int Depth`
-- `int OrderInDepth`
-- `long ParentConceptId`
-- `long ParentPresentationId`
+### PresentationDetailsDTO
+- **File:** `Stocks.Persistence/Database/DTO/Taxonomies/PresentationDetailsDTO.cs`
+- **Namespace:** `Stocks.Persistence.Database.DTO.Taxonomies`
+- **Definition:**
 
-### DataPoint (namespace: Stocks.DataModels)
+```csharp
+  public record PresentationDetailsDTO(
+    long PresentationId,
+    long ConceptId,
+    int Depth,
+    int OrderInDepth,
+    long ParentConceptId,
+    long ParentPresentationId);
+```
 
-- `ulong DataPointId`
-- `ulong CompanyId`
-- `string FactName`
-- `string FilingReference`
-- `DatePair DatePair`
-- `decimal Value`
-- `DataPointUnit Units`
-- `DateOnly FiledDate`
-- `ulong SubmissionId`
-- `long TaxonomyConceptId`
+- **Properties:**
+  - `long PresentationId`
+  - `long ConceptId`
+  - `int Depth`
+  - `int OrderInDepth`
+  - `long ParentConceptId`
+  - `long ParentPresentationId`
+
+### DataPoint
+- **File:** `Stocks.DataModels/DataPoint.cs`
+- **Namespace:** `Stocks.DataModels`
+- **Definition:**
+
+```csharp
+  public record DataPoint(
+    ulong DataPointId,
+    ulong CompanyId,
+    string FactName,
+    string FilingReference,
+    DatePair DatePair,
+    decimal Value,
+    DataPointUnit Units,
+    DateOnly FiledDate,
+    ulong SubmissionId,
+    long TaxonomyConceptId)
+```
+
+- **Properties:**
+  - `ulong DataPointId`
+  - `ulong CompanyId`
+  - `string FactName`
+  - `string FilingReference`
+  - `DatePair DatePair`
+  - `decimal Value`
+  - `DataPointUnit Units`
+  - `DateOnly FiledDate`
+  - `ulong SubmissionId`
+  - `long TaxonomyConceptId`
+
+### IDbmService
+- **File:** `Stocks.Persistence/Database/IDbmService.cs`
+- **Namespace:** `Stocks.Persistence.Database`
+- **Definition:**public interface IDbmService {
+    Task<Result<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(string dataSource, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<ConceptDetailsDTO>>> GetTaxonomyConceptsByTaxonomyType(int taxonomyTypeId, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct);
+    // ...other methods
+  }- **Key Methods Used:**
+  - `GetAllCompaniesByDataSource`
+  - `GetTaxonomyConceptsByTaxonomyType`
+  - `GetSubmissions`
 
 ---
 
@@ -310,6 +364,6 @@ Then the output should reflect data from the submission dated "2019-03-01"
 
 ## Implementation Hints
 
-- Use `ConceptDetailsDTO.IsAbstract == true` to find top-level statement concepts.
-- Use `PresentationDetailsDTO` for parent/child navigation.
-- Query for `DataPoint` by CompanyId, Submission
+- Use `ConceptDetailsDTO.IsAbstract == true` to find top-level statement concepts (see `Stocks.Persistence.Database.DTO.Taxonomies.ConceptDetailsDTO`).
+- Use `PresentationDetailsDTO` for parent/child navigation (see `Stocks.Persistence.Database.DTO.Taxonomies.PresentationDetailsDTO`).
+- Query for `DataPoint` by CompanyId, Submission (see `Stocks.DataModels.DataPoint`).

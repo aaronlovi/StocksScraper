@@ -11,6 +11,7 @@
 | 7  | Robustness | Handle errors gracefully; log and continue where possible. | Not Started | Prototype quality, but avoid crashes. |
 | 8  | Filter by date | Allow user to specify a date to select the set of data points (e.g., display balance sheet as of 2019-03-01). | Not Started | Use command-line arg to filter by report date. |
 | 9  | Output format switch | Allow user to select output format via CLI (csv, html, json). | Not Started | Use --format argument. |
+| 10 | CLI argument validation | Validate all required CLI arguments; if missing or invalid, print usage instructions to stderr and exit with a non-zero code. | Not Started | Usage should clearly describe all required and optional arguments. |
 
 ---
 
@@ -23,6 +24,7 @@ The prototype financial statement viewer will be a command-line tool integrated 
 - Display a statement or concept hierarchy for a company and date, traversing the taxonomy presentation tree.
 - Output results in CSV, HTML, or JSON format, suitable for further processing or analysis.
 - Robust error handling and logging.
+- **Argument validation:** If required arguments are missing or invalid, print usage instructions to stderr and exit with a non-zero code.
 
 **User Flow:**
 1. User invokes the tool with command-line arguments specifying CIK, concept, date, output format, and optional recursion depth.
@@ -40,9 +42,23 @@ The prototype financial statement viewer will be a command-line tool integrated 
   - New switch: `--print-statement`
   - Arguments: `--cik`, `--concept`, `--date`, `--max-depth`, `--format`
   - Entry point: `Program.cs` in `Stocks.EDGARScraper`
-  - Example:  dotnet run --print-statement --cik 1234 --concept "Assets" --date "2019-03-01" --max-depth 10 --format html- **StatementPrinter Class:**
-  - Encapsulates logic for loading concepts, traversing the presentation tree, querying data points, and outputting in the selected format.
-  - Accepts parameters for CIK, concept, date, recursion depth, and output format.
+  - Example:  dotnet run --print-statement --cik 1234 --concept "Assets" --date "2019-03-01" --max-depth 10 --format html
+  - **Argument validation:** If any required argument is missing or invalid, print usage instructions to stderr and exit with a non-zero code.
+  - **StatementPrinter Class:**
+    - Encapsulates all logic for rendering a financial statement or taxonomy concept hierarchy for a company.
+    - Responsibilities:
+      - Accepts parameters for CIK, concept, date, recursion depth, and output format (CSV, HTML, JSON).
+      - Loads taxonomy concepts and presentation hierarchy from the database using IDbmService.
+      - Finds the relevant company and submission for the specified CIK and date.
+      - Recursively traverses the taxonomy presentation tree starting from the selected concept, respecting the max depth.
+      - Queries data points for each concept in the hierarchy.
+      - Formats and outputs the results in the selected format (CSV, HTML, or JSON) to stdout.
+      - Handles missing data, errors, and logging as specified in the requirements.
+    - Main methods (suggested):
+      - `PrintStatement()`: Main entry point for rendering the statement.
+      - `TraverseConceptTree()`: Recursively walks the taxonomy tree.
+      - `FormatOutput()`: Handles output formatting for each supported format.
+      - `ValidateParameters()`: Ensures all required parameters are present and valid.
 
 - **Data Access:**
   - Uses `IDbmService` for all database operations.
@@ -175,6 +191,7 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
 - If a company, concept, or submission is not found, log a warning and exit gracefully with a non-zero exit code.
 - If a data point is missing for a concept, output an empty value and log a warning.
 - All errors should be logged to stderr.
+- **If required CLI arguments are missing or invalid, print usage instructions to stderr and exit with a non-zero code.**
 
 ---
 

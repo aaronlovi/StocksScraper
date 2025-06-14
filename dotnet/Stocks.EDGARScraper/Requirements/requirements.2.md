@@ -3,31 +3,32 @@
 | ID | Requirement | Description | Status | Notes |
 |----|-------------|-------------|--------|-------|
 | 1  | List available statements | List all available balance sheets, income statements, cash flow statements, or any top-level/abstract taxonomy concept for a specific company. | Not Started | Use command-line args to specify company (by CIK or name) and statement type or concept. |
-| 2  | Display statement hierarchy | Display a specific statement or any abstract taxonomy concept for a company, starting from the selected concept. | Not Started | Recursively traverse taxonomy presentation tree, output as CSV. |
-| 3  | Output format | Output should be in CSV format, suitable for piping to file or further processing. | Not Started | Columns: Concept Name, Label, Value, Depth, Parent Concept, etc. |
+| 2  | Display statement hierarchy | Display a specific statement or any abstract taxonomy concept for a company, starting from the selected concept. | Not Started | Recursively traverse taxonomy presentation tree, output as CSV, HTML, or JSON. |
+| 3  | Output format | Output should be in CSV, HTML, or JSON format, suitable for piping to file, further processing, or human viewing. | Not Started | Columns: Concept Name, Label, Value, Depth, Parent Concept, etc. |
 | 4  | Recursion limit | Implement a reasonable recursion limit to avoid runaway output. | Not Started | Configurable, default to 10 levels. |
 | 5  | Integration | Integrate as a new command in Stocks.EDGARScraper (console app). | Not Started | Add new command-line switch, e.g. --print-statement. |
 | 6  | Data access | Use IDbmService for all data access. | Not Started | Use GetTaxonomyConceptsByTaxonomyType, GetAllCompaniesByDataSource, GetSubmissions, etc. |
 | 7  | Robustness | Handle errors gracefully; log and continue where possible. | Not Started | Prototype quality, but avoid crashes. |
 | 8  | Filter by date | Allow user to specify a date to select the set of data points (e.g., display balance sheet as of 2019-03-01). | Not Started | Use command-line arg to filter by report date. |
+| 9  | Output format switch | Allow user to select output format via CLI (csv, html, json). | Not Started | Use --format argument. |
 
 ---
 
 ## High-Level Design
 
-The prototype financial statement viewer will be a command-line tool integrated into the `Stocks.EDGARScraper` console application. It will allow users to display a company's financial statement (or any abstract taxonomy concept) as of a specific date, starting from any top-level/abstract taxonomy concept, and output the result as CSV.
+The prototype financial statement viewer will be a command-line tool integrated into the `Stocks.EDGARScraper` console application. It will allow users to display a company's financial statement (or any abstract taxonomy concept) as of a specific date, starting from any top-level/abstract taxonomy concept, and output the result as CSV, HTML, or JSON.
 
 **Key Features:**
 - List all available statements or abstract concepts for a company.
 - Display a statement or concept hierarchy for a company and date, traversing the taxonomy presentation tree.
-- Output results in CSV format, suitable for further processing or analysis.
+- Output results in CSV, HTML, or JSON format, suitable for further processing or analysis.
 - Robust error handling and logging.
 
 **User Flow:**
-1. User invokes the tool with command-line arguments specifying CIK, concept, date, and optional recursion depth.
+1. User invokes the tool with command-line arguments specifying CIK, concept, date, output format, and optional recursion depth.
 2. The tool resolves the company, loads taxonomy concepts and presentation hierarchy, and finds the relevant submission for the specified date.
 3. The tool recursively traverses the presentation tree from the selected concept, querying and outputting data points for each concept in the hierarchy.
-4. Output is written to stdout in CSV format.
+4. Output is written to stdout in the selected format.
 
 ---
 
@@ -37,12 +38,11 @@ The prototype financial statement viewer will be a command-line tool integrated 
 
 - **Command-Line Interface (CLI):**
   - New switch: `--print-statement`
-  - Arguments: `--cik`, `--concept`, `--date`, `--max-depth`
+  - Arguments: `--cik`, `--concept`, `--date`, `--max-depth`, `--format`
   - Entry point: `Program.cs` in `Stocks.EDGARScraper`
-
-- **StatementPrinter Class:**
-  - Encapsulates logic for loading concepts, traversing the presentation tree, querying data points, and outputting CSV.
-  - Accepts parameters for CIK, concept, date, and recursion depth.
+  - Example:  dotnet run --print-statement --cik 1234 --concept "Assets" --date "2019-03-01" --max-depth 10 --format html- **StatementPrinter Class:**
+  - Encapsulates logic for loading concepts, traversing the presentation tree, querying data points, and outputting in the selected format.
+  - Accepts parameters for CIK, concept, date, recursion depth, and output format.
 
 - **Data Access:**
   - Uses `IDbmService` for all database operations.
@@ -57,9 +57,10 @@ The prototype financial statement viewer will be a command-line tool integrated 
   - Use `PresentationDetailsDTO` to navigate parent/child relationships in the taxonomy presentation tree.
   - Recursively traverse the tree, respecting the max depth.
 
-- **CSV Output:**
-  - Output columns: `ConceptName,Label,Value,Depth,ParentConceptName`
-  - Write to stdout.
+- **Output Formats:**
+  - **CSV:** Columns: `ConceptName,Label,Value,Depth,ParentConceptName`
+  - **HTML:** Nested `<ul>`/`<li>` or table structure for hierarchy.
+  - **JSON:** Tree structure with children as arrays.
 
 ### Data Flow
 
@@ -74,92 +75,130 @@ The prototype financial statement viewer will be a command-line tool integrated 
 5. **Find Submission by Date:**  
    Use `IDbmService.GetSubmissions` and filter by `CompanyId` and `ReportDate` to find the correct submission.
 6. **Traverse and Output:**  
-   Starting from the selected concept, recursively traverse children, querying for data points at each node, and outputting results as CSV.
-
-### Extensibility
-
-- New queries for presentation hierarchy and data points can be added to `Stocks.Persistence\Database\Statements\`.
-- The `StatementPrinter` class can be extended for additional output formats or filtering options.
-
-### Error Handling
-
-- If a company, concept, or submission is not found, log a warning and exit gracefully.
-- If a data point is missing for a concept, output an empty value and log a warning.
+   Starting from the selected concept, recursively traverse children, querying for data points at each node, and outputting results in the selected format.
 
 ---
 
-## General Notes & Implementation Context
+## DTOs and Data Structures
 
-- **Where to Implement:**
-  - Main entry point: `Program.cs` in `Stocks.EDGARScraper`.
-  - Add a new command-line switch, e.g. `--print-statement`.
-  - Place statement traversal and CSV output logic in a new class, e.g. `StatementPrinter`.
+### ConceptDetailsDTO (namespace: Stocks.Persistence.Database.DTO.Taxonomies)
+- `long ConceptId`
+- `int TaxonomyTypeId`
+- `int PeriodTypeId`
+- `int BalanceTypeId`
+- `bool IsAbstract`
+- `string Name`
+- `string Label`
+- `string Documentation`
 
-- **How to List Statements/Concepts:**
-  - Use `IDbmService.GetAllCompaniesByDataSource` to find the company.
-  - Use `IDbmService.GetSubmissions` to list available filings for the company.
-  - Use taxonomy concepts and presentations to determine available statement types or any top-level/abstract concept (`IsAbstract == true`).
-  - Allow user to list all available abstract concepts for selection.
+### PresentationDetailsDTO (namespace: Stocks.Persistence.Database.DTO.Taxonomies)
+- `long PresentationId`
+- `long ConceptId`
+- `int Depth`
+- `int OrderInDepth`
+- `long ParentConceptId`
+- `long ParentPresentationId`
 
-- **How to Display a Statement or Concept:**
-  - Use `IDbmService.GetTaxonomyConceptsByTaxonomyType` to load concepts.
-  - Use a (to be implemented) method to load the presentation tree (hierarchy) for the selected concept.
-  - Start from the selected abstract concept (specified by command-line switch, e.g., --concept "Assets").
-  - Recursively traverse child concepts (using presentation hierarchy), for each:
-    - Query for data points for the company and submission.
-    - Output each concept and value as a row in CSV.
-    - Include columns: Concept Name, Label, Value, Depth, Parent Concept, etc.
-  - Stop recursion at the configured limit.
+### DataPoint (namespace: Stocks.DataModels)
+- `ulong DataPointId`
+- `ulong CompanyId`
+- `string FactName`
+- `string FilingReference`
+- `DatePair DatePair`
+- `decimal Value`
+- `DataPointUnit Units`
+- `DateOnly FiledDate`
+- `ulong SubmissionId`
+- `long TaxonomyConceptId`
 
-- **CSV Output:**
-  - Output to console (stdout) in CSV format.
-  - Use indentation or a "Depth" column to indicate hierarchy.
-  - Example columns: `ConceptName,Label,Value,Depth,ParentConceptName`
+---
 
-- **DTOs and Services:**
-  - Use `ConceptDetailsDTO` and `PresentationDetailsDTO` for taxonomy navigation.
-  - Use `DataPoint` for actual values.
-  - All DTOs are in `Stocks.Persistence.Database.DTO.Taxonomies` or `Stocks.DataModels`.
+## Output Format Examples
 
-- **Database Statements:**
-  - Use or extend existing statements in `Stocks.Persistence\Database\Statements\` as needed.
-  - If a new query is needed (e.g., to get children of a concept, or data points for a concept/company/submission/date), add it in `Stocks.Persistence`.
+### CSV
+#### ConceptName,Label,Value,Depth,ParentConceptName
+Assets,Assets,350000,0,
+Current Assets,Current Assets,150000,1,Assets
+Cash and Cash Equivalents,Cash,100000,2,Current Assets
+Accounts Receivable,Receivables,50000,2,Current Assets
+Noncurrent Assets,Noncurrent Assets,200000,1,Assets
+Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
+### HTML<ul>
+  <li>Assets: 350000
+    <ul>
+      <li>Current Assets: 150000
+        <ul>
+          <li>Cash and Cash Equivalents: 100000</li>
+          <li>Accounts Receivable: 50000</li>
+        </ul>
+      </li>
+      <li>Noncurrent Assets: 200000
+        <ul>
+          <li>Property, Plant, Equipment: 200000</li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+</ul>
 
-- **Recursion Limit:**
-  - Default to 10 levels; make configurable via command-line arg.
+### JSON{
+  "ConceptName": "Assets",
+  "Label": "Assets",
+  "Value": 350000,
+  "Children": [
+    {
+      "ConceptName": "Current Assets",
+      "Label": "Current Assets",
+      "Value": 150000,
+      "Children": [
+        { "ConceptName": "Cash and Cash Equivalents", "Label": "Cash", "Value": 100000 },
+        { "ConceptName": "Accounts Receivable", "Label": "Receivables", "Value": 50000 }
+      ]
+    },
+    {
+      "ConceptName": "Noncurrent Assets",
+      "Label": "Noncurrent Assets",
+      "Value": 200000,
+      "Children": [
+        { "ConceptName": "Property, Plant, Equipment", "Label": "PPE", "Value": 200000 }
+      ]
+    }
+  ]
+}---
 
-- **Date Filtering:**
-  - Allow user to specify a date (e.g., --date "2019-03-01") to select the set of data points for that report date.
-  - Filter submissions and data points by the specified date.
+## Error Handling
 
-- **Error Handling:**
-  - Log errors and continue where possible.
-  - If a concept or data point is missing, log a warning and skip.
+- If a company, concept, or submission is not found, log a warning and exit gracefully with a non-zero exit code.
+- If a data point is missing for a concept, output an empty value and log a warning.
+- All errors should be logged to stderr.
 
-- **Assumptions:**
-  - Only US-GAAP 2025 taxonomy is supported for this prototype.
-  - Company is specified by CIK or name (resolve to CompanyId).
-  - Statement/concept is specified by name (e.g., "BalanceSheet", "Assets", etc.).
-  - Output is to console; user may redirect to file.
+---
+
+## Testing
+
+- Add Gherkin-style scenarios or xUnit tests for:
+  - Listing available statements for a company.
+  - Displaying a statement in each output format.
+  - Handling missing company, concept, or data.
+  - Recursion limit enforcement.
+  - Date filtering.
+
+---
+
+## Kanban Task List
+
+- [ ] Inspect DTOs and data access methods; document their properties here.
+- [ ] Implement CLI argument parsing for all required switches.
+- [ ] Implement StatementPrinter class with support for CSV, HTML, and JSON output.
+- [ ] Implement/extend data access methods in IDbmService.
+- [ ] Implement error handling and logging.
+- [ ] Add Gherkin/xUnit tests for all major scenarios.
+- [ ] Document sample outputs and update this requirements file as needed.
 
 ---
 
 ## Implementation Hints
 
-- **Finding Abstract Concepts:**  
-  Use `ConceptDetailsDTO.IsAbstract == true` to find top-level statement concepts.
-- **Presentation Hierarchy:**  
-  Use `PresentationDetailsDTO` to navigate parent/child relationships (ParentConceptId, ConceptId).
-- **Data Points:**  
-  Query for `DataPoint` by CompanyId, SubmissionId, TaxonomyConceptId, and filter by date if specified.
-- **Command-line Example:**  dotnet run --print-statement --cik 1234 --concept "Assets" --date "2019-03-01" --max-depth 10- **Relevant Files:**  
-  - `Program.cs` (main entry, add new switch)
-  - `IDbmService.cs` (data access)
-  - `ConceptDetailsDTO.cs`, `PresentationDetailsDTO.cs` (taxonomy)
-  - `DataPoint.cs` (values)
-  - `GetTaxonomyConceptsByTaxonomyTypeStmt.cs`, `GetAllSubmissionsStmt.cs` (DB queries)
-  - Add new files/classes as needed for statement printing logic.
-
----
-
-Update this table as requirements are implemented. Each requirement should be implemented in a way that does not introduce regressions to other ETL or data loading operations.
+- Use `ConceptDetailsDTO.IsAbstract == true` to find top-level statement concepts.
+- Use `PresentationDetailsDTO` for parent/child navigation.
+- Query for `DataPoint` by CompanyId, Submission

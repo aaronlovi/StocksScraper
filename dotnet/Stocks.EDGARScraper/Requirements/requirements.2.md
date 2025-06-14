@@ -141,7 +141,9 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
   </li>
 </ul>
 
-### JSON{
+### JSON
+```json
+{
   "ConceptName": "Assets",
   "Label": "Assets",
   "Value": 350000,
@@ -164,7 +166,9 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
       ]
     }
   ]
-}---
+}
+```
+---
 
 ## Error Handling
 

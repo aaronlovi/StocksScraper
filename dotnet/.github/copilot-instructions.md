@@ -6,6 +6,7 @@ These instructions are for GitHub Copilot and AI agents working on this reposito
 - Always use `project_fact_sheet.md` and `project_instructions.md` as the primary context for all tasks.
 
 ## Workflow Requirements
+- All code changes must pass a successful compilation/build phase before being considered complete or merged. This applies to all features, bugfixes, and documentation updates that affect code.
 - At the start of every project or major feature, before implementation, collaboratively write or update a requirements document that:
   - Loosely follows the template in requirements.1.md and requirements.2.md
   - Includes a Kanban-style task list (in a separate section)

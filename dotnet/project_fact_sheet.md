@@ -51,6 +51,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - Privacy/Compliance: No requirements yet; to be determined as user data and features expand.
 - Error handling: Prefer using the `Result`/`IResult` pattern (see `Stocks.Shared.Result`, `Stocks.Shared.IResult`, and the `Results.cs` file) for error handling instead of throwing exceptions, unless an exception is truly exceptional or unrecoverable. Robust error handling and logging throughout ETL, data processing, caching, and persistence.
 - Automated and behavior-driven testing (xUnit and Gherkin/SpecFlow) is a standard requirement for most new features and changes. Contributors must provide tests or scenarios that prove new functionality works as intended, unless explicitly stated otherwise.
+- All code changes must pass a successful compilation/build phase before being considered complete or merged.
 - All features and projects must be broken down into a Kanban-style list of tasks, each estimated at 2 hours or less, before implementation begins.
 - At the end of each project, an Architecture Decision Record (ADR) summarizing key decisions must be produced using the MADR template.
 - Glossary: All requirements documents must include a Glossary section at the bottom, defining key domain and project-specific terms.

@@ -26,6 +26,7 @@ This document provides overarching instructions and best practices for working o
 - For all new features, bugfixes, or changes, you (including AI agents) must write or update automated tests using xUnit and/or Gherkin-style scenarios (e.g., SpecFlow) that prove the feature works as intended. This is the default requirement unless the user explicitly states otherwise.
 - Ensure that new functionality is covered by tests that prove requirements are met.
 - Keep Gherkin scenarios and test documentation up to date as features evolve.
+- All code changes must pass a successful compilation/build phase before being considered complete or merged.
 
 ## Coding and Documentation Standards
 - Follow .NET 8 and C# best practices for code style, structure, and naming.

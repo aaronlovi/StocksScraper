@@ -38,6 +38,12 @@ public interface IDbmService {
         int taxonomyTypeId, CancellationToken ct);
     Task<Result> BulkInsertTaxonomyPresentations(List<PresentationDetailsDTO> taxonomyPresentations, CancellationToken ct);
 
+    // Taxonomy presentation hierarchy
+    Task<Result<IReadOnlyCollection<PresentationDetailsDTO>>> GetTaxonomyPresentationsByTaxonomyType(int taxonomyTypeId, CancellationToken ct);
+
+    // Data points for a company and submission
+    Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct);
+
     // Company submissions
 
     Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct);

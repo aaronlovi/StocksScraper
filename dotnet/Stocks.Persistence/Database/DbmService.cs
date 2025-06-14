@@ -249,6 +249,22 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
+    public async Task<Result<IReadOnlyCollection<PresentationDetailsDTO>>> GetTaxonomyPresentationsByTaxonomyType(int taxonomyTypeId, CancellationToken ct)
+    {
+        // TODO: Implement actual DB query
+        _logger.LogInformation("GetTaxonomyPresentationsByTaxonomyType called (stub) for taxonomyTypeId={TaxonomyTypeId}", taxonomyTypeId);
+        await Task.CompletedTask;
+        return Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(new List<PresentationDetailsDTO>());
+    }
+
+    public async Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct)
+    {
+        // TODO: Implement actual DB query
+        _logger.LogInformation("GetDataPointsForSubmission called (stub) for companyId={CompanyId}, submissionId={SubmissionId}", companyId, submissionId);
+        await Task.CompletedTask;
+        return Result<IReadOnlyCollection<DataPoint>>.Success(new List<DataPoint>());
+    }
+
     #endregion
 
     #region Company submissions

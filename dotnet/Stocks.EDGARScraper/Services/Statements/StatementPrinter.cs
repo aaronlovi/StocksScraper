@@ -137,4 +137,22 @@ public class StatementPrinter {
         // TODO: Implement parameter validation
         return true;
     }
+
+    /// <summary>
+    /// Builds a map from ParentConceptId to a list of child PresentationDetailsDTOs for efficient hierarchy traversal.
+    /// </summary>
+    private static Dictionary<long, List<PresentationDetailsDTO>> BuildParentToChildrenMap(IEnumerable<PresentationDetailsDTO> presentations)
+    {
+        var parentToChildren = new Dictionary<long, List<PresentationDetailsDTO>>();
+        foreach (var pres in presentations)
+        {
+            if (!parentToChildren.TryGetValue(pres.ParentConceptId, out var children))
+            {
+                children = new List<PresentationDetailsDTO>();
+                parentToChildren[pres.ParentConceptId] = children;
+            }
+            children.Add(pres);
+        }
+        return parentToChildren;
+    }
 }

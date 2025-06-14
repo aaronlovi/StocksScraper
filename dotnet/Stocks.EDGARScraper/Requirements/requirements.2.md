@@ -125,6 +125,20 @@ The core of statement hierarchy output is a recursive traversal of the taxonomy 
 
 This design supports extensibility for new output formats and additional metadata fields as needed.
 
+### In-Memory Structure for Taxonomy Parent/Child Relationships
+
+To efficiently traverse the taxonomy presentation tree, build an in-memory map from parent concept IDs to their child PresentationDetailsDTOs. This enables fast lookup of children for any concept during recursion.
+
+**Recommended C# structure:**
+// Maps ParentConceptId to a list of child PresentationDetailsDTOs
+Dictionary<long, List<PresentationDetailsDTO>> parentToChildren = new();
+- Populate this dictionary by iterating over all PresentationDetailsDTOs for the taxonomy.
+- For each PresentationDetailsDTO, add it to the list for its ParentConceptId.
+- During traversal, use this map to find all children of the current concept.
+- This structure supports efficient, cycle-safe, and depth-limited recursion.
+
+This structure should be created and populated as part of the data loading step in StatementPrinter before starting the recursive traversal.
+
 ### Data Flow
 
 1. **Resolve Company:**  

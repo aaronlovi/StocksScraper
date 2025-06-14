@@ -348,15 +348,26 @@ Then the output should reflect data from the submission dated "2019-03-01"
 ### Backlog
 - Refactor StatementPrinter to query for a single company by CIK in the database, rather than loading all companies and iterating in memory, for better performance with large datasets.
 - Add Microsoft.Extensions.Logging (Serilog abstraction) logging to StatementPrinter for typical info, warning, and error events.
-- Implement recursive taxonomy traversal in StatementPrinter.TraverseConceptTree().
-- Implement output formatting in StatementPrinter.FormatOutput() for CSV, HTML, and JSON.
 - Add Gherkin/xUnit tests for all major scenarios.
 - Document sample outputs and update this requirements file as needed.
 - Document and maintain output format extensibility: When adding a new output format, extend the StatementPrinter class and update documentation and CLI validation accordingly.
 - Write Gherkin/xUnit tests for CLI argument validation (requirement 10), including missing/invalid arguments and usage output.
 - Write xUnit tests for CLI integration (requirement 5), ensuring the --print-statement switch is recognized and routed correctly.
 - Write xUnit tests for data access methods used in statement listing (requirement 1/6), ensuring correct data is returned or errors are handled.
-- Add robust error handling and logging to StatementPrinter (hierarchy mode).
+- Hierarchy Traversal & Output (Requirement 2)
+  - Design and document the recursive traversal algorithm for the taxonomy presentation tree.
+  - Define the in-memory structure for parent/child relationships using PresentationDetailsDTO.
+  - Implement loading and mapping of PresentationDetailsDTOs for the selected taxonomy.
+  - Implement logic to find the root concept (by name or ID) and validate its existence.
+  - Implement recursive traversal of the taxonomy tree, respecting the max depth.
+  - Implement CSV output for the hierarchy, matching the required columns and format.
+  - Implement HTML output for the hierarchy, using nested lists or tables.
+  - Implement JSON output for the hierarchy, using a tree structure.
+  - Implement recursion limit enforcement (Requirement 4).
+  - Implement robust error handling for missing concept, missing children, and missing data points (Requirement 7).
+  - Implement date filtering for data points (Requirement 8).
+  - Add xUnit tests for hierarchy traversal, including edge cases (missing concept, recursion limit, etc.).
+  - Add Gherkin scenarios for hierarchy output in all formats.
 
 ### Ready
 - Implement GetTaxonomyPresentationsByTaxonomyType in DbmService: Implement the actual database query to retrieve all PresentationDetailsDTO for a given taxonomy type.

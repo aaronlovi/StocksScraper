@@ -3,7 +3,7 @@
 | ID | Requirement | Description | Status | Acceptance Criteria | Notes |
 |----|-------------|-------------|--------|---------------------|-------|
 | 1  | List available statements | List all available balance sheets, income statements, cash flow statements, or any top-level/abstract taxonomy concept for a specific company. | Complete | Output must list all available top-level/abstract concepts for the specified company and match sample format. | Use command-line args to specify company (by CIK or name) and statement type or concept. |
-| 2  | Display statement hierarchy | Display a specific statement or any abstract taxonomy concept for a company, starting from the selected concept. | Not Started | Output must show the full hierarchy for the selected concept, matching the requested format and sample output. | Recursively traverse taxonomy presentation tree, output as CSV, HTML, or JSON. |
+| 2  | Display statement hierarchy | Display a specific statement or any abstract taxonomy concept for a company, starting from the selected concept. | In Progress | Output must show the full hierarchy for the selected concept, matching the requested format and sample output. | Recursively traverse taxonomy presentation tree, output as CSV, HTML, or JSON. |
 | 3  | Output format | Output should be in CSV, HTML, or JSON format, suitable for piping to file, further processing, or human viewing. | Not Started | Output must match the selected format (CSV, HTML, or JSON) and include all required columns/fields. | Columns: Concept Name, Label, Value, Depth, Parent Concept, etc. |
 | 4  | Recursion limit | Implement a reasonable recursion limit to avoid runaway output. | Not Started | Output must not include concepts deeper than the specified max depth. | Configurable, default to 10 levels. |
 | 5  | Integration | Integrate as a new command in Stocks.EDGARScraper (console app). | Complete | New command-line switch (--print-statement) must be available and functional. | Add new command-line switch, e.g. --print-statement. |
@@ -82,6 +82,48 @@ The prototype financial statement viewer will be a command-line tool integrated 
   - **HTML:** Nested `<ul>`/`<li>` or table structure for hierarchy.
   - **JSON:** Tree structure with children as arrays.
   - **Extensibility:** New formats can be added by extending the `StatementPrinter` class as described above.
+
+### Algorithm Design: Recursive Taxonomy Traversal
+
+The core of statement hierarchy output is a recursive traversal of the taxonomy presentation tree, starting from a user-specified root concept. The traversal must:
+- Output each concept's details (name, label, value, depth, parent) in the requested format (CSV, HTML, JSON)
+- Query the value for each concept for the selected company and submission/date
+- Respect a configurable maximum recursion depth (default: 10)
+- Handle missing data points and missing children gracefully, logging warnings as needed
+
+**Inputs:**
+- Root concept (by name or ID)
+- Parent concept (null for root)
+- Current depth (starts at 0)
+- Max depth (from CLI or default)
+- In-memory parent/child map (built from PresentationDetailsDTO)
+- Concept metadata (from ConceptDetailsDTO)
+- Data points (from DataPoint, filtered by company, submission, concept)
+
+**Outputs:**
+- For each concept, output a row/object/element with: ConceptName, Label, Value, Depth, ParentConceptName (CSV/HTML/JSON as appropriate)
+- For JSON/HTML, include children as nested arrays/elements
+
+**Algorithm:**
+1. If current depth > max depth, return (stop recursion)
+2. Output the current concept's details (including value, if available)
+3. For each child of the current concept (from parent/child map):
+    - Recursively call the traversal function with child as the new current concept, incrementing depth
+4. If a concept has no children, output as a leaf node
+5. If a data point is missing for a concept, output an empty value and log a warning
+
+**Data Structures:**
+- Dictionary<long, List<PresentationDetailsDTO>>: maps ParentConceptId to child PresentationDetailsDTOs
+- Dictionary<long, ConceptDetailsDTO>: maps ConceptId to concept metadata
+- Dictionary<long, DataPoint>: maps ConceptId to data point for the selected company/submission
+
+**Edge Cases:**
+- Root concept not found: log error, exit non-zero
+- No children for a concept: treat as leaf
+- Cycles in the tree: detect and prevent infinite recursion (track visited ConceptIds)
+- Max depth reached: stop recursion, do not output deeper nodes
+
+This design supports extensibility for new output formats and additional metadata fields as needed.
 
 ### Data Flow
 
@@ -355,7 +397,6 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Write xUnit tests for CLI integration (requirement 5), ensuring the --print-statement switch is recognized and routed correctly.
 - Write xUnit tests for data access methods used in statement listing (requirement 1/6), ensuring correct data is returned or errors are handled.
 - Hierarchy Traversal & Output (Requirement 2)
-  - Design and document the recursive traversal algorithm for the taxonomy presentation tree.
   - Define the in-memory structure for parent/child relationships using PresentationDetailsDTO.
   - Implement loading and mapping of PresentationDetailsDTOs for the selected taxonomy.
   - Implement logic to find the root concept (by name or ID) and validate its existence.
@@ -373,6 +414,9 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Implement GetTaxonomyPresentationsByTaxonomyType in DbmService: Implement the actual database query to retrieve all PresentationDetailsDTO for a given taxonomy type.
 - Implement GetDataPointsForSubmission in DbmService: Implement the actual database query to retrieve all DataPoint records for a given company and submission.
 - Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
+- Hierarchy Traversal & Output (Requirement 2)
+  - Design and document the recursive traversal algorithm for the taxonomy presentation tree. (Done)
+  - Define the in-memory structure for parent/child relationships using PresentationDetailsDTO.
 
 ### In Progress
 - Implement CLI argument parsing for all required switches.
@@ -386,3 +430,5 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Write xUnit test for listing available statements (requirement 1)
 - Write Gherkin/xUnit tests for listing available statements (requirement 1), including normal and edge cases (e.g., company not found, no abstract concepts).
 - Add robust error handling and logging to StatementPrinter (listing mode).
+- Hierarchy Traversal & Output (Requirement 2)
+  - Design and document the recursive traversal algorithm for the taxonomy presentation tree.

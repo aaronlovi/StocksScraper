@@ -97,12 +97,13 @@ public class StatementPrinter {
                 }
             }
             abstractConcepts.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
+            // Print header always
+            await _stdout.WriteLineAsync("ConceptName,Label,Documentation");
             if (abstractConcepts.Count == 0) {
-                await _stderr.WriteLineAsync("ERROR: No abstract (top-level) concepts found in taxonomy.");
-                return 2;
+                // No error, just header
+                return 0;
             }
             // 4. Output as CSV (for now)
-            await _stdout.WriteLineAsync("ConceptName,Label,Documentation");
             foreach (ConceptDetailsDTO c in abstractConcepts) {
                 string doc = c.Documentation != null ? c.Documentation.Replace('\n', ' ').Replace('\r', ' ') : string.Empty;
                 await _stdout.WriteLineAsync($"{c.Name},\"{c.Label}\",\"{doc}\"");

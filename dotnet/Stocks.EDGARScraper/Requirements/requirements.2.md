@@ -365,6 +365,7 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Add robust error handling and logging to StatementPrinter.
 
 ### In Progress
+- Write xUnit test for listing available statements (requirement 1)
 - Implement CLI argument parsing for all required switches.
 - Implement StatementPrinter class with support for CSV, HTML, and JSON output (hierarchy mode).
 

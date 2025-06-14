@@ -12,12 +12,15 @@ This document provides overarching instructions and best practices for working o
 - After completing a feature, bugfix, or architectural change, review and update the fact sheet as needed.
 - Document any new cross-cutting rules, tech stack changes, or architectural decisions in the fact sheet.
 - If you are unsure whether a change warrants an update, err on the side of updating the fact sheet.
+- For new features or changes, write or update automated tests using xUnit and, where appropriate, Gerkin-style scenarios (e.g., SpecFlow). Ensure that new functionality is covered by tests that prove requirements are met.
+- Keep Gerkin scenarios and test documentation up to date as features evolve.
 
 ## Coding and Documentation Standards
 - Follow .NET 8 and C# best practices for code style, structure, and naming.
 - Use clear, descriptive commit messages and pull request descriptions.
 - Write concise, meaningful comments where necessary, but prefer self-explanatory code.
 - Keep documentation (including this file and the fact sheet) clear, concise, and up to date.
+- Write xUnit tests for new code and maintain existing tests. Use Gerkin scenarios to describe and validate user-facing behaviors where appropriate.
 
 ## AI Agent Instructions
 - Always use `project_fact_sheet.md` and this instructions file as primary context for all tasks.

@@ -53,6 +53,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - Automated and behavior-driven testing (xUnit and Gherkin/SpecFlow) is a standard requirement for most new features and changes. Contributors must provide tests or scenarios that prove new functionality works as intended, unless explicitly stated otherwise.
 - All features and projects must be broken down into a Kanban-style list of tasks, each estimated at 2 hours or less, before implementation begins.
 - At the end of each project, an Architecture Decision Record (ADR) summarizing key decisions must be produced using the MADR template.
+- Glossary: All requirements documents must include a Glossary section at the bottom, defining key domain and project-specific terms.
 
 ## Requirements & Project Planning Process
 - At the start of every project or major feature, requirements documents must be created or updated using a standard template (see requirements.1.md and requirements.2.md for examples).
@@ -63,6 +64,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
   - Technical design
   - Implementation context and helpful code snippets/files discovered by inspecting the codebase
   - Implementation hints
+  - A Glossary section at the bottom, defining key domain and project-specific terms.
 - Before implementation, the codebase should be inspected for relevant files, DTOs, and code snippets, and these should be referenced or included in the requirements document to aid implementation.
 - Architecture Decision Records (ADRs) must be written for key decisions and stored in a `decisions` folder, with a running `README.md` linking to each ADR.
 

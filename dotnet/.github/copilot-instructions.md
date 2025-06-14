@@ -12,6 +12,7 @@ These instructions are for GitHub Copilot and AI agents working on this reposito
   - Includes high-level and technical design sections
   - Includes implementation context and codebase helpers (gathered by inspecting the codebase for relevant files, DTOs, and code snippets)
   - Includes implementation hints
+  - Includes a Glossary section at the bottom, defining key domain and project-specific terms.
 - Inspect the codebase for relevant files and code snippets to aid implementation, and reference these in the requirements document.
 - For all tasks, write or update Gherkin-style scenarios or xUnit tests to prove the feature works, unless the user explicitly states otherwise.
 - At the end of each project, generate an Architecture Decision Record (ADR) summarizing key decisions using the MADR template. Store ADRs in a `decisions` folder with a running `README.md` linking to each ADR.

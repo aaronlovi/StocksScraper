@@ -17,6 +17,7 @@ This document provides overarching instructions and best practices for working o
   - Technical design
   - Implementation context and codebase helpers (gathered by inspecting the codebase for relevant files, DTOs, and code snippets)
   - Implementation hints
+  - A Glossary section at the bottom, defining key domain and project-specific terms.
 - Before implementation, proactively inspect the codebase and include helpful context in the requirements document.
 - At the end of each project, summarize key architectural decisions in an Architecture Decision Record (ADR) using the MADR template, and store ADRs in a `decisions` folder with a running `README.md` linking to each ADR.
 - After completing a feature, bugfix, or architectural change, review and update the fact sheet as needed.

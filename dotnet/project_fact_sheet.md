@@ -39,7 +39,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - gRPC (data API)
 - Shared utilities/models (custom library, including core financial, company, taxonomy, and ETL data structures)
 - Planned: Prometheus/Grafana (metrics), JWT-based auth, cloud/on-prem hosting, WebSockets/other protocols for data API
-- Planned: xUnit (unit testing), SpecFlow or similar (Gerkin-style BDD scenarios)
+- Core: xUnit (unit testing), SpecFlow or similar (Gherkin-style BDD scenarios) for automated and behavior-driven testing of most new features and changes
 
 ## Cross-cutting rules
 - Logging: Serilog to Elastic/Kibana; logs to stdout for future Loki/Grafana scraping.
@@ -50,7 +50,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - Security: No user logins yet; plan for Google/Facebook JWT or custom login in future.
 - Privacy/Compliance: No requirements yet; to be determined as user data and features expand.
 - Error handling: Robust error handling and logging throughout ETL, data processing, caching, and persistence.
-- Planned: Automated and behavior-driven testing using xUnit and Gerkin-style scenarios (e.g., SpecFlow) to validate new and existing features.
+- Automated and behavior-driven testing (xUnit and Gherkin/SpecFlow) is a standard requirement for most new features and changes. Contributors must provide tests or scenarios that prove new functionality works as intended, unless explicitly stated otherwise.
 
 ## Out-of-scope
 - Real-time or intraday stock quotes/data (only daily/delayed data is planned)

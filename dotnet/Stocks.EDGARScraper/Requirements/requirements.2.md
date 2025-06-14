@@ -7,8 +7,8 @@
 | 3  | Output format | Output should be in CSV, HTML, or JSON format, suitable for piping to file, further processing, or human viewing. | Not Started | Output must match the selected format (CSV, HTML, or JSON) and include all required columns/fields. | Columns: Concept Name, Label, Value, Depth, Parent Concept, etc. |
 | 4  | Recursion limit | Implement a reasonable recursion limit to avoid runaway output. | Not Started | Output must not include concepts deeper than the specified max depth. | Configurable, default to 10 levels. |
 | 5  | Integration | Integrate as a new command in Stocks.EDGARScraper (console app). | Complete | New command-line switch (--print-statement) must be available and functional. | Add new command-line switch, e.g. --print-statement. |
-| 6  | Data access | Use `IDbmService` (see `Stocks.Persistence.Database.IDbmService`) for all data access. | Not Started | All data must be loaded via `IDbmService` methods. | Use `GetTaxonomyConceptsByTaxonomyType`, `GetAllCompaniesByDataSource`, `GetSubmissions`, etc. |
-| 7  | Robustness | Handle errors gracefully; log and continue where possible. | Not Started | Errors must be logged to stderr, and the tool must not crash on missing data. | Prototype quality, but avoid crashes. |
+| 6  | Data access | Use `IDbmService` (see `Stocks.Persistence.Database.IDbmService`) for all data access. | In Progress | All data must be loaded via `IDbmService` methods. | Use `GetTaxonomyConceptsByTaxonomyType`, `GetAllCompaniesByDataSource`, `GetSubmissions`, etc. |
+| 7  | Robustness | Handle errors gracefully; log and continue where possible. | In Progress | Errors must be logged to stderr, and the tool must not crash on missing data. | Prototype quality, but avoid crashes. |
 | 8  | Filter by date | Allow user to specify a date to select the set of data points (e.g., display balance sheet as of 2019-03-01). | Not Started | Output must reflect data as of the specified date. | Use command-line arg to filter by report date. |
 | 9  | Output format switch | Allow user to select output format via CLI (csv, html, json). | Not Started | Output must match the format specified by the --format argument. | Use --format argument. |
 | 10 | CLI argument validation | Validate all required CLI arguments; if missing or invalid, print usage instructions to stderr and exit with a non-zero code. | Complete | Usage instructions must be printed and exit code non-zero if required arguments are missing or invalid. | Usage should clearly describe all required and optional arguments. |
@@ -353,19 +353,17 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Add Gherkin/xUnit tests for all major scenarios.
 - Document sample outputs and update this requirements file as needed.
 - Document and maintain output format extensibility: When adding a new output format, extend the StatementPrinter class and update documentation and CLI validation accordingly.
-- Write Gherkin/xUnit tests for listing available statements (requirement 1), including normal and edge cases (e.g., company not found, no abstract concepts).
 - Write Gherkin/xUnit tests for CLI argument validation (requirement 10), including missing/invalid arguments and usage output.
 - Write xUnit tests for CLI integration (requirement 5), ensuring the --print-statement switch is recognized and routed correctly.
 - Write xUnit tests for data access methods used in statement listing (requirement 1/6), ensuring correct data is returned or errors are handled.
+- Add robust error handling and logging to StatementPrinter (hierarchy mode).
 
 ### Ready
 - Implement GetTaxonomyPresentationsByTaxonomyType in DbmService: Implement the actual database query to retrieve all PresentationDetailsDTO for a given taxonomy type.
 - Implement GetDataPointsForSubmission in DbmService: Implement the actual database query to retrieve all DataPoint records for a given company and submission.
 - Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
-- Add robust error handling and logging to StatementPrinter.
 
 ### In Progress
-- Write xUnit test for listing available statements (requirement 1)
 - Implement CLI argument parsing for all required switches.
 - Implement StatementPrinter class with support for CSV, HTML, and JSON output (hierarchy mode).
 
@@ -374,3 +372,6 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Implement StatementPrinter class with support for CSV output for --list-statements.
 - Create GetTaxonomyPresentationsByTaxonomyTypeStmt for querying all PresentationDetailsDTO for a taxonomy type.
 - Create GetDataPointsForSubmissionStmt for querying all DataPoint records for a company and submission.
+- Write xUnit test for listing available statements (requirement 1)
+- Write Gherkin/xUnit tests for listing available statements (requirement 1), including normal and edge cases (e.g., company not found, no abstract concepts).
+- Add robust error handling and logging to StatementPrinter (listing mode).

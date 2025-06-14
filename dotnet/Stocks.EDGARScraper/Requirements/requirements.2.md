@@ -373,3 +373,15 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Use `ConceptDetailsDTO.IsAbstract == true` to find top-level statement concepts (see `Stocks.Persistence.Database.DTO.Taxonomies.ConceptDetailsDTO`).
 - Use `PresentationDetailsDTO` for parent/child navigation (see `Stocks.Persistence.Database.DTO.Taxonomies.PresentationDetailsDTO`).
 - Query for `DataPoint` by CompanyId, Submission (see `Stocks.DataModels.DataPoint`).
+
+---
+
+## Glossary
+
+- **CIK**: Central Index Key, a unique identifier assigned by the SEC to companies and individuals who file disclosures.
+- **Taxonomy**: A classification system for financial concepts (e.g., US-GAAP) used in XBRL filings.
+- **Abstract Concept**: A high-level, non-leaf node in the taxonomy, often representing a financial statement or grouping (e.g., "Assets").
+- **Presentation Tree**: The hierarchical structure that defines parent/child relationships between taxonomy concepts for display purposes.
+- **Submission**: A single SEC filing instance for a company, containing financial data for a specific period.
+- **Data Point**: A single reported value for a taxonomy concept, company, and submission (e.g., value of "Cash" for Q1 2019).
+- **StatementPrinter**: The class responsible

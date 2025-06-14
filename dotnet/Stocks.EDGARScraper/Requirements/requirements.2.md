@@ -193,6 +193,21 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
 - All errors should be logged to stderr.
 - **If required CLI arguments are missing or invalid, print usage instructions to stderr and exit with a non-zero code.**
 
+### Sample Error/Warning Messages
+
+- Company not found:
+  - `ERROR: Company with CIK '00001234' not found.`
+- Concept not found:
+  - `ERROR: Concept 'Assets' not found in taxonomy.`
+- Submission not found for date:
+  - `ERROR: No submission found for CIK '00001234' on or before 2019-03-01.`
+- Data point missing for concept:
+  - `WARNING: No data point found for concept 'Cash and Cash Equivalents' (ConceptId: 12345) in submission 67890.`
+- Invalid or missing CLI argument:
+  - `ERROR: Missing required argument --cik.`
+  - `ERROR: Invalid value for --date: 'not-a-date'.`
+  - `USAGE: dotnet run --print-statement --cik <CIK> --concept <ConceptName> --date <YYYY-MM-DD> --format <csv|html|json> [--max-depth <N>]`
+
 ---
 
 ## Testing

@@ -15,6 +15,8 @@ using Serilog;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
 using Stocks.DataModels.Enums;
+using Stocks.EDGARScraper.Models.Statements;
+using Stocks.EDGARScraper.Services.Statements;
 using Stocks.EDGARScraper.Services.Taxonomies;
 using Stocks.Persistence.Database;
 using Stocks.Persistence.Database.DTO.Taxonomies;
@@ -59,55 +61,149 @@ internal partial class Program {
             _svp = host.Services;
             _dbm = _svp.GetRequiredService<IDbmService>();
 
-            switch (args[0].ToLowerInvariant()) {
-                case "--drop-all-tables": {
-                    _ = await _dbm!.DropAllTables(CancellationToken.None);
-                    break;
-                }
-                case "--get-full-cik-list": {
-                    await DownloadAndSaveFullCikList();
-                    break;
-                }
-                case "--parse-bulk-edgar-submissions-list": {
-                    await ParseBulkEdgarSubmissionsList();
-                    break;
-                }
-                case "--parse-bulk-xbrl-archive": {
-                    await ParseBulkXbrlArchive();
-                    break;
-                }
-                case "--run-all": {
-                    await DownloadAndSaveFullCikList();
-                    await ParseBulkEdgarSubmissionsList();
-                    await ParseBulkXbrlArchive();
-                    break;
-                }
-                case "--load-taxonomy-concepts": {
-                    UsGaap2025ConceptsFileProcessor processor = _svp.GetRequiredService<UsGaap2025ConceptsFileProcessor>();
-                    _ = await processor.Process();
-                    break;
-                }
-                case "--load-taxonomy-presentations": {
-                    UsGaap2025PresentationFileProcessor processor = _svp.GetRequiredService<UsGaap2025PresentationFileProcessor>();
-                    _ = await processor.Process();
-                    break;
-                }
-                default:
-                _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
-                return 3;
-            }
+            int result = await HandleCommandAsync(args);
 
             DateTime end = DateTime.UtcNow;
             TimeSpan timeTaken = end - start;
             _logger.LogInformation("Service execution completed in {TimeTaken}s", timeTaken.TotalSeconds);
 
-            return 0;
+            return result;
         } catch (Exception ex) {
             _logger.LogError(ex, "Service execution is terminated with an error");
             return 1;
         } finally {
             Log.CloseAndFlush();
         }
+    }
+
+    private static async Task<int> HandleCommandAsync(string[] args) {
+        switch (args[0].ToLowerInvariant()) {
+            case "--drop-all-tables": {
+                _ = await _dbm!.DropAllTables(CancellationToken.None);
+                return 0;
+            }
+            case "--get-full-cik-list": {
+                await DownloadAndSaveFullCikList();
+                return 0;
+            }
+            case "--parse-bulk-edgar-submissions-list": {
+                await ParseBulkEdgarSubmissionsList();
+                return 0;
+            }
+            case "--parse-bulk-xbrl-archive": {
+                await ParseBulkXbrlArchive();
+                return 0;
+            }
+            case "--run-all": {
+                await DownloadAndSaveFullCikList();
+                await ParseBulkEdgarSubmissionsList();
+                await ParseBulkXbrlArchive();
+                return 0;
+            }
+            case "--load-taxonomy-concepts": {
+                UsGaap2025ConceptsFileProcessor processor = _svp!.GetRequiredService<UsGaap2025ConceptsFileProcessor>();
+                _ = await processor.Process();
+                return 0;
+            }
+            case "--load-taxonomy-presentations": {
+                UsGaap2025PresentationFileProcessor processor = _svp!.GetRequiredService<UsGaap2025PresentationFileProcessor>();
+                _ = await processor.Process();
+                return 0;
+            }
+            case "--print-statement": {
+                return await HandlePrintStatementAsync(args);
+            }
+            default: {
+                _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
+                return 3;
+            }
+        }
+    }
+
+    private static async Task<int> HandlePrintStatementAsync(string[] args) {
+        PrintStatementArgs parsed = ParsePrintStatementArgs(args);
+
+        if (string.IsNullOrWhiteSpace(parsed.Cik) || (!parsed.ListStatements && (string.IsNullOrWhiteSpace(parsed.Concept) || parsed.Date == default || string.IsNullOrWhiteSpace(parsed.Format)))) {
+            parsed = parsed with { ShowUsage = true };
+        }
+
+        if (parsed.ShowUsage) {
+            Console.Error.WriteLine("USAGE: dotnet run --print-statement --cik <CIK> [--concept <ConceptName>] [--date <YYYY-MM-DD>] [--format <csv|html|json>] [--max-depth <N>] [--list-statements]");
+            return 4;
+        }
+
+        var printer = new StatementPrinter(
+            _dbm!,
+            parsed.Cik!,
+            parsed.Concept ?? string.Empty,
+            parsed.Date,
+            parsed.MaxDepth,
+            parsed.Format,
+            parsed.ListStatements,
+            Console.Out,
+            Console.Error,
+            CancellationToken.None
+        );
+        return await printer.PrintStatement();
+    }
+
+    private static PrintStatementArgs ParsePrintStatementArgs(string[] args) {
+        string? cik = null;
+        string? concept = null;
+        DateOnly date = default;
+        int maxDepth = 10;
+        string format = "csv";
+        bool listStatements = false;
+        bool showUsage = false;
+
+        for (int i = 1; i < args.Length; i++) {
+            switch (args[i]) {
+                case "--cik": {
+                    if (i + 1 < args.Length)
+                        cik = args[++i];
+                    else
+                        showUsage = true;
+                    break;
+                }
+                case "--concept": {
+                    if (i + 1 < args.Length)
+                        concept = args[++i];
+                    else
+                        showUsage = true;
+                    break;
+                }
+                case "--date": {
+                    if (i + 1 < args.Length && DateOnly.TryParse(args[++i], out DateOnly d))
+                        date = d;
+                    else
+                        showUsage = true;
+                    break;
+                }
+                case "--max-depth": {
+                    if (i + 1 < args.Length && int.TryParse(args[++i], out int md))
+                        maxDepth = md;
+                    else
+                        showUsage = true;
+                    break;
+                }
+                case "--format": {
+                    if (i + 1 < args.Length)
+                        format = args[++i].ToLowerInvariant();
+                    else
+                        showUsage = true;
+                    break;
+                }
+                case "--list-statements": {
+                    listStatements = true;
+                    break;
+                }
+                case "--help": {
+                    showUsage = true;
+                    break;
+                }
+            }
+        }
+        return new PrintStatementArgs(cik, concept, date, maxDepth, format, listStatements, showUsage);
     }
 
     private static IHost BuildHost<TStartup>(string[] args) where TStartup : class {

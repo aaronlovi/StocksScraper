@@ -6,9 +6,10 @@
             //"commandLineArgs": "--get-full-cik-list"
             //"commandLineArgs": "--parse-bulk-edgar-submissions-list"
             //"commandLineArgs": "--parse-bulk-xbrl-archive"
-            "commandLineArgs": "--run-all"
+            // "commandLineArgs": "--run-all"
             //"commandLineArgs": "--load-taxonomy-concepts"
             //"commandLineArgs": "--load-taxonomy-presentations"
+            "commandLineArgs": "--print-statement --cik 320193 --list-statements"
         }
     }
 }

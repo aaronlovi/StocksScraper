@@ -106,12 +106,8 @@ The prototype financial statement viewer will be a command-line tool integrated 
 - **File:** `Stocks.Persistence/Database/DTO/Taxonomies/ConceptDetailsDTO.cs`
 - **Namespace:** `Stocks.Persistence.Database.DTO.Taxonomies`
 - **Definition:**
-
-```csharp
   public record ConceptDetailsDTO(
     long ConceptId, int TaxonomyTypeId, int PeriodTypeId, int BalanceTypeId, bool IsAbstract, string Name, string Label, string Documentation);
-```
-
 - **Properties:**
   - long ConceptId
   - int TaxonomyTypeId
@@ -126,8 +122,6 @@ The prototype financial statement viewer will be a command-line tool integrated 
 - **File:** `Stocks.Persistence/Database/DTO/Taxonomies/PresentationDetailsDTO.cs`
 - **Namespace:** `Stocks.Persistence.Database.DTO.Taxonomies`
 - **Definition:**
-
-```csharp
   public record PresentationDetailsDTO(
     long PresentationId,
     long ConceptId,
@@ -135,8 +129,6 @@ The prototype financial statement viewer will be a command-line tool integrated 
     int OrderInDepth,
     long ParentConceptId,
     long ParentPresentationId);
-```
-
 - **Properties:**
   - `long PresentationId`
   - `long ConceptId`
@@ -149,8 +141,6 @@ The prototype financial statement viewer will be a command-line tool integrated 
 - **File:** `Stocks.DataModels/DataPoint.cs`
 - **Namespace:** `Stocks.DataModels`
 - **Definition:**
-
-```csharp
   public record DataPoint(
     ulong DataPointId,
     ulong CompanyId,
@@ -162,8 +152,6 @@ The prototype financial statement viewer will be a command-line tool integrated 
     DateOnly FiledDate,
     ulong SubmissionId,
     long TaxonomyConceptId)
-```
-
 - **Properties:**
   - `ulong DataPointId`
   - `ulong CompanyId`
@@ -206,8 +194,6 @@ ___
 ## Output Format Examples
 
 ### CSV
-
-```csv
 ConceptName,Label,Value,Depth,ParentConceptName
 Assets,Assets,350000,0,
 Current Assets,Current Assets,150000,1,Assets
@@ -215,11 +201,7 @@ Cash and Cash Equivalents,Cash,100000,2,Current Assets
 Accounts Receivable,Receivables,50000,2,Current Assets
 Noncurrent Assets,Noncurrent Assets,200000,1,Assets
 Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
-```
-
 ### HTML
-
-```html
 <ul>
   <li>Assets: 350000
     <ul>
@@ -237,11 +219,7 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
     </ul>
   </li>
 </ul>
-```
-
 ### JSON
-
-```json
 {
   "ConceptName": "Assets",
   "Label": "Assets",
@@ -266,8 +244,6 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
     }
   ]
 }
-```
-
 ---
 
 ## Error Handling
@@ -369,35 +345,26 @@ Then the output should reflect data from the submission dated "2019-03-01"
 
 ## Kanban Task List
 
-- [ ] Inspect DTOs and data access methods; document their properties here.
-- [x] Implement CLI argument parsing for all required switches.
-- [ ] Implement StatementPrinter class with support for CSV, HTML, and JSON output.
-- [ ] Implement/extend data access methods in IDbmService:
-    - [ ] Add method to retrieve presentation hierarchy (PresentationDetailsDTO) for a taxonomy type.
-    - [ ] Add method to retrieve data points for a given CompanyId, SubmissionId, and TaxonomyConceptId.
-- [ ] Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
-- [ ] Implement recursive taxonomy traversal in StatementPrinter.TraverseConceptTree().
-- [ ] Implement output formatting in StatementPrinter.FormatOutput() for CSV, HTML, and JSON.
-- [ ] Add robust error handling and logging to StatementPrinter.
-- [ ] Add Gherkin/xUnit tests for all major scenarios.
-- [ ] Document sample outputs and update this requirements file as needed.
-- [ ] **Document and maintain output format extensibility:** When adding a new output format, extend the `StatementPrinter` class and update documentation and CLI validation accordingly.
+### Backlog
+- Refactor StatementPrinter to query for a single company by CIK in the database, rather than loading all companies and iterating in memory, for better performance with large datasets.
+- Add Microsoft.Extensions.Logging (Serilog abstraction) logging to StatementPrinter for typical info, warning, and error events.
+- Implement/extend data access methods in IDbmService:
+    - Add method to retrieve presentation hierarchy (PresentationDetailsDTO) for a taxonomy type.
+    - Add method to retrieve data points for a given CompanyId, SubmissionId, and TaxonomyConceptId.
+- Implement recursive taxonomy traversal in StatementPrinter.TraverseConceptTree().
+- Implement output formatting in StatementPrinter.FormatOutput() for CSV, HTML, and JSON.
+- Add Gherkin/xUnit tests for all major scenarios.
+- Document sample outputs and update this requirements file as needed.
+- Document and maintain output format extensibility: When adding a new output format, extend the StatementPrinter class and update documentation and CLI validation accordingly.
 
----
+### Ready
+- Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
+- Add robust error handling and logging to StatementPrinter.
 
-## Implementation Hints
+### In Progress
+- Implement CLI argument parsing for all required switches.
+- Implement StatementPrinter class with support for CSV output for --list-statements.
+- Implement StatementPrinter class with support for CSV, HTML, and JSON output (hierarchy mode).
 
-- Use `ConceptDetailsDTO.IsAbstract == true` to find top-level statement concepts (see `Stocks.Persistence.Database.DTO.Taxonomies.ConceptDetailsDTO`).
-- Use `PresentationDetailsDTO` for parent/child navigation (see `Stocks.Persistence.Database.DTO.Taxonomies.PresentationDetailsDTO`).
-- Query for `DataPoint` by CompanyId, Submission (see `Stocks.DataModels.DataPoint`).
-
----
-
-## Glossary
-
-- **CIK**: Central Index Key, a unique identifier assigned by the SEC to companies and individuals who file disclosures.
-- **Taxonomy**: A classification system for financial concepts (e.g., US-GAAP) used in XBRL filings.
-- **Abstract Concept**: A high-level, non-leaf node in the taxonomy, often representing a financial statement or grouping (e.g., "Assets").
-- **Presentation Tree**: The hierarchical structure that defines parent/child relationships between taxonomy concepts for display purposes.
-- **Submission**: A single SEC filing instance for a company, containing financial data for a specific period.
-- **Data Point**: A single reported value for a taxonomy concept, company, and submission (e.g., value of "Cash" for Q1 2019).
+### Done
+- Inspect DTOs and data access methods; document their properties here.

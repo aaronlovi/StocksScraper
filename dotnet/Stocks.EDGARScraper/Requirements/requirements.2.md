@@ -348,9 +348,6 @@ Then the output should reflect data from the submission dated "2019-03-01"
 ### Backlog
 - Refactor StatementPrinter to query for a single company by CIK in the database, rather than loading all companies and iterating in memory, for better performance with large datasets.
 - Add Microsoft.Extensions.Logging (Serilog abstraction) logging to StatementPrinter for typical info, warning, and error events.
-- Implement/extend data access methods in IDbmService:
-    - Add method to retrieve presentation hierarchy (PresentationDetailsDTO) for a taxonomy type.
-    - Add method to retrieve data points for a given CompanyId, SubmissionId, and TaxonomyConceptId.
 - Implement recursive taxonomy traversal in StatementPrinter.TraverseConceptTree().
 - Implement output formatting in StatementPrinter.FormatOutput() for CSV, HTML, and JSON.
 - Add Gherkin/xUnit tests for all major scenarios.
@@ -360,6 +357,8 @@ Then the output should reflect data from the submission dated "2019-03-01"
 ### Ready
 - Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
 - Add robust error handling and logging to StatementPrinter.
+- Implement GetTaxonomyPresentationsByTaxonomyType in DbmService: Implement the actual database query to retrieve all PresentationDetailsDTO for a given taxonomy type.
+- Implement GetDataPointsForSubmission in DbmService: Implement the actual database query to retrieve all DataPoint records for a given company and submission.
 
 ### In Progress
 - Implement CLI argument parsing for all required switches.

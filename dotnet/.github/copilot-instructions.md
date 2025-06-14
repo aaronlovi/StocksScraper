@@ -24,6 +24,7 @@ These instructions are for GitHub Copilot and AI agents working on this reposito
 - Follow .NET 8 and C# best practices for code style, structure, and naming.
 - Prefer using the `Result`/`IResult` pattern (see `Stocks.Shared.Result`, `Stocks.Shared.IResult`, and the `Results.cs` file) for error handling instead of throwing exceptions, unless an exception is truly exceptional or unrecoverable.
 - Prefer using record types or classes over tuples for method return values and complex data structures. Tuples should be avoided except for simple, short-lived, and self-explanatory cases, as records/classes are more maintainable and self-documenting.
+- Avoid using LINQ in production code unless there is a clear, justified benefit for readability or performance. Prefer explicit loops and clear logic for maintainability and debuggability and fewer unexpected allocations.
 - Keep all documentation, including ADRs, Kanban task lists, and test scenarios, clear, concise, and up to date.
 
 ---

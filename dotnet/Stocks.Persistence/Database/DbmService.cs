@@ -249,22 +249,29 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
-    public async Task<Result<IReadOnlyCollection<PresentationDetailsDTO>>> GetTaxonomyPresentationsByTaxonomyType(int taxonomyTypeId, CancellationToken ct)
-    {
-        // TODO: Implement actual DB query
-        _logger.LogInformation("GetTaxonomyPresentationsByTaxonomyType called (stub) for taxonomyTypeId={TaxonomyTypeId}", taxonomyTypeId);
-        await Task.CompletedTask;
-        return Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(new List<PresentationDetailsDTO>());
+    public async Task<Result<IReadOnlyCollection<PresentationDetailsDTO>>> GetTaxonomyPresentationsByTaxonomyType(int taxonomyTypeId, CancellationToken ct) {
+        var stmt = new Statements.GetTaxonomyPresentationsByTaxonomyTypeStmt(taxonomyTypeId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetTaxonomyPresentationsByTaxonomyType success - Num presentations: {NumPresentations}", stmt.Presentations.Count);
+            return Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(stmt.Presentations);
+        } else {
+            _logger.LogWarning("GetTaxonomyPresentationsByTaxonomyType failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<PresentationDetailsDTO>>.Failure(res);
+        }
     }
 
-    public async Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct)
-    {
-        // TODO: Implement actual DB query
-        _logger.LogInformation("GetDataPointsForSubmission called (stub) for companyId={CompanyId}, submissionId={SubmissionId}", companyId, submissionId);
-        await Task.CompletedTask;
-        return Result<IReadOnlyCollection<DataPoint>>.Success(new List<DataPoint>());
+    public async Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct) {
+        var stmt = new Statements.GetDataPointsForSubmissionStmt(companyId, submissionId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetDataPointsForSubmission success - Num data points: {NumDataPoints}", stmt.DataPoints.Count);
+            return Result<IReadOnlyCollection<DataPoint>>.Success(stmt.DataPoints);
+        } else {
+            _logger.LogWarning("GetDataPointsForSubmission failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<DataPoint>>.Failure(res);
+        }
     }
-
     #endregion
 
     #region Company submissions
@@ -297,7 +304,6 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
         return res;
     }
-
 
     private async Task<DbStmtResult> RetryInsertSubmissions(List<Submission> batch, CancellationToken ct) {
         _logger.LogWarning("Failed to bulk insert submissions due to duplicates, retrying one by one. {NumSubmissions} to insert",

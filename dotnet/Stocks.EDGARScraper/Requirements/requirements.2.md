@@ -353,19 +353,19 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Add Gherkin/xUnit tests for all major scenarios.
 - Document sample outputs and update this requirements file as needed.
 - Document and maintain output format extensibility: When adding a new output format, extend the StatementPrinter class and update documentation and CLI validation accordingly.
-- Create GetTaxonomyPresentationsByTaxonomyTypeStmt for querying all PresentationDetailsDTO for a taxonomy type.
-- Create GetDataPointsForSubmissionStmt for querying all DataPoint records for a company and submission.
 
 ### Ready
-- Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
-- Add robust error handling and logging to StatementPrinter.
 - Implement GetTaxonomyPresentationsByTaxonomyType in DbmService: Implement the actual database query to retrieve all PresentationDetailsDTO for a given taxonomy type.
 - Implement GetDataPointsForSubmission in DbmService: Implement the actual database query to retrieve all DataPoint records for a given company and submission.
+- Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
+- Add robust error handling and logging to StatementPrinter.
 
 ### In Progress
 - Implement CLI argument parsing for all required switches.
 - Implement StatementPrinter class with support for CSV output for --list-statements.
 - Implement StatementPrinter class with support for CSV, HTML, and JSON output (hierarchy mode).
+- Create GetTaxonomyPresentationsByTaxonomyTypeStmt for querying all PresentationDetailsDTO for a taxonomy type.
+- Create GetDataPointsForSubmissionStmt for querying all DataPoint records for a company and submission.
 
 ### Done
 - Inspect DTOs and data access methods; document their properties here.

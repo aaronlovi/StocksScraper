@@ -6,12 +6,12 @@
 | 2  | Display statement hierarchy | Display a specific statement or any abstract taxonomy concept for a company, starting from the selected concept. | Not Started | Output must show the full hierarchy for the selected concept, matching the requested format and sample output. | Recursively traverse taxonomy presentation tree, output as CSV, HTML, or JSON. |
 | 3  | Output format | Output should be in CSV, HTML, or JSON format, suitable for piping to file, further processing, or human viewing. | Not Started | Output must match the selected format (CSV, HTML, or JSON) and include all required columns/fields. | Columns: Concept Name, Label, Value, Depth, Parent Concept, etc. |
 | 4  | Recursion limit | Implement a reasonable recursion limit to avoid runaway output. | Not Started | Output must not include concepts deeper than the specified max depth. | Configurable, default to 10 levels. |
-| 5  | Integration | Integrate as a new command in Stocks.EDGARScraper (console app). | Not Started | New command-line switch (--print-statement) must be available and functional. | Add new command-line switch, e.g. --print-statement. |
+| 5  | Integration | Integrate as a new command in Stocks.EDGARScraper (console app). | Complete | New command-line switch (--print-statement) must be available and functional. | Add new command-line switch, e.g. --print-statement. |
 | 6  | Data access | Use `IDbmService` (see `Stocks.Persistence.Database.IDbmService`) for all data access. | Not Started | All data must be loaded via `IDbmService` methods. | Use `GetTaxonomyConceptsByTaxonomyType`, `GetAllCompaniesByDataSource`, `GetSubmissions`, etc. |
 | 7  | Robustness | Handle errors gracefully; log and continue where possible. | Not Started | Errors must be logged to stderr, and the tool must not crash on missing data. | Prototype quality, but avoid crashes. |
 | 8  | Filter by date | Allow user to specify a date to select the set of data points (e.g., display balance sheet as of 2019-03-01). | Not Started | Output must reflect data as of the specified date. | Use command-line arg to filter by report date. |
 | 9  | Output format switch | Allow user to select output format via CLI (csv, html, json). | Not Started | Output must match the format specified by the --format argument. | Use --format argument. |
-| 10 | CLI argument validation | Validate all required CLI arguments; if missing or invalid, print usage instructions to stderr and exit with a non-zero code. | Not Started | Usage instructions must be printed and exit code non-zero if required arguments are missing or invalid. | Usage should clearly describe all required and optional arguments. |
+| 10 | CLI argument validation | Validate all required CLI arguments; if missing or invalid, print usage instructions to stderr and exit with a non-zero code. | Complete | Usage instructions must be printed and exit code non-zero if required arguments are missing or invalid. | Usage should clearly describe all required and optional arguments. |
 
 ---
 
@@ -358,7 +358,7 @@ Then the output should reflect data from the submission dated "2019-03-01"
 ## Kanban Task List
 
 - [ ] Inspect DTOs and data access methods; document their properties here.
-- [ ] Implement CLI argument parsing for all required switches.
+- [x] Implement CLI argument parsing for all required switches.
 - [ ] Implement StatementPrinter class with support for CSV, HTML, and JSON output.
 - [ ] Implement/extend data access methods in IDbmService.
 - [ ] Implement error handling and logging.

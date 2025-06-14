@@ -9,8 +9,16 @@ This document provides overarching instructions and best practices for working o
 
 ## Workflow Guidelines
 - Before starting a new feature or major change, review the fact sheet and this instructions document.
-- Before beginning implementation of any feature or project, produce a Kanban-style list of tasks, each sized at 2 hours or less, as part of the planning process.
-- At the end of each project, summarize key architectural decisions in an Architecture Decision Record (ADR) using the MADR template.
+- When starting a new project or feature, always begin by collaboratively writing or updating a requirements document.
+- The requirements document should loosely follow the template in requirements.1.md and requirements.2.md, and must include:
+  - A table of requirements with the following columns: ID | Requirement | Description | Status | Notes
+  - Kanban-style task list (separate section)
+  - High-level design
+  - Technical design
+  - Implementation context and codebase helpers (gathered by inspecting the codebase for relevant files, DTOs, and code snippets)
+  - Implementation hints
+- Before implementation, proactively inspect the codebase and include helpful context in the requirements document.
+- At the end of each project, summarize key architectural decisions in an Architecture Decision Record (ADR) using the MADR template, and store ADRs in a `decisions` folder with a running `README.md` linking to each ADR.
 - After completing a feature, bugfix, or architectural change, review and update the fact sheet as needed.
 - Document any new cross-cutting rules, tech stack changes, or architectural decisions in the fact sheet.
 - If you are unsure whether a change warrants an update, err on the side of updating the fact sheet.
@@ -27,10 +35,11 @@ This document provides overarching instructions and best practices for working o
 
 ## AI Agent Instructions
 - Always use `project_fact_sheet.md` and this instructions file as primary context for all tasks.
+- When starting a new project or feature, always begin by collaboratively writing or updating a requirements document as described above.
 - Proactively suggest updates to the fact sheet when you detect changes that affect project purpose, user stories, architecture, tech stack, or cross-cutting rules.
 - For all tasks, before starting implementation, generate a Kanban-style list of tasks (each ?2h) as part of planning, unless the user explicitly specifies otherwise.
 - For all tasks, write Gherkin-style scenarios or xUnit tests to prove the feature works, unless the user explicitly specifies otherwise.
-- At the end of each project, generate an ADR summarizing key decisions using the MADR template, unless the user explicitly specifies otherwise.
+- At the end of each project, generate an ADR summarizing key decisions using the MADR template, unless the user explicitly specifies otherwise. Store ADRs in a `decisions` folder with a running `README.md` linking to each ADR.
 - When in doubt, ask the user if the fact sheet or instructions should be updated.
 
 ## Collaboration

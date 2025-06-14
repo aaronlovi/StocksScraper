@@ -54,6 +54,18 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - All features and projects must be broken down into a Kanban-style list of tasks, each estimated at 2 hours or less, before implementation begins.
 - At the end of each project, an Architecture Decision Record (ADR) summarizing key decisions must be produced using the MADR template.
 
+## Requirements & Project Planning Process
+- At the start of every project or major feature, requirements documents must be created or updated using a standard template (see requirements.1.md and requirements.2.md for examples).
+- The requirements document must include:
+  - A table of requirements with the following columns: ID | Requirement | Description | Status | Notes
+  - Kanban-style task list (in a separate section)
+  - High-level design
+  - Technical design
+  - Implementation context and helpful code snippets/files discovered by inspecting the codebase
+  - Implementation hints
+- Before implementation, the codebase should be inspected for relevant files, DTOs, and code snippets, and these should be referenced or included in the requirements document to aid implementation.
+- Architecture Decision Records (ADRs) must be written for key decisions and stored in a `decisions` folder, with a running `README.md` linking to each ADR.
+
 ## Out-of-scope
 - Real-time or intraday stock quotes/data (only daily/delayed data is planned)
 - GraphQL APIs (not planned/preferred)

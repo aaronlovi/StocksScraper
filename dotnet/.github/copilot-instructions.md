@@ -6,9 +6,15 @@ These instructions are for GitHub Copilot and AI agents working on this reposito
 - Always use `project_fact_sheet.md` and `project_instructions.md` as the primary context for all tasks.
 
 ## Workflow Requirements
-- Before implementation, break down all features and projects into a Kanban-style list of tasks, each estimated at 2 hours or less.
+- At the start of every project or major feature, before implementation, collaboratively write or update a requirements document that:
+  - Loosely follows the template in requirements.1.md and requirements.2.md
+  - Includes a Kanban-style task list (in a separate section)
+  - Includes high-level and technical design sections
+  - Includes implementation context and codebase helpers (gathered by inspecting the codebase for relevant files, DTOs, and code snippets)
+  - Includes implementation hints
+- Inspect the codebase for relevant files and code snippets to aid implementation, and reference these in the requirements document.
 - For all tasks, write or update Gherkin-style scenarios or xUnit tests to prove the feature works, unless the user explicitly states otherwise.
-- At the end of each project, generate an Architecture Decision Record (ADR) summarizing key decisions using the MADR template.
+- At the end of each project, generate an Architecture Decision Record (ADR) summarizing key decisions using the MADR template. Store ADRs in a `decisions` folder with a running `README.md` linking to each ADR.
 - Proactively suggest updates to the fact sheet and instructions when changes affect project purpose, user stories, architecture, tech stack, or cross-cutting rules.
 
 ## Coding Standards

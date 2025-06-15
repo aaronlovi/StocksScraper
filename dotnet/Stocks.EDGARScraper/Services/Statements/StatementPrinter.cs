@@ -58,7 +58,6 @@ public class StatementPrinter {
     public async Task<int> PrintStatement() {
         // Only support EdgarDataSource for now
         const string DataSource = "EDGAR";
-        // 1. Load company by CIK
         if (!ulong.TryParse(_cik, out ulong cikNum)) {
             await _stderr.WriteLineAsync($"ERROR: Invalid CIK '{_cik}'.");
             return 2;
@@ -92,6 +91,7 @@ public class StatementPrinter {
 
         // 3. Load presentation hierarchy for the taxonomy (only if not listing statements)
         ConceptDetailsDTO? rootConcept = null;
+        Dictionary<long, List<PresentationDetailsDTO>>? parentToChildren = null;
         if (!_listStatements) {
             Result<IReadOnlyCollection<PresentationDetailsDTO>> presentationsResult = await _dbmService.GetTaxonomyPresentationsByTaxonomyType(UsGaap2025TaxonomyTypeId, _ct);
             if (presentationsResult.IsFailure || presentationsResult.Value is null) {
@@ -99,8 +99,7 @@ public class StatementPrinter {
                 return 2;
             }
             IReadOnlyCollection<PresentationDetailsDTO> presentations = presentationsResult.Value;
-            // Build parent-to-children map for traversal
-            Dictionary<long, List<PresentationDetailsDTO>> parentToChildren = BuildParentToChildrenMap(presentations);
+            parentToChildren = BuildParentToChildrenMap(presentations);
 
             // Find root concept by name (case-insensitive) or ID
             foreach (ConceptDetailsDTO c in concepts) {
@@ -142,29 +141,139 @@ public class StatementPrinter {
             return 0;
         }
 
-        // TODO: Implement hierarchy traversal and output
-        await _stderr.WriteLineAsync("ERROR: Only --list-statements is implemented in this prototype.");
-        return 2;
+        // 4. Find submission for the specified date
+        Result<IReadOnlyCollection<Submission>> submissionsResult = await _dbmService.GetSubmissions(_ct);
+        if (submissionsResult.IsFailure || submissionsResult.Value is null) {
+            await _stderr.WriteLineAsync($"ERROR: Could not load submissions for company.");
+            return 2;
+        }
+        Submission? selectedSubmission = null;
+        foreach (Submission sub in submissionsResult.Value) {
+            if (sub.CompanyId != company.CompanyId
+                || sub.ReportDate > _date
+                || (selectedSubmission != null && sub.ReportDate <= selectedSubmission.ReportDate)) {
+                continue;
+            }
+            selectedSubmission = sub;
+        }
+        if (selectedSubmission is null) {
+            await _stderr.WriteLineAsync($"ERROR: No submission found for CIK '{_cik}' on or before {_date:yyyy-MM-dd}.");
+            return 2;
+        }
+
+        // 5. Load data points for the company and submission
+        Result<IReadOnlyCollection<DataPoint>> dataPointsResult = await _dbmService.GetDataPointsForSubmission(company.CompanyId, selectedSubmission.SubmissionId, _ct);
+        if (dataPointsResult.IsFailure || dataPointsResult.Value is null) {
+            await _stderr.WriteLineAsync($"ERROR: Could not load data points for company/submission.");
+            return 2;
+        }
+        var dataPointMap = new Dictionary<long, DataPoint>();
+        foreach (DataPoint dp in dataPointsResult.Value) {
+            dataPointMap[dp.TaxonomyConceptId] = dp;
+        }
+
+        // 6. Traverse the taxonomy tree and collect hierarchy nodes
+        Dictionary<long, ConceptDetailsDTO> conceptMap = [];
+        foreach (ConceptDetailsDTO c in concepts)
+            conceptMap[c.ConceptId] = c;
+        var ctx = new TraverseContext(
+            rootConcept!.ConceptId,
+            parentToChildren!,
+            conceptMap,
+            0,
+            _maxDepth,
+            null,
+            []
+        );
+        Result<List<HierarchyNode>> hierarchyResult = await TraverseConceptTree(ctx);
+        if (hierarchyResult.IsFailure || hierarchyResult.Value is null) {
+            await _stderr.WriteLineAsync($"ERROR: {hierarchyResult.ErrorMessage}");
+            return 2;
+        }
+        List<HierarchyNode> hierarchy = hierarchyResult.Value;
+
+        // 7. Output in the requested format
+        await FormatOutput(hierarchy, conceptMap, dataPointMap);
+        return 0;
+    }
+
+    private async Task FormatOutput(List<HierarchyNode> hierarchy, Dictionary<long, ConceptDetailsDTO> conceptMap, Dictionary<long, DataPoint> dataPointMap) {
+        if (_format.Equals("csv", StringComparison.OrdinalIgnoreCase)) {
+            await _stdout.WriteLineAsync("ConceptName,Label,Value,Depth,ParentConceptName");
+            foreach (HierarchyNode node in hierarchy) {
+                string value = string.Empty;
+                if (dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp))
+                    value = dp.Value.ToString();
+                else
+                    await _stderr.WriteLineAsync($"WARNING: No data point found for concept '{node.Name}' (ConceptId: {node.ConceptId}) in submission.");
+                string parentName = node.ParentConceptId.HasValue && conceptMap.TryGetValue(node.ParentConceptId.Value, out ConceptDetailsDTO? parentConcept) ? parentConcept.Name : string.Empty;
+                await _stdout.WriteLineAsync($"{node.Name},\"{node.Label}\",{value},{node.Depth},{parentName}");
+            }
+        } else if (_format.Equals("html", StringComparison.OrdinalIgnoreCase)) {
+            await _stdout.WriteLineAsync("<ul>");
+            await WriteHtmlTree(hierarchy, conceptMap, dataPointMap, null, 0);
+            await _stdout.WriteLineAsync("</ul>");
+        } else if (_format.Equals("json", StringComparison.OrdinalIgnoreCase)) {
+            await _stdout.WriteLineAsync(System.Text.Json.JsonSerializer.Serialize(BuildJsonTree(hierarchy, conceptMap, dataPointMap, null)));
+        } else {
+            await _stderr.WriteLineAsync($"ERROR: Unknown format '{_format}'.");
+        }
+    }
+
+    private async Task WriteHtmlTree(List<HierarchyNode> nodes, Dictionary<long, ConceptDetailsDTO> conceptMap, Dictionary<long, DataPoint> dataPointMap, long? parentId, int depth) {
+        foreach (HierarchyNode node in nodes) {
+            if (node.ParentConceptId != parentId)
+                continue;
+            string value = dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp) ? dp.Value.ToString() : string.Empty;
+            await _stdout.WriteLineAsync($"<li>{node.Name}: {value}");
+            bool hasChildren = nodes.Exists(n => n.ParentConceptId == node.ConceptId);
+            if (hasChildren) {
+                await _stdout.WriteLineAsync("<ul>");
+                await WriteHtmlTree(nodes, conceptMap, dataPointMap, node.ConceptId, depth + 1);
+                await _stdout.WriteLineAsync("</ul>");
+            }
+            await _stdout.WriteLineAsync("</li>");
+        }
+    }
+
+    private object? BuildJsonTree(List<HierarchyNode> nodes, Dictionary<long, ConceptDetailsDTO> conceptMap, Dictionary<long, DataPoint> dataPointMap, long? parentId) {
+        var result = new List<object>();
+        foreach (HierarchyNode node in nodes) {
+            if (node.ParentConceptId != parentId)
+                continue;
+            var obj = new Dictionary<string, object?> {
+                ["ConceptName"] = node.Name,
+                ["Label"] = node.Label,
+                ["Value"] = dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp) ? dp.Value : null
+            };
+            object? children = BuildJsonTree(nodes, conceptMap, dataPointMap, node.ConceptId);
+            if (children is List<object> list && list.Count > 0)
+                obj["Children"] = children;
+            result.Add(obj);
+        }
+        if (parentId == null && result.Count == 1)
+            return result[0];
+        return result;
     }
 
     /// <summary>
     /// Recursively walks the taxonomy tree from the selected concept.
     /// </summary>
-    private Result<List<HierarchyNode>> TraverseConceptTree(TraverseContext ctx) {
+    private async Task<Result<List<HierarchyNode>>> TraverseConceptTree(TraverseContext ctx) {
         var result = new List<HierarchyNode>();
-        string? error = Traverse(ctx, result);
+        string? error = await Traverse(ctx, result);
         if (error is not null)
             return Result<List<HierarchyNode>>.Failure(ErrorCodes.GenericError, error);
         return Result<List<HierarchyNode>>.Success(result);
     }
 
-    private string? Traverse(TraverseContext ctx, List<HierarchyNode> result) {
+    private async Task<string?> Traverse(TraverseContext ctx, List<HierarchyNode> result) {
         if (ctx.Depth > ctx.MaxDepth)
             return null;
         if (!ctx.ConceptMap.TryGetValue(ctx.ConceptId, out ConceptDetailsDTO? concept))
             return $"ConceptId {ctx.ConceptId} not found in concept map.";
         if (!ctx.Visited.Add(ctx.ConceptId)) {
-            _stderr.WriteLine($"WARNING: Cycle detected at conceptId {ctx.ConceptId}, skipping to prevent infinite recursion.");
+            await _stderr.WriteLineAsync($"WARNING: Cycle detected at conceptId {ctx.ConceptId}, skipping to prevent infinite recursion.");
             return null;
         }
         result.Add(new HierarchyNode {
@@ -181,7 +290,7 @@ public class StatementPrinter {
                     Depth = ctx.Depth + 1,
                     ParentConceptId = ctx.ConceptId
                 };
-                string? err = Traverse(childCtx, result);
+                string? err = await Traverse(childCtx, result);
                 if (err is not null)
                     return err;
             }

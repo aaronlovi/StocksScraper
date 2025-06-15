@@ -88,8 +88,20 @@ public class StatementPrinter {
         }
         IReadOnlyCollection<ConceptDetailsDTO> concepts = conceptsResult.Value;
 
+        // 3. Load presentation hierarchy for the taxonomy (only if not listing statements)
+        if (!_listStatements) {
+            Result<IReadOnlyCollection<PresentationDetailsDTO>> presentationsResult = await _dbmService.GetTaxonomyPresentationsByTaxonomyType(UsGaap2025TaxonomyTypeId, _ct);
+            if (presentationsResult.IsFailure || presentationsResult.Value == null) {
+                await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy presentation hierarchy for US-GAAP 2025.");
+                return 2;
+            }
+            IReadOnlyCollection<PresentationDetailsDTO> presentations = presentationsResult.Value;
+            // Build parent-to-children map for traversal
+            Dictionary<long, List<PresentationDetailsDTO>> parentToChildren = BuildParentToChildrenMap(presentations);
+        }
+
         if (_listStatements) {
-            // 3. Filter for abstract concepts (top-level statements)
+            // 4. Filter for abstract concepts (top-level statements)
             var abstractConcepts = new List<ConceptDetailsDTO>();
             foreach (ConceptDetailsDTO c in concepts) {
                 if (c.IsAbstract) {
@@ -103,7 +115,7 @@ public class StatementPrinter {
                 // No error, just header
                 return 0;
             }
-            // 4. Output as CSV (for now)
+            // 5. Output as CSV (for now)
             foreach (ConceptDetailsDTO c in abstractConcepts) {
                 string doc = c.Documentation != null ? c.Documentation.Replace('\n', ' ').Replace('\r', ' ') : string.Empty;
                 await _stdout.WriteLineAsync($"{c.Name},\"{c.Label}\",\"{doc}\"");

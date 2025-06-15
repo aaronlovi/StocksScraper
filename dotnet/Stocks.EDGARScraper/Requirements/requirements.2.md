@@ -411,8 +411,6 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Write xUnit tests for CLI integration (requirement 5), ensuring the --print-statement switch is recognized and routed correctly.
 - Write xUnit tests for data access methods used in statement listing (requirement 1/6), ensuring correct data is returned or errors are handled.
 - Hierarchy Traversal & Output (Requirement 2)
-  - Define the in-memory structure for parent/child relationships using PresentationDetailsDTO.
-  - Implement loading and mapping of PresentationDetailsDTOs for the selected taxonomy.
   - Implement logic to find the root concept (by name or ID) and validate its existence.
   - Implement recursive traversal of the taxonomy tree, respecting the max depth.
   - Implement CSV output for the hierarchy, matching the required columns and format.
@@ -429,8 +427,7 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Implement GetDataPointsForSubmission in DbmService: Implement the actual database query to retrieve all DataPoint records for a given company and submission.
 - Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
 - Hierarchy Traversal & Output (Requirement 2)
-  - Design and document the recursive traversal algorithm for the taxonomy presentation tree. (Done)
-  - Define the in-memory structure for parent/child relationships using PresentationDetailsDTO.
+  - Implement loading and mapping of PresentationDetailsDTOs for the selected taxonomy.
 
 ### In Progress
 - Implement CLI argument parsing for all required switches.
@@ -446,3 +443,4 @@ Then the output should reflect data from the submission dated "2019-03-01"
 - Add robust error handling and logging to StatementPrinter (listing mode).
 - Hierarchy Traversal & Output (Requirement 2)
   - Design and document the recursive traversal algorithm for the taxonomy presentation tree.
+  - Define the in-memory structure for parent/child relationships using PresentationDetailsDTO.

@@ -149,16 +149,29 @@ public class StatementPrinter {
         }
         Submission? selectedSubmission = null;
         foreach (Submission sub in submissionsResult.Value) {
-            if (sub.CompanyId != company.CompanyId
-                || sub.ReportDate > _date
-                || (selectedSubmission != null && sub.ReportDate <= selectedSubmission.ReportDate)) {
+            if (sub.CompanyId != company.CompanyId)
                 continue;
+            if (sub.ReportDate > _date)
+                continue;
+            if (selectedSubmission == null || sub.ReportDate > selectedSubmission.ReportDate)
+                selectedSubmission = sub;
+        }
+        // If no submission found, and there are submissions for this company, but all are after the requested date, return error
+        bool hasAnySubmissionForCompany = false;
+        foreach (Submission sub in submissionsResult.Value) {
+            if (sub.CompanyId == company.CompanyId) {
+                hasAnySubmissionForCompany = true;
+                break;
             }
-            selectedSubmission = sub;
         }
         if (selectedSubmission is null) {
-            await _stderr.WriteLineAsync($"ERROR: No submission found for CIK '{_cik}' on or before {_date:yyyy-MM-dd}.");
-            return 2;
+            if (hasAnySubmissionForCompany) {
+                await _stderr.WriteLineAsync($"ERROR: No submission found for CIK '{_cik}' on or before {_date:yyyy-MM-dd}.");
+                return 2;
+            } else {
+                await _stderr.WriteLineAsync($"ERROR: No submissions exist for CIK '{_cik}'.");
+                return 2;
+            }
         }
 
         // 5. Load data points for the company and submission

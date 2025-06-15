@@ -224,8 +224,7 @@ public class StatementPrinterTests {
     }
 
     [Fact]
-    public async Task PrintStatement_ConceptNotFound_PrintsErrorAndNonZeroExit()
-    {
+    public async Task PrintStatement_ConceptNotFound_PrintsErrorAndNonZeroExit() {
         // Arrange
         var mockDbmService = new Mock<IDbmService>();
         var company = new Company(1UL, 1234UL, "TestSource");
@@ -263,5 +262,334 @@ public class StatementPrinterTests {
         // Assert
         Assert.NotEqual(0, exitCode);
         Assert.Contains("ERROR: Concept 'NonexistentConcept' not found in taxonomy.", error);
+    }
+
+    [Fact]
+    public async Task PrintStatement_HierarchyCsv_Works() {
+        // Arrange
+        var mockDbmService = new Mock<IDbmService>();
+        var company = new Company(1UL, 1234UL, "TestSource");
+        var companies = new List<Company> { company };
+        _ = mockDbmService.Setup(s => s.GetAllCompaniesByDataSource(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Company>>.Success(companies));
+        var concepts = new List<ConceptDetailsDTO>
+        {
+            new(1, 1, 1, 1, true, "Assets", "Assets", "Assets doc"),
+            new(2, 1, 1, 1, false, "CurrentAssets", "Current Assets", "Current assets doc"),
+            new(3, 1, 1, 1, false, "Cash", "Cash", "Cash doc")
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyConceptsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
+        var presentations = new List<PresentationDetailsDTO>
+        {
+            new(1, 1, 0, 0, 0, 0), // Assets (root)
+            new(2, 2, 1, 0, 1, 1), // CurrentAssets child of Assets
+            new(3, 3, 2, 0, 2, 2)  // Cash child of CurrentAssets
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
+        var submissions = new List<Submission> { new(1UL, 1UL, "ref", 0, 0, new DateOnly(2019, 3, 1), null) };
+        _ = mockDbmService.Setup(s => s.GetSubmissions(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Submission>>.Success(submissions));
+        var dataPoints = new List<DataPoint>
+        {
+            new(1UL, 1UL, "Assets", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 350000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 1),
+            new(2UL, 1UL, "CurrentAssets", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 150000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 2),
+            new(3UL, 1UL, "Cash", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 100000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 3)
+        };
+        _ = mockDbmService.Setup(s => s.GetDataPointsForSubmission(1UL, 1UL, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<DataPoint>>.Success(dataPoints));
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var printer = new StatementPrinter(
+            mockDbmService.Object,
+            cik: "1234",
+            concept: "Assets",
+            date: new DateOnly(2019, 3, 1),
+            maxDepth: 10,
+            format: "csv",
+            listStatements: false,
+            stdout: stdout,
+            stderr: stderr
+        );
+        // Act
+        int exitCode = await printer.PrintStatement();
+        string output = stdout.ToString();
+        // Assert
+        Assert.Equal(0, exitCode);
+        Assert.Contains("ConceptName,Label,Value,Depth,ParentConceptName", output);
+        Assert.Contains("Assets,\"Assets\",350000,0,", output);
+        Assert.Contains("CurrentAssets,\"Current Assets\",150000,1,Assets", output);
+        Assert.Contains("Cash,\"Cash\",100000,2,CurrentAssets", output);
+    }
+
+    [Fact]
+    public async Task PrintStatement_HierarchyHtml_Works() {
+        // Arrange
+        var mockDbmService = new Mock<IDbmService>();
+        var company = new Company(1UL, 1234UL, "TestSource");
+        var companies = new List<Company> { company };
+        _ = mockDbmService.Setup(s => s.GetAllCompaniesByDataSource(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Company>>.Success(companies));
+        var concepts = new List<ConceptDetailsDTO>
+        {
+            new(1, 1, 1, 1, true, "Assets", "Assets", "Assets doc"),
+            new(2, 1, 1, 1, false, "CurrentAssets", "Current Assets", "Current assets doc"),
+            new(3, 1, 1, 1, false, "Cash", "Cash", "Cash doc")
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyConceptsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
+        var presentations = new List<PresentationDetailsDTO>
+        {
+            new(1, 1, 0, 0, 0, 0),
+            new(2, 2, 1, 0, 1, 1),
+            new(3, 3, 2, 0, 2, 2)
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
+        var submissions = new List<Submission> { new(1UL, 1UL, "ref", 0, 0, new DateOnly(2019, 3, 1), null) };
+        _ = mockDbmService.Setup(s => s.GetSubmissions(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Submission>>.Success(submissions));
+        var dataPoints = new List<DataPoint>
+        {
+            new(1UL, 1UL, "Assets", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 350000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 1),
+            new(2UL, 1UL, "CurrentAssets", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 150000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 2),
+            new(3UL, 1UL, "Cash", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 100000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 3)
+        };
+        _ = mockDbmService.Setup(s => s.GetDataPointsForSubmission(1UL, 1UL, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<DataPoint>>.Success(dataPoints));
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var printer = new StatementPrinter(
+            mockDbmService.Object,
+            cik: "1234",
+            concept: "Assets",
+            date: new DateOnly(2019, 3, 1),
+            maxDepth: 10,
+            format: "html",
+            listStatements: false,
+            stdout: stdout,
+            stderr: stderr
+        );
+        // Act
+        int exitCode = await printer.PrintStatement();
+        string output = stdout.ToString();
+        // Assert
+        Assert.Equal(0, exitCode);
+        Assert.Contains("<ul>", output);
+        Assert.Contains("<li>Assets: 350000", output);
+        Assert.Contains("<li>CurrentAssets: 150000", output);
+        Assert.Contains("<li>Cash: 100000", output);
+    }
+
+    [Fact]
+    public async Task PrintStatement_HierarchyJson_Works() {
+        // Arrange
+        var mockDbmService = new Mock<IDbmService>();
+        var company = new Company(1UL, 1234UL, "TestSource");
+        var companies = new List<Company> { company };
+        _ = mockDbmService.Setup(s => s.GetAllCompaniesByDataSource(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Company>>.Success(companies));
+        var concepts = new List<ConceptDetailsDTO>
+        {
+            new(1, 1, 1, 1, true, "Assets", "Assets", "Assets doc"),
+            new(2, 1, 1, 1, false, "CurrentAssets", "Current Assets", "Current assets doc"),
+            new(3, 1, 1, 1, false, "Cash", "Cash", "Cash doc")
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyConceptsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
+        var presentations = new List<PresentationDetailsDTO>
+        {
+            new(1, 1, 0, 0, 0, 0),
+            new(2, 2, 1, 0, 1, 1),
+            new(3, 3, 2, 0, 2, 2)
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
+        var submissions = new List<Submission> { new(1UL, 1UL, "ref", 0, 0, new DateOnly(2019, 3, 1), null) };
+        _ = mockDbmService.Setup(s => s.GetSubmissions(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Submission>>.Success(submissions));
+        var dataPoints = new List<DataPoint>
+        {
+            new(1UL, 1UL, "Assets", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 350000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 1),
+            new(2UL, 1UL, "CurrentAssets", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 150000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 2),
+            new(3UL, 1UL, "Cash", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 100000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 3)
+        };
+        _ = mockDbmService.Setup(s => s.GetDataPointsForSubmission(1UL, 1UL, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<DataPoint>>.Success(dataPoints));
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var printer = new StatementPrinter(
+            mockDbmService.Object,
+            cik: "1234",
+            concept: "Assets",
+            date: new DateOnly(2019, 3, 1),
+            maxDepth: 10,
+            format: "json",
+            listStatements: false,
+            stdout: stdout,
+            stderr: stderr
+        );
+        // Act
+        int exitCode = await printer.PrintStatement();
+        string output = stdout.ToString();
+        // Assert
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"ConceptName\":\"Assets\"", output);
+        Assert.Contains("\"Value\":350000", output);
+        Assert.Contains("\"Children\":", output);
+    }
+
+    [Fact]
+    public async Task PrintStatement_RecursionLimit_Enforced() {
+        // Arrange
+        var mockDbmService = new Mock<IDbmService>();
+        var company = new Company(1UL, 1234UL, "TestSource");
+        var companies = new List<Company> { company };
+        _ = mockDbmService.Setup(s => s.GetAllCompaniesByDataSource(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Company>>.Success(companies));
+        var concepts = new List<ConceptDetailsDTO>
+        {
+            new(1, 1, 1, 1, true, "Assets", "Assets", "Assets doc"),
+            new(2, 1, 1, 1, false, "CurrentAssets", "Current Assets", "Current assets doc"),
+            new(3, 1, 1, 1, false, "Cash", "Cash", "Cash doc")
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyConceptsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
+        var presentations = new List<PresentationDetailsDTO>
+        {
+            new(1, 1, 0, 0, 0, 0),
+            new(2, 2, 1, 0, 1, 1),
+            new(3, 3, 2, 0, 2, 2)
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
+        var submissions = new List<Submission> { new(1UL, 1UL, "ref", 0, 0, new DateOnly(2019, 3, 1), null) };
+        _ = mockDbmService.Setup(s => s.GetSubmissions(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Submission>>.Success(submissions));
+        var dataPoints = new List<DataPoint>
+        {
+            new(1UL, 1UL, "Assets", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 350000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 1),
+            new(2UL, 1UL, "CurrentAssets", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 150000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 2),
+            new(3UL, 1UL, "Cash", "ref", new DatePair(new DateOnly(2019, 1, 1), new DateOnly(2019, 12, 31)), 100000, new DataPointUnit(1UL, "USD"), new DateOnly(2019, 3, 1), 1UL, 3)
+        };
+        _ = mockDbmService.Setup(s => s.GetDataPointsForSubmission(1UL, 1UL, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<DataPoint>>.Success(dataPoints));
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var printer = new StatementPrinter(
+            mockDbmService.Object,
+            cik: "1234",
+            concept: "Assets",
+            date: new DateOnly(2019, 3, 1),
+            maxDepth: 1, // Only root and first child
+            format: "csv",
+            listStatements: false,
+            stdout: stdout,
+            stderr: stderr
+        );
+        // Act
+        int exitCode = await printer.PrintStatement();
+        string output = stdout.ToString();
+        // Assert
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Assets,\"Assets\",350000,0,", output);
+        Assert.Contains("CurrentAssets,\"Current Assets\",150000,1,Assets", output);
+        Assert.DoesNotContain("Cash,\"Cash\",100000,2,CurrentAssets", output); // Should not appear
+    }
+
+    [Fact]
+    public async Task PrintStatement_MissingSubmissionForDate_PrintsError() {
+        // Arrange
+        var mockDbmService = new Mock<IDbmService>();
+        var company = new Company(1UL, 1234UL, "TestSource");
+        var companies = new List<Company> { company };
+        _ = mockDbmService.Setup(s => s.GetAllCompaniesByDataSource(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Company>>.Success(companies));
+        var concepts = new List<ConceptDetailsDTO>
+        {
+            new(1, 1, 1, 1, true, "Assets", "Assets", "Assets doc")
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyConceptsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
+        var presentations = new List<PresentationDetailsDTO>
+        {
+            new(1, 1, 0, 0, 0, 0)
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
+        // Only submission is after the requested date, so none should be found
+        var submissions = new List<Submission> { new(1UL, 1UL, "ref", 0, 0, new DateOnly(2020, 1, 1), null) };
+        _ = mockDbmService.Setup(s => s.GetSubmissions(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Submission>>.Success(submissions));
+        var dataPoints = new List<DataPoint>();
+        _ = mockDbmService.Setup(s => s.GetDataPointsForSubmission(1UL, 1UL, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<DataPoint>>.Success(dataPoints));
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var printer = new StatementPrinter(
+            mockDbmService.Object,
+            cik: "1234",
+            concept: "Assets",
+            date: new DateOnly(2019, 3, 1), // No submission on or before this date
+            maxDepth: 10,
+            format: "csv",
+            listStatements: false,
+            stdout: stdout,
+            stderr: stderr
+        );
+        // Act
+        int exitCode = await printer.PrintStatement();
+        string error = stderr.ToString();
+        // Assert
+        Assert.NotEqual(0, exitCode);
+        Assert.Contains("ERROR: No submission found for CIK", error);
+    }
+
+    [Fact]
+    public async Task PrintStatement_MissingDataPoint_PrintsWarning() {
+        // Arrange
+        var mockDbmService = new Mock<IDbmService>();
+        var company = new Company(1UL, 1234UL, "TestSource");
+        var companies = new List<Company> { company };
+        _ = mockDbmService.Setup(s => s.GetAllCompaniesByDataSource(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Company>>.Success(companies));
+        var concepts = new List<ConceptDetailsDTO>
+        {
+            new(1, 1, 1, 1, true, "Assets", "Assets", "Assets doc")
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyConceptsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
+        var presentations = new List<PresentationDetailsDTO>
+        {
+            new(1, 1, 0, 0, 0, 0)
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
+        var submissions = new List<Submission> { new(1UL, 1UL, "ref", 0, 0, new DateOnly(2019, 3, 1), null) };
+        _ = mockDbmService.Setup(s => s.GetSubmissions(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Submission>>.Success(submissions));
+        var dataPoints = new List<DataPoint>(); // No data points
+        _ = mockDbmService.Setup(s => s.GetDataPointsForSubmission(1UL, 1UL, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<DataPoint>>.Success(dataPoints));
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var printer = new StatementPrinter(
+            mockDbmService.Object,
+            cik: "1234",
+            concept: "Assets",
+            date: new DateOnly(2019, 3, 1),
+            maxDepth: 10,
+            format: "csv",
+            listStatements: false,
+            stdout: stdout,
+            stderr: stderr
+        );
+        // Act
+        int exitCode = await printer.PrintStatement();
+        string error = stderr.ToString();
+        // Assert
+        Assert.Equal(0, exitCode);
+        Assert.Contains("WARNING: No data point found for concept 'Assets", error);
     }
 }

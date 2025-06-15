@@ -4,9 +4,11 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Stocks.DataModels;
+using Stocks.EDGARScraper.Models.Statements;
 using Stocks.Persistence.Database;
 using Stocks.Persistence.Database.DTO.Taxonomies;
 using Stocks.Shared;
+using Stocks.Shared.Models;
 
 namespace Stocks.EDGARScraper.Services.Statements;
 
@@ -148,8 +150,44 @@ public class StatementPrinter {
     /// <summary>
     /// Recursively walks the taxonomy tree from the selected concept.
     /// </summary>
-    private void TraverseConceptTree(/* params */) {
-        // TODO: Implement recursive traversal
+    private Result<List<HierarchyNode>> TraverseConceptTree(TraverseContext ctx) {
+        var result = new List<HierarchyNode>();
+        string? error = Traverse(ctx, result);
+        if (error is not null)
+            return Result<List<HierarchyNode>>.Failure(ErrorCodes.GenericError, error);
+        return Result<List<HierarchyNode>>.Success(result);
+    }
+
+    private string? Traverse(TraverseContext ctx, List<HierarchyNode> result) {
+        if (ctx.Depth > ctx.MaxDepth)
+            return null;
+        if (!ctx.ConceptMap.TryGetValue(ctx.ConceptId, out ConceptDetailsDTO? concept))
+            return $"ConceptId {ctx.ConceptId} not found in concept map.";
+        if (!ctx.Visited.Add(ctx.ConceptId)) {
+            _stderr.WriteLine($"WARNING: Cycle detected at conceptId {ctx.ConceptId}, skipping to prevent infinite recursion.");
+            return null;
+        }
+        result.Add(new HierarchyNode {
+            ConceptId = concept.ConceptId,
+            Name = concept.Name ?? string.Empty,
+            Label = concept.Label ?? string.Empty,
+            Depth = ctx.Depth,
+            ParentConceptId = ctx.ParentConceptId,
+        });
+        if (ctx.ParentToChildren.TryGetValue(ctx.ConceptId, out List<PresentationDetailsDTO>? children)) {
+            foreach (PresentationDetailsDTO child in children) {
+                TraverseContext childCtx = ctx with {
+                    ConceptId = child.ConceptId,
+                    Depth = ctx.Depth + 1,
+                    ParentConceptId = ctx.ConceptId
+                };
+                string? err = Traverse(childCtx, result);
+                if (err is not null)
+                    return err;
+            }
+        }
+        _ = ctx.Visited.Remove(ctx.ConceptId);
+        return null;
     }
 
     /// <summary>

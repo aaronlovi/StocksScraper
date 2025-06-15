@@ -63,7 +63,7 @@ public class StatementPrinter {
         }
         // TODO: Refactor to query for a single company by CIK in the database for better performance with large datasets.
         Result<IReadOnlyCollection<Company>> companiesResult = await _dbmService.GetAllCompaniesByDataSource(DataSource, _ct);
-        if (companiesResult.IsFailure || companiesResult.Value == null) {
+        if (companiesResult.IsFailure || companiesResult.Value is null) {
             await _stderr.WriteLineAsync($"ERROR: Could not load companies from data source '{DataSource}'.");
             return 2;
         }
@@ -82,22 +82,39 @@ public class StatementPrinter {
         // 2. Load taxonomy concepts (US-GAAP 2025 assumed for now)
         const int UsGaap2025TaxonomyTypeId = 1; // TODO: Make configurable if needed
         Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult = await _dbmService.GetTaxonomyConceptsByTaxonomyType(UsGaap2025TaxonomyTypeId, _ct);
-        if (conceptsResult.IsFailure || conceptsResult.Value == null) {
+        if (conceptsResult.IsFailure || conceptsResult.Value is null) {
             await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy concepts for US-GAAP 2025.");
             return 2;
         }
         IReadOnlyCollection<ConceptDetailsDTO> concepts = conceptsResult.Value;
 
         // 3. Load presentation hierarchy for the taxonomy (only if not listing statements)
+        ConceptDetailsDTO? rootConcept = null;
         if (!_listStatements) {
             Result<IReadOnlyCollection<PresentationDetailsDTO>> presentationsResult = await _dbmService.GetTaxonomyPresentationsByTaxonomyType(UsGaap2025TaxonomyTypeId, _ct);
-            if (presentationsResult.IsFailure || presentationsResult.Value == null) {
+            if (presentationsResult.IsFailure || presentationsResult.Value is null) {
                 await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy presentation hierarchy for US-GAAP 2025.");
                 return 2;
             }
             IReadOnlyCollection<PresentationDetailsDTO> presentations = presentationsResult.Value;
             // Build parent-to-children map for traversal
             Dictionary<long, List<PresentationDetailsDTO>> parentToChildren = BuildParentToChildrenMap(presentations);
+
+            // Find root concept by name (case-insensitive) or ID
+            foreach (ConceptDetailsDTO c in concepts) {
+                if (c.Name.EqualsOrdinalIgnoreCase(_concept)) {
+                    rootConcept = c;
+                    break;
+                }
+                if (long.TryParse(_concept, out long conceptId) && c.ConceptId == conceptId) {
+                    rootConcept = c;
+                    break;
+                }
+            }
+            if (rootConcept is null) {
+                await _stderr.WriteLineAsync($"ERROR: Concept '{_concept}' not found in taxonomy.");
+                return 2;
+            }
         }
 
         if (_listStatements) {
@@ -153,14 +170,11 @@ public class StatementPrinter {
     /// <summary>
     /// Builds a map from ParentConceptId to a list of child PresentationDetailsDTOs for efficient hierarchy traversal.
     /// </summary>
-    private static Dictionary<long, List<PresentationDetailsDTO>> BuildParentToChildrenMap(IEnumerable<PresentationDetailsDTO> presentations)
-    {
+    private static Dictionary<long, List<PresentationDetailsDTO>> BuildParentToChildrenMap(IEnumerable<PresentationDetailsDTO> presentations) {
         var parentToChildren = new Dictionary<long, List<PresentationDetailsDTO>>();
-        foreach (var pres in presentations)
-        {
-            if (!parentToChildren.TryGetValue(pres.ParentConceptId, out var children))
-            {
-                children = new List<PresentationDetailsDTO>();
+        foreach (PresentationDetailsDTO pres in presentations) {
+            if (!parentToChildren.TryGetValue(pres.ParentConceptId, out List<PresentationDetailsDTO>? children)) {
+                children = [];
                 parentToChildren[pres.ParentConceptId] = children;
             }
             children.Add(pres);

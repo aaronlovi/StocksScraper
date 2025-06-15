@@ -68,6 +68,9 @@ public static class Utilities {
     public static bool EqualsInvariant(this string str, string other)
         => str.Equals(other, StringComparison.InvariantCulture);
 
+    public static bool EqualsOrdinalIgnoreCase(this string str, string other)
+        => str.Equals(other, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// Checks if the given decimal value is an integer.
     /// </summary>

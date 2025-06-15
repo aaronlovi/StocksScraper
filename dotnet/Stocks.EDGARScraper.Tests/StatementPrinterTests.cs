@@ -222,4 +222,46 @@ public class StatementPrinterTests {
         Assert.NotEqual(0, exitCode);
         Assert.Contains("ERROR: Could not load taxonomy concepts", error);
     }
+
+    [Fact]
+    public async Task PrintStatement_ConceptNotFound_PrintsErrorAndNonZeroExit()
+    {
+        // Arrange
+        var mockDbmService = new Mock<IDbmService>();
+        var company = new Company(1UL, 1234UL, "TestSource");
+        var companies = new List<Company> { company };
+        _ = mockDbmService.Setup(s => s.GetAllCompaniesByDataSource(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<Company>>.Success(companies));
+        var concepts = new List<ConceptDetailsDTO>
+        {
+            new(1, 1, 1, 1, true, "Assets", "Assets", "Assets doc")
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyConceptsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
+        var presentations = new List<PresentationDetailsDTO>();
+        _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
+
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var printer = new StatementPrinter(
+            mockDbmService.Object,
+            cik: "1234",
+            concept: "NonexistentConcept",
+            date: DateOnly.FromDateTime(DateTime.Today),
+            maxDepth: 10,
+            format: "csv",
+            listStatements: false,
+            stdout: stdout,
+            stderr: stderr
+        );
+
+        // Act
+        int exitCode = await printer.PrintStatement();
+        string error = stderr.ToString();
+
+        // Assert
+        Assert.NotEqual(0, exitCode);
+        Assert.Contains("ERROR: Concept 'NonexistentConcept' not found in taxonomy.", error);
+    }
 }

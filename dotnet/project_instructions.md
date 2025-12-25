@@ -3,11 +3,13 @@
 This document provides overarching instructions and best practices for working on this project, both for human contributors and AI agents. It is intended to ensure consistency, maintainability, and alignment with project goals.
 
 ## General Principles
+
 - Always use `project_fact_sheet.md` as the source of truth for project purpose, user stories, architecture, tech stack, and cross-cutting rules.
 - Keep `project_fact_sheet.md` up to date. Whenever you implement, refactor, or remove a significant feature, update the fact sheet to reflect the current state of the project.
 - Prioritize clarity, maintainability, and extensibility in all code and documentation.
 
 ## Workflow Guidelines
+
 - Before starting a new feature or major change, review the fact sheet and this instructions document.
 - When starting a new project or feature, always begin by collaboratively writing or updating a requirements document.
 - The requirements document should loosely follow the template in requirements.1.md and requirements.2.md, and must include:
@@ -30,6 +32,7 @@ This document provides overarching instructions and best practices for working o
 - After completing any work, the AI agent must check the requirements and Kanban lists for any items that should be marked complete or have their status changed, and ask the project owner for permission to update the requirements document accordingly.
 
 ## Coding and Documentation Standards
+
 - Follow .NET 8 and C# best practices for code style, structure, and naming.
 - Prefer using the `Result`/`IResult` pattern (see `Stocks.Shared.Result`, `Stocks.Shared.IResult`, and the `Results.cs` file) for error handling instead of throwing exceptions, unless an exception is truly exceptional or unrecoverable.
 - Use record types or classes instead of tuples for method return values and complex data passing. Tuples are discouraged except for simple, local, and obvious cases, as records/classes provide better maintainability and self-documentation.
@@ -40,6 +43,7 @@ This document provides overarching instructions and best practices for working o
 - Write xUnit tests for new code and maintain existing tests. Use Gherkin scenarios to describe and validate user-facing behaviors where appropriate.
 
 ## AI Agent Instructions
+
 - Always use `project_fact_sheet.md` and this instructions file as primary context for all tasks.
 - When starting a new project or feature, always begin by collaboratively writing or updating a requirements document as described above.
 - Proactively suggest updates to the fact sheet when you detect changes that affect project purpose, user stories, architecture, tech stack, or cross-cutting rules.
@@ -50,6 +54,7 @@ This document provides overarching instructions and best practices for working o
 - **After completing any work, the AI agent must check the requirements and Kanban lists for any items that should be marked complete or have their status changed, and ask the project owner for permission to update the requirements document accordingly.**
 
 ## Collaboration
+
 - Communicate any major changes, questions, or uncertainties to the project owner.
 - Encourage feedback and continuous improvement of both code and documentation.
 

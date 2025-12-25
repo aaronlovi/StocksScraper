@@ -7,11 +7,13 @@ The `Stocks.EDGARScraper` project is a .NET 8 console application for downloadin
 ## Main Components
 
 ### 1. Data Download and Parsing
+
 - **EdgarHttpClientService**: Downloads raw data files from the SEC EDGAR system.
 - **ParseBulkEdgarSubmissionsContext / ParseBulkXbrlArchiveContext**: Context classes for parsing bulk EDGAR submissions and XBRL archives.
 - **XBRLFileParser**: Parses XBRL JSON files and extracts financial data points.
 
 ### 2. ETL and Database Integration
+
 - **Program.cs**: Main entry point; supports command-line operations for:
   - Downloading CIK/company lists
   - Parsing and loading bulk EDGAR submissions
@@ -21,10 +23,12 @@ The `Stocks.EDGARScraper` project is a .NET 8 console application for downloadin
 - **Integration with Stocks.Persistence**: Uses database services for bulk inserts and data management.
 
 ### 3. Taxonomy Processing
+
 - **UsGaap2025ConceptsFileProcessor / UsGaap2025PresentationFileProcessor**: Parse and load US GAAP 2025 taxonomy concepts and presentation hierarchies from CSV files into the database.
 - **Taxonomy Options Models**: Configuration for taxonomy file locations.
 
 ### 4. Utilities and Services
+
 - **PuppeteerService**: (Not currently in use) Utility for fetching rendered HTML using headless Chromium.
 - **Enums and Models**: Internal enums and models for parsing and error handling.
 - **Startup / ReportingHostConfig**: Application and gRPC service configuration.

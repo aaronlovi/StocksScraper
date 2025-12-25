@@ -20,6 +20,7 @@
 The prototype financial statement viewer will be a command-line tool integrated into the `Stocks.EDGARScraper` console application. It will allow users to display a company's financial statement (or any abstract taxonomy concept) as of a specific date, starting from any top-level/abstract taxonomy concept, and output the result as CSV, HTML, or JSON.
 
 **Key Features:**
+
 - List all available statements or abstract concepts for a company.
 - Display a statement or concept hierarchy for a company and date, traversing the taxonomy presentation tree.
 - Output results in CSV, HTML, or JSON format, suitable for further processing or analysis.
@@ -27,6 +28,7 @@ The prototype financial statement viewer will be a command-line tool integrated 
 - **Argument validation:** If required arguments are missing or invalid, print usage instructions to stderr and exit with a non-zero code.
 
 **User Flow:**
+
 1. User invokes the tool with command-line arguments specifying CIK, concept, date, output format, and optional recursion depth.
 2. The tool resolves the company, loads taxonomy concepts and presentation hierarchy, and finds the relevant submission for the specified date.
 3. The tool recursively traverses the presentation tree from the selected concept, querying and outputting data points for each concept in the hierarchy.
@@ -59,7 +61,7 @@ The prototype financial statement viewer will be a command-line tool integrated 
       - `TraverseConceptTree()`: Recursively walks the taxonomy tree.
       - `FormatOutput()`: Handles output formatting for each supported format.
       - `ValidateParameters()`: Ensures all required parameters are present and valid.
-    
+
     - **Output Format Extensibility:**
       - The `StatementPrinter` class is designed for extensibility. To add a new output format, extend the `FormatOutput()` method (or use a strategy pattern or similar extension point) to support the new format. Document the new format and update CLI argument validation accordingly.
       - This allows future developers to add formats such as XML, Markdown, or others with minimal changes to the core logic.
@@ -86,12 +88,14 @@ The prototype financial statement viewer will be a command-line tool integrated 
 ### Algorithm Design: Recursive Taxonomy Traversal
 
 The core of statement hierarchy output is a recursive traversal of the taxonomy presentation tree, starting from a user-specified root concept. The traversal must:
+
 - Output each concept's details (name, label, value, depth, parent) in the requested format (CSV, HTML, JSON)
 - Query the value for each concept for the selected company and submission/date
 - Respect a configurable maximum recursion depth (default: 10)
 - Handle missing data points and missing children gracefully, logging warnings as needed
 
 **Inputs:**
+
 - Root concept (by name or ID)
 - Parent concept (null for root)
 - Current depth (starts at 0)
@@ -101,10 +105,12 @@ The core of statement hierarchy output is a recursive traversal of the taxonomy 
 - Data points (from DataPoint, filtered by company, submission, concept)
 
 **Outputs:**
+
 - For each concept, output a row/object/element with: ConceptName, Label, Value, Depth, ParentConceptName (CSV/HTML/JSON as appropriate)
 - For JSON/HTML, include children as nested arrays/elements
 
 **Algorithm:**
+
 1. If current depth > max depth, return (stop recursion)
 2. Output the current concept's details (including value, if available)
 3. For each child of the current concept (from parent/child map):
@@ -113,11 +119,13 @@ The core of statement hierarchy output is a recursive traversal of the taxonomy 
 5. If a data point is missing for a concept, output an empty value and log a warning
 
 **Data Structures:**
+
 - Dictionary<long, List<PresentationDetailsDTO>>: maps ParentConceptId to child PresentationDetailsDTOs
 - Dictionary<long, ConceptDetailsDTO>: maps ConceptId to concept metadata
 - Dictionary<long, DataPoint>: maps ConceptId to data point for the selected company/submission
 
 **Edge Cases:**
+
 - Root concept not found: log error, exit non-zero
 - No children for a concept: treat as leaf
 - Cycles in the tree: detect and prevent infinite recursion (track visited ConceptIds)
@@ -132,6 +140,7 @@ To efficiently traverse the taxonomy presentation tree, build an in-memory map f
 **Recommended C# structure:**
 // Maps ParentConceptId to a list of child PresentationDetailsDTOs
 Dictionary<long, List<PresentationDetailsDTO>> parentToChildren = new();
+
 - Populate this dictionary by iterating over all PresentationDetailsDTOs for the taxonomy.
 - For each PresentationDetailsDTO, add it to the list for its ParentConceptId.
 - During traversal, use this map to find all children of the current concept.
@@ -159,6 +168,7 @@ This structure should be created and populated as part of the data loading step 
 ## DTOs and Data Structures
 
 ### ConceptDetailsDTO
+
 - **File:** `Stocks.Persistence/Database/DTO/Taxonomies/ConceptDetailsDTO.cs`
 - **Namespace:** `Stocks.Persistence.Database.DTO.Taxonomies`
 - **Definition:**
@@ -175,6 +185,7 @@ This structure should be created and populated as part of the data loading step 
   - string Documentation
 
 ### PresentationDetailsDTO
+
 - **File:** `Stocks.Persistence/Database/DTO/Taxonomies/PresentationDetailsDTO.cs`
 - **Namespace:** `Stocks.Persistence.Database.DTO.Taxonomies`
 - **Definition:**
@@ -194,6 +205,7 @@ This structure should be created and populated as part of the data loading step 
   - `long ParentPresentationId`
 
 ### DataPoint
+
 - **File:** `Stocks.DataModels/DataPoint.cs`
 - **Namespace:** `Stocks.DataModels`
 - **Definition:**
@@ -221,6 +233,7 @@ This structure should be created and populated as part of the data loading step 
   - `long TaxonomyConceptId`
 
 ### IDbmService
+
 - **File:** `Stocks.Persistence/Database/IDbmService.cs`
 - **Namespace:** `Stocks.Persistence.Database`
 - **Definition:**public interface IDbmService {
@@ -250,6 +263,7 @@ ___
 ## Output Format Examples
 
 ### CSV
+
 ConceptName,Label,Value,Depth,ParentConceptName
 Assets,Assets,350000,0,
 Current Assets,Current Assets,150000,1,Assets
@@ -257,7 +271,9 @@ Cash and Cash Equivalents,Cash,100000,2,Current Assets
 Accounts Receivable,Receivables,50000,2,Current Assets
 Noncurrent Assets,Noncurrent Assets,200000,1,Assets
 Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
+
 ### HTML
+
 <ul>
   <li>Assets: 350000
     <ul>
@@ -331,6 +347,7 @@ Property, Plant, Equipment,PPE,200000,2,Noncurrent Assets
 Below are concrete Gherkin scenarios for each major requirement. These scenarios should be automated using SpecFlow or a similar tool, or used as the basis for xUnit tests.
 
 ### Scenario: List available statements for a company
+
 Given the EDGARScraper CLI is available
 And the database contains a company with CIK "00001234" and US-GAAP taxonomy concepts
 When I run "dotnet run --print-statement --cik 00001234 --list-statements"
@@ -338,6 +355,7 @@ Then the output should include a list of available top-level statements or abstr
 And the output should contain "Assets" and "Liabilities"
 
 ### Scenario: Display a statement in CSV format
+
 Given the EDGARScraper CLI is available
 And the database contains a company with CIK "00001234" and a submission dated "2019-03-01"
 And the taxonomy contains the concept "Assets"
@@ -346,6 +364,7 @@ Then the output should be valid CSV
 And the output should include a row with "Assets" and its value
 
 ### Scenario: Display a statement in HTML format
+
 Given the EDGARScraper CLI is available
 And the database contains a company with CIK "00001234" and a submission dated "2019-03-01"
 And the taxonomy contains the concept "Assets"
@@ -354,6 +373,7 @@ Then the output should be valid HTML
 And the output should include an element with "Assets" and its value
 
 ### Scenario: Display a statement in JSON format
+
 Given the EDGARScraper CLI is available
 And the database contains a company with CIK "00001234" and a submission dated "2019-03-01"
 And the taxonomy contains the concept "Assets"
@@ -362,6 +382,7 @@ Then the output should be valid JSON
 And the output should include a property "ConceptName" with value "Assets"
 
 ### Scenario: Handle missing company
+
 Given the EDGARScraper CLI is available
 And the database does not contain a company with CIK "99999999"
 When I run "dotnet run --print-statement --cik 99999999 --concept Assets --date 2019-03-01 --format csv"
@@ -369,6 +390,7 @@ Then the error output should contain "ERROR: Company with CIK '99999999' not fou
 And the exit code should be non-zero
 
 ### Scenario: Handle missing concept
+
 Given the EDGARScraper CLI is available
 And the database contains a company with CIK "00001234"
 But the taxonomy does not contain the concept "NonexistentConcept"
@@ -377,6 +399,7 @@ Then the error output should contain "ERROR: Concept 'NonexistentConcept' not fo
 And the exit code should be non-zero
 
 ### Scenario: Handle missing submission for date
+
 Given the EDGARScraper CLI is available
 And the database contains a company with CIK "00001234"
 But there is no submission for the date "1990-01-01"
@@ -385,12 +408,14 @@ Then the error output should contain "ERROR: No submission found for CIK '000012
 And the exit code should be non-zero
 
 ### Scenario: Recursion limit enforcement
+
 Given the EDGARScraper CLI is available
 And the taxonomy contains a deeply nested concept hierarchy under "Assets"
 When I run "dotnet run --print-statement --cik 00001234 --concept Assets --date 2019-03-01 --format csv --max-depth 2"
 Then the output should not include any concepts deeper than depth 2
 
 ### Scenario: Date filtering
+
 Given the EDGARScraper CLI is available
 And the database contains a company with CIK "00001234"
 And there are submissions for "2018-12-31" and "2019-03-01"
@@ -402,6 +427,7 @@ Then the output should reflect data from the submission dated "2019-03-01"
 ## Kanban Task List
 
 ### Backlog
+
 - Refactor StatementPrinter to query for a single company by CIK in the database, rather than loading all companies and iterating in memory, for better performance with large datasets.
 - Add Microsoft.Extensions.Logging (Serilog abstraction) logging to StatementPrinter for typical info, warning, and error events.
 - Add Gherkin/xUnit tests for all major scenarios.
@@ -422,6 +448,7 @@ Then the output should reflect data from the submission dated "2019-03-01"
   - Add Gherkin scenarios for hierarchy output in all formats.
 
 ### Ready
+
 - Implement GetTaxonomyPresentationsByTaxonomyType in DbmService: Implement the actual database query to retrieve all PresentationDetailsDTO for a given taxonomy type.
 - Implement GetDataPointsForSubmission in DbmService: Implement the actual database query to retrieve all DataPoint records for a given company and submission.
 - Implement main flow in StatementPrinter.PrintStatement() (load data, handle list/hierarchy, error handling).
@@ -429,10 +456,12 @@ Then the output should reflect data from the submission dated "2019-03-01"
   - Implement recursive traversal of the taxonomy tree, respecting the max depth.
 
 ### In Progress
+
 - Implement CLI argument parsing for all required switches.
 - Implement StatementPrinter class with support for CSV, HTML, and JSON output (hierarchy mode).
 
 ### Done
+
 - Inspect DTOs and data access methods; document their properties here.
 - Implement StatementPrinter class with support for CSV output for --list-statements.
 - Create GetTaxonomyPresentationsByTaxonomyTypeStmt for querying all PresentationDetailsDTO for a taxonomy type.

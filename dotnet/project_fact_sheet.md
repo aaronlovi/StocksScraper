@@ -1,9 +1,11 @@
 # Project Fact Sheet
 
 ## Purpose
+
 A C#/.NET backend for collecting, processing, and serving stock market data (initially US, via SEC EDGAR bulk downloads) for research and public consumption. The long-term goal is to power a B2C platform for retail investors and individuals to research stocks and markets, with a future consumer-facing frontend. The project also aspires to provide a robust data API (gRPC and potentially other protocols) for frontends and other services.
 
 ## Primary user stories
+
 - As the project owner, I want to scrape and analyze stock market data for my own research.
 - As a retail investor, I want to quickly generate reports and screen stocks using up-to-date, historical, and cross-company data.
 - As a user, I want to run offline jobs to analyze and screen stocks across the market.
@@ -16,6 +18,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - As the project owner, I want to extend the system to support new taxonomies, data sources, or output formats as requirements evolve.
 
 ## Architecture snapshot
+
 - Data ingestion: .NET console app scrapes SEC EDGAR bulk data (and, in future, other sources/markets) and loads it into a Docker-hosted database.
 - Data persistence: Centralized PostgreSQL database (in Docker), managed by a custom data access layer with retry logic, transactional support, and distributed-safe ID generation.
 - Data service: .NET Worker Service and supporting libraries for ETL, data access, and business logic.
@@ -28,6 +31,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - Future: API and frontend for public/retail investor access.
 
 ## Tech stack
+
 - .NET 8 (C#)
 - Serilog (logging)
 - Elastic/Kibana (log aggregation)
@@ -42,6 +46,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - Core: xUnit (unit testing), SpecFlow or similar (Gherkin-style BDD scenarios) for automated and behavior-driven testing of most new features and changes
 
 ## Cross-cutting rules
+
 - Logging: Serilog to Elastic/Kibana; logs to stdout for future Loki/Grafana scraping.
 - Metrics: Prometheus/Grafana integration planned; cache metrics (hits, misses, errors) tracked.
 - Distributed caching: Redis or in-memory, with distributed locking for cache consistency.
@@ -60,6 +65,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - After completing any work, the AI agent must check the requirements and Kanban lists for any items that should be marked complete or have their status changed, and ask the project owner for permission to update the requirements document accordingly.
 
 ## Requirements & Project Planning Process
+
 - At the start of every project or major feature, requirements documents must be created or updated using a standard template (see requirements.1.md and requirements.2.md for examples).
 - The requirements document must include:
   - A table of requirements with the following columns: ID | Requirement | Description | Status | Notes
@@ -73,6 +79,7 @@ A C#/.NET backend for collecting, processing, and serving stock market data (ini
 - Architecture Decision Records (ADRs) must be written for key decisions and stored in a `decisions` folder, with a running `README.md` linking to each ADR.
 
 ## Out-of-scope
+
 - Real-time or intraday stock quotes/data (only daily/delayed data is planned)
 - GraphQL APIs (not planned/preferred)
 - Trading or brokerage features

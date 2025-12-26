@@ -74,6 +74,8 @@ internal record ConceptDetails(
 
         if (Abstract.EqualsInvariant("true"))
             return Result<bool>.Success(true); // Valid -- is an abstract concept
+        if (Abstract.EqualsInvariant("false"))
+            return Result<bool>.Success(false); // Valid -- not an abstract concept
 
         return Result<bool>.Failure(ErrorCodes.ValidationError, $"Invalid abstract value: {Abstract}", Abstract);
     }

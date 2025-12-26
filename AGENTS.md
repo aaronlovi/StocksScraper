@@ -27,6 +27,7 @@
 - Treat warnings as errors; keep analyzer warnings clean.
 - Prefer `Result`/`IResult` patterns from `dotnet/Stocks.Shared/Results.cs` over exceptions.
 - Avoid LINQ in production paths unless clearly justified.
+- Do not use LINQ outside of unit test code.
 
 ## Testing Guidelines
 

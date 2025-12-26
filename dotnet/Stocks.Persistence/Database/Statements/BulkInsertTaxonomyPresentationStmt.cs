@@ -10,7 +10,7 @@ internal sealed class BulkInsertTaxonomyPresentationStmt : BulkInsertDbStmtBase<
     public BulkInsertTaxonomyPresentationStmt(IReadOnlyCollection<PresentationDetailsDTO> taxonomyPresentations)
         : base(nameof(BulkInsertTaxonomyPresentationStmt), taxonomyPresentations) { }
     protected override string GetCopyCommand() => "COPY taxonomy_presentation"
-        + " (taxonomy_presentation_id, taxonomy_concept_id, depth, order_in_depth, parent_concept_id, parent_presentation_id)"
+        + " (taxonomy_presentation_id, taxonomy_concept_id, depth, order_in_depth, parent_concept_id, parent_presentation_id, role_name)"
         + " FROM STDIN (FORMAT BINARY)";
     protected override async Task WriteItemAsync(NpgsqlBinaryImporter writer, PresentationDetailsDTO presentationDetails) {
         await writer.WriteAsync(presentationDetails.PresentationId, NpgsqlDbType.Bigint);
@@ -19,5 +19,6 @@ internal sealed class BulkInsertTaxonomyPresentationStmt : BulkInsertDbStmtBase<
         await writer.WriteAsync(presentationDetails.OrderInDepth, NpgsqlDbType.Integer);
         await writer.WriteAsync(presentationDetails.ParentConceptId, NpgsqlDbType.Bigint);
         await writer.WriteAsync(presentationDetails.ParentPresentationId, NpgsqlDbType.Bigint);
+        await writer.WriteAsync(presentationDetails.RoleName ?? string.Empty, NpgsqlDbType.Varchar);
     }
 }

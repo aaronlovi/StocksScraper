@@ -18,6 +18,45 @@ Because the FASB zip does not ship these exact worksheets, they were generated w
 
 **Arelle** is an open-source XBRL processing tool that can load taxonomy entry points (XSDs) and export concepts/linkbase relationships to CSV. It was used here to export raw concept and presentation data before converting to the project’s expected CSV schema.
 
+The presentation CSV now includes a `role_name` column so statement traversal can be scoped to a specific presentation role.
+Use `--list-statements` to see available role names and pass one via `--role` when printing a statement.
+
+## Regenerate Taxonomy CSVs (Role-Aware)
+
+Use this when you need to rebuild the presentation CSV with `role_name`.
+
+Prerequisites:
+
+- FASB US-GAAP taxonomy ZIPs extracted under `/var/lib/edgar-data/us-gaap-taxonomies/<YEAR>/`.
+- Arelle installed (example below uses a local venv).
+
+Steps (2025 example):
+
+```bash
+# 1) Create a local venv and install Arelle (one-time)
+python3 -m venv .venv-taxonomy
+. .venv-taxonomy/bin/activate
+pip install arelle-release
+
+# 2) Export raw presentation CSV from the entry point
+arelleCmdLine \
+  -f /var/lib/edgar-data/us-gaap-taxonomies/2025/us-gaap-2025/entire/us-gaap-entryPoint-all-2025.xsd \
+  --csvPre /var/lib/edgar-data/us-gaap-taxonomies/2025_pre_raw.csv \
+  --relationshipCols=Name,LocalName
+
+# 3) Transform raw CSV to the project schema (adds role_name)
+python3 scripts/generate_taxonomy_csvs.py \
+  --year 2025 \
+  --raw-pre /var/lib/edgar-data/us-gaap-taxonomies/2025_pre_raw.csv \
+  --out-dir /var/lib/edgar-data/us-gaap-taxonomies
+```
+
+This produces:
+
+- `/var/lib/edgar-data/us-gaap-taxonomies/2025_GAAP_Taxonomy.worksheets.presentation.csv`
+
+Repeat with `--year 2024` and a 2024 entry point to rebuild 2024.
+
 High-level steps used:
 
 1) Download and unzip the FASB taxonomy packages into versioned folders.
@@ -44,8 +83,10 @@ unzip -q /var/lib/edgar-data/us-gaap-taxonomies/us-gaap-2025.zip \
 # 3) Transform to project schema (summary)
 # - Concepts: keep US-GAAP namespace rows; output columns:
 #   prefix, periodType, balance, abstract, name, label, documentation
-# - Presentations: compute depth from left-most non-empty column; output columns:
-#   prefix, name, depth, order, parent (parent uses prefix:name)
+# - Presentations: track the current role header row, compute depth from the
+#   left-most non-empty column, and output columns:
+#   prefix, name, depth, order, parent (parent uses prefix:name), role_name
+#   (role_name is sourced from the role header row in the Arelle CSV output)
 ```
 
 The same process was repeated for 2024. The final CSVs are placed at:

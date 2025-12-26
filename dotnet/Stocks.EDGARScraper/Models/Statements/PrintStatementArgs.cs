@@ -8,6 +8,7 @@ public record PrintStatementArgs(
     DateOnly Date,
     int MaxDepth,
     string Format,
+    string? RoleName,
     bool ListStatements,
     bool ShowUsage
 );

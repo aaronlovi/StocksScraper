@@ -6,4 +6,5 @@ public record PresentationDetailsDTO(
     int Depth,
     int OrderInDepth,
     long ParentConceptId,
-    long ParentPresentationId);
+    long ParentPresentationId,
+    string RoleName);

@@ -15,7 +15,7 @@ namespace Stocks.EDGARScraper.Tests;
 
 public class StatementPrinterTests {
     [Fact]
-    public async Task ListAvailableStatements_ReturnsAbstractConceptsCsv() {
+    public async Task ListAvailableStatements_ReturnsRoleCsv() {
         // Arrange
         var mockDbmService = new Mock<IDbmService>();
         var company = new Company(1UL, 1234UL, "TestSource");
@@ -31,6 +31,13 @@ public class StatementPrinterTests {
         };
         _ = mockDbmService.Setup(s => s.GetTaxonomyConceptsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
+        var presentations = new List<PresentationDetailsDTO>
+        {
+            new(1, 1, 1, 0, 0, 0, "Statement - Balance Sheet"),
+            new(2, 2, 1, 0, 0, 0, "Statement - Liabilities")
+        };
+        _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
 
         var stdout = new StringWriter();
         var stderr = new StringWriter();
@@ -40,6 +47,7 @@ public class StatementPrinterTests {
             concept: "",
             date: DateOnly.FromDateTime(DateTime.Today),
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: true,
             stdout: stdout,
@@ -53,10 +61,9 @@ public class StatementPrinterTests {
 
         // Assert
         Assert.Equal(0, exitCode);
-        Assert.Contains("ConceptName,Label,Documentation", output);
-        Assert.Contains("Assets", output);
-        Assert.Contains("Liabilities", output);
-        Assert.DoesNotContain("Cash", output); // Not abstract
+        Assert.Contains("RoleName,RootConceptName,RootLabel", output);
+        Assert.Contains("Statement - Balance Sheet,Assets", output);
+        Assert.Contains("Statement - Liabilities,Liabilities", output);
         Assert.True(string.IsNullOrWhiteSpace(error));
     }
 
@@ -78,6 +85,7 @@ public class StatementPrinterTests {
             concept: "",
             date: DateOnly.FromDateTime(DateTime.Today),
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: true,
             stdout: stdout,
@@ -94,7 +102,7 @@ public class StatementPrinterTests {
     }
 
     [Fact]
-    public async Task ListAvailableStatements_NoAbstractConcepts_PrintsHeaderOnly() {
+    public async Task ListAvailableStatements_NoRoles_PrintsHeaderOnly() {
         // Arrange
         var mockDbmService = new Mock<IDbmService>();
         var company = new Company(1UL, 1234UL, "TestSource");
@@ -107,6 +115,9 @@ public class StatementPrinterTests {
         };
         _ = mockDbmService.Setup(s => s.GetTaxonomyConceptsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
+        var presentations = new List<PresentationDetailsDTO>();
+        _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
 
         var stdout = new StringWriter();
         var stderr = new StringWriter();
@@ -116,6 +127,7 @@ public class StatementPrinterTests {
             concept: "",
             date: DateOnly.FromDateTime(DateTime.Today),
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: true,
             stdout: stdout,
@@ -129,8 +141,7 @@ public class StatementPrinterTests {
 
         // Assert
         Assert.Equal(0, exitCode);
-        Assert.Contains("ConceptName,Label,Documentation", output);
-        Assert.DoesNotContain("Cash", output);
+        Assert.Contains("RoleName,RootConceptName,RootLabel", output);
         Assert.True(string.IsNullOrWhiteSpace(error));
     }
 
@@ -146,6 +157,7 @@ public class StatementPrinterTests {
             concept: "",
             date: DateOnly.FromDateTime(DateTime.Today),
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: true,
             stdout: stdout,
@@ -175,6 +187,7 @@ public class StatementPrinterTests {
             concept: "",
             date: DateOnly.FromDateTime(DateTime.Today),
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: true,
             stdout: stdout,
@@ -208,6 +221,7 @@ public class StatementPrinterTests {
             concept: "",
             date: DateOnly.FromDateTime(DateTime.Today),
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: true,
             stdout: stdout,
@@ -249,6 +263,7 @@ public class StatementPrinterTests {
             concept: "NonexistentConcept",
             date: DateOnly.FromDateTime(DateTime.Today),
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: false,
             stdout: stdout,
@@ -282,9 +297,9 @@ public class StatementPrinterTests {
             .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
         var presentations = new List<PresentationDetailsDTO>
         {
-            new(1, 1, 0, 0, 0, 0), // Assets (root)
-            new(2, 2, 1, 0, 1, 1), // CurrentAssets child of Assets
-            new(3, 3, 2, 0, 2, 2)  // Cash child of CurrentAssets
+            new(1, 1, 1, 0, 0, 0, "Statement - Test"), // Assets (root)
+            new(2, 2, 2, 0, 1, 1, "Statement - Test"), // CurrentAssets child of Assets
+            new(3, 3, 3, 0, 2, 2, "Statement - Test")  // Cash child of CurrentAssets
         };
         _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
@@ -307,6 +322,7 @@ public class StatementPrinterTests {
             concept: "Assets",
             date: new DateOnly(2019, 3, 1),
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: false,
             stdout: stdout,
@@ -341,9 +357,9 @@ public class StatementPrinterTests {
             .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
         var presentations = new List<PresentationDetailsDTO>
         {
-            new(1, 1, 0, 0, 0, 0),
-            new(2, 2, 1, 0, 1, 1),
-            new(3, 3, 2, 0, 2, 2)
+            new(1, 1, 1, 0, 0, 0, "Statement - Test"),
+            new(2, 2, 2, 0, 1, 1, "Statement - Test"),
+            new(3, 3, 3, 0, 2, 2, "Statement - Test")
         };
         _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
@@ -366,6 +382,7 @@ public class StatementPrinterTests {
             concept: "Assets",
             date: new DateOnly(2019, 3, 1),
             maxDepth: 10,
+            roleName: null,
             format: "html",
             listStatements: false,
             stdout: stdout,
@@ -400,9 +417,9 @@ public class StatementPrinterTests {
             .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
         var presentations = new List<PresentationDetailsDTO>
         {
-            new(1, 1, 0, 0, 0, 0),
-            new(2, 2, 1, 0, 1, 1),
-            new(3, 3, 2, 0, 2, 2)
+            new(1, 1, 1, 0, 0, 0, "Statement - Test"),
+            new(2, 2, 2, 0, 1, 1, "Statement - Test"),
+            new(3, 3, 3, 0, 2, 2, "Statement - Test")
         };
         _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
@@ -425,6 +442,7 @@ public class StatementPrinterTests {
             concept: "Assets",
             date: new DateOnly(2019, 3, 1),
             maxDepth: 10,
+            roleName: null,
             format: "json",
             listStatements: false,
             stdout: stdout,
@@ -458,9 +476,9 @@ public class StatementPrinterTests {
             .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
         var presentations = new List<PresentationDetailsDTO>
         {
-            new(1, 1, 0, 0, 0, 0),
-            new(2, 2, 1, 0, 1, 1),
-            new(3, 3, 2, 0, 2, 2)
+            new(1, 1, 1, 0, 0, 0, "Statement - Test"),
+            new(2, 2, 2, 0, 1, 1, "Statement - Test"),
+            new(3, 3, 3, 0, 2, 2, "Statement - Test")
         };
         _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
@@ -483,6 +501,7 @@ public class StatementPrinterTests {
             concept: "Assets",
             date: new DateOnly(2019, 3, 1),
             maxDepth: 1, // Only root and first child
+            roleName: null,
             format: "csv",
             listStatements: false,
             stdout: stdout,
@@ -514,7 +533,7 @@ public class StatementPrinterTests {
             .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
         var presentations = new List<PresentationDetailsDTO>
         {
-            new(1, 1, 0, 0, 0, 0)
+            new(1, 1, 1, 0, 0, 0, "Statement - Test")
         };
         _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
@@ -533,6 +552,7 @@ public class StatementPrinterTests {
             concept: "Assets",
             date: new DateOnly(2019, 3, 1), // No submission on or before this date
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: false,
             stdout: stdout,
@@ -562,7 +582,7 @@ public class StatementPrinterTests {
             .ReturnsAsync(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(concepts));
         var presentations = new List<PresentationDetailsDTO>
         {
-            new(1, 1, 0, 0, 0, 0)
+            new(1, 1, 1, 0, 0, 0, "Statement - Test")
         };
         _ = mockDbmService.Setup(s => s.GetTaxonomyPresentationsByTaxonomyType(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(presentations));
@@ -580,6 +600,7 @@ public class StatementPrinterTests {
             concept: "Assets",
             date: new DateOnly(2019, 3, 1),
             maxDepth: 10,
+            roleName: null,
             format: "csv",
             listStatements: false,
             stdout: stdout,

@@ -128,7 +128,7 @@ internal partial class Program {
         }
 
         if (parsed.ShowUsage) {
-            Console.Error.WriteLine("USAGE: dotnet run --print-statement --cik <CIK> [--concept <ConceptName>] [--date <YYYY-MM-DD>] [--format <csv|html|json>] [--max-depth <N>] [--list-statements]");
+            Console.Error.WriteLine("USAGE: dotnet run --print-statement --cik <CIK> [--concept <ConceptName>] [--date <YYYY-MM-DD>] [--format <csv|html|json>] [--max-depth <N>] [--role <RoleName>] [--list-statements]");
             return 4;
         }
 
@@ -139,6 +139,7 @@ internal partial class Program {
             parsed.Date,
             parsed.MaxDepth,
             parsed.Format,
+            parsed.RoleName,
             parsed.ListStatements,
             Console.Out,
             Console.Error,
@@ -153,6 +154,7 @@ internal partial class Program {
         DateOnly date = default;
         int maxDepth = 10;
         string format = "csv";
+        string? roleName = null;
         bool listStatements = false;
         bool showUsage = false;
 
@@ -193,6 +195,13 @@ internal partial class Program {
                         showUsage = true;
                     break;
                 }
+                case "--role": {
+                    if (i + 1 < args.Length)
+                        roleName = args[++i];
+                    else
+                        showUsage = true;
+                    break;
+                }
                 case "--list-statements": {
                     listStatements = true;
                     break;
@@ -203,7 +212,7 @@ internal partial class Program {
                 }
             }
         }
-        return new PrintStatementArgs(cik, concept, date, maxDepth, format, listStatements, showUsage);
+        return new PrintStatementArgs(cik, concept, date, maxDepth, format, roleName, listStatements, showUsage);
     }
 
     private static IHost BuildHost<TStartup>(string[] args) where TStartup : class {

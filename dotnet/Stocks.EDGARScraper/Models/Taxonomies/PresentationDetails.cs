@@ -26,6 +26,7 @@ internal record PresentationDetails(
     string ConceptName,
     string Depth,
     string OrderInDepth,
+    string RoleName,
     PresentationDetails? ParentPresentationDetails) {
 
     internal string ParentConceptName => ParentPresentationDetails?.ConceptName ?? string.Empty;
@@ -73,7 +74,8 @@ internal record PresentationDetails(
             depth,
             (int)orderInDepthScaled100,
             parentConceptId,
-            parentPresentationId);
+            parentPresentationId,
+            RoleName);
         return Result<PresentationDetailsDTO>.Success(dto);
     }
 }

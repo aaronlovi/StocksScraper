@@ -27,6 +27,7 @@ public class StatementPrinter {
     private readonly int _maxDepth;
     private readonly string _format;
     private readonly bool _listStatements;
+    private readonly string? _roleName;
     private readonly CancellationToken _ct;
 
     public StatementPrinter(
@@ -36,6 +37,7 @@ public class StatementPrinter {
         DateOnly date,
         int maxDepth,
         string format,
+        string? roleName,
         bool listStatements,
         TextWriter? stdout = null,
         TextWriter? stderr = null,
@@ -46,6 +48,7 @@ public class StatementPrinter {
         _date = date;
         _maxDepth = maxDepth;
         _format = format;
+        _roleName = roleName;
         _listStatements = listStatements;
         _stdout = stdout ?? Console.Out;
         _stderr = stderr ?? Console.Error;
@@ -89,57 +92,93 @@ public class StatementPrinter {
         }
         IReadOnlyCollection<ConceptDetailsDTO> concepts = conceptsResult.Value;
 
-        // 3. Load presentation hierarchy for the taxonomy (only if not listing statements)
-        ConceptDetailsDTO? rootConcept = null;
-        Dictionary<long, List<PresentationDetailsDTO>>? parentToChildren = null;
-        if (!_listStatements) {
-            Result<IReadOnlyCollection<PresentationDetailsDTO>> presentationsResult = await _dbmService.GetTaxonomyPresentationsByTaxonomyType(UsGaap2025TaxonomyTypeId, _ct);
-            if (presentationsResult.IsFailure || presentationsResult.Value is null) {
-                await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy presentation hierarchy for US-GAAP 2025.");
-                return 2;
-            }
-            IReadOnlyCollection<PresentationDetailsDTO> presentations = presentationsResult.Value;
-            parentToChildren = BuildParentToChildrenMap(presentations);
-
-            // Find root concept by name (case-insensitive) or ID
-            foreach (ConceptDetailsDTO c in concepts) {
-                if (c.Name.EqualsOrdinalIgnoreCase(_concept)) {
-                    rootConcept = c;
-                    break;
-                }
-                if (long.TryParse(_concept, out long conceptId) && c.ConceptId == conceptId) {
-                    rootConcept = c;
-                    break;
-                }
-            }
-            if (rootConcept is null) {
-                await _stderr.WriteLineAsync($"ERROR: Concept '{_concept}' not found in taxonomy.");
-                return 2;
-            }
+        // 3. Load presentation hierarchy for role-scoped traversal
+        Result<IReadOnlyCollection<PresentationDetailsDTO>> presentationsResult =
+            await _dbmService.GetTaxonomyPresentationsByTaxonomyType(UsGaap2025TaxonomyTypeId, _ct);
+        if (presentationsResult.IsFailure || presentationsResult.Value is null) {
+            await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy presentation hierarchy for US-GAAP 2025.");
+            return 2;
         }
+        IReadOnlyCollection<PresentationDetailsDTO> presentations = presentationsResult.Value;
 
         if (_listStatements) {
-            // 4. Filter for abstract concepts (top-level statements)
-            var abstractConcepts = new List<ConceptDetailsDTO>();
-            foreach (ConceptDetailsDTO c in concepts) {
-                if (c.IsAbstract) {
-                    abstractConcepts.Add(c);
-                }
+            var roleRoots = new Dictionary<string, long>();
+            foreach (PresentationDetailsDTO p in presentations) {
+                if (p.Depth != 1)
+                    continue;
+                if (string.IsNullOrWhiteSpace(p.RoleName))
+                    continue;
+                if (!roleRoots.ContainsKey(p.RoleName))
+                    roleRoots[p.RoleName] = p.ConceptId;
             }
-            abstractConcepts.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
-            // Print header always
-            await _stdout.WriteLineAsync("ConceptName,Label,Documentation");
-            if (abstractConcepts.Count == 0) {
-                // No error, just header
+
+            await _stdout.WriteLineAsync("RoleName,RootConceptName,RootLabel");
+            if (roleRoots.Count == 0)
                 return 0;
-            }
-            // 5. Output as CSV (for now)
-            foreach (ConceptDetailsDTO c in abstractConcepts) {
-                string doc = c.Documentation != null ? c.Documentation.Replace('\n', ' ').Replace('\r', ' ') : string.Empty;
-                await _stdout.WriteLineAsync($"{c.Name},\"{c.Label}\",\"{doc}\"");
+            foreach (var kvp in roleRoots) {
+                ConceptDetailsDTO? root = null;
+                foreach (ConceptDetailsDTO c in concepts) {
+                    if (c.ConceptId == kvp.Value) {
+                        root = c;
+                        break;
+                    }
+                }
+                if (root is null) {
+                    await _stdout.WriteLineAsync($"{kvp.Key},,");
+                    continue;
+                }
+                await _stdout.WriteLineAsync($"{kvp.Key},{root.Name},\"{root.Label}\"");
             }
             return 0;
         }
+
+        ConceptDetailsDTO? rootConcept = null;
+        foreach (ConceptDetailsDTO c in concepts) {
+            if (c.Name.EqualsOrdinalIgnoreCase(_concept)) {
+                rootConcept = c;
+                break;
+            }
+            if (long.TryParse(_concept, out long conceptId) && c.ConceptId == conceptId) {
+                rootConcept = c;
+                break;
+            }
+        }
+        if (rootConcept is null) {
+            await _stderr.WriteLineAsync($"ERROR: Concept '{_concept}' not found in taxonomy.");
+            return 2;
+        }
+
+        string? roleNameToUse = _roleName;
+        if (string.IsNullOrWhiteSpace(roleNameToUse)) {
+            var matchingRoles = new List<string>();
+            foreach (PresentationDetailsDTO p in presentations) {
+                if (p.ConceptId != rootConcept.ConceptId)
+                    continue;
+                if (string.IsNullOrWhiteSpace(p.RoleName))
+                    continue;
+                bool alreadyAdded = false;
+                foreach (string role in matchingRoles) {
+                    if (role.EqualsOrdinalIgnoreCase(p.RoleName)) {
+                        alreadyAdded = true;
+                        break;
+                    }
+                }
+                if (!alreadyAdded)
+                    matchingRoles.Add(p.RoleName);
+            }
+            if (matchingRoles.Count == 1) {
+                roleNameToUse = matchingRoles[0];
+            } else if (matchingRoles.Count == 0) {
+                await _stderr.WriteLineAsync($"ERROR: No presentation role found for concept '{rootConcept.Name}'.");
+                return 2;
+            } else {
+                await _stderr.WriteLineAsync($"ERROR: Multiple presentation roles found for concept '{rootConcept.Name}'. Please specify --role.");
+                return 2;
+            }
+        }
+
+        Dictionary<long, List<PresentationDetailsDTO>> parentToChildren =
+            BuildParentToChildrenMap(presentations, roleNameToUse!);
 
         // 4. Find submission for the specified date
         Result<IReadOnlyCollection<Submission>> submissionsResult = await _dbmService.GetSubmissions(_ct);
@@ -330,9 +369,13 @@ public class StatementPrinter {
     /// <summary>
     /// Builds a map from ParentConceptId to a list of child PresentationDetailsDTOs for efficient hierarchy traversal.
     /// </summary>
-    private static Dictionary<long, List<PresentationDetailsDTO>> BuildParentToChildrenMap(IEnumerable<PresentationDetailsDTO> presentations) {
+    private static Dictionary<long, List<PresentationDetailsDTO>> BuildParentToChildrenMap(
+        IEnumerable<PresentationDetailsDTO> presentations,
+        string roleName) {
         var parentToChildren = new Dictionary<long, List<PresentationDetailsDTO>>();
         foreach (PresentationDetailsDTO pres in presentations) {
+            if (!string.Equals(pres.RoleName, roleName, StringComparison.OrdinalIgnoreCase))
+                continue;
             if (!parentToChildren.TryGetValue(pres.ParentConceptId, out List<PresentationDetailsDTO>? children)) {
                 children = [];
                 parentToChildren[pres.ParentConceptId] = children;

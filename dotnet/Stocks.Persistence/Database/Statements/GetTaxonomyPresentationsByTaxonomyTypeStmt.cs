@@ -6,7 +6,7 @@ namespace Stocks.Persistence.Database.Statements;
 
 internal class GetTaxonomyPresentationsByTaxonomyTypeStmt : QueryDbStmtBase {
     private const string Sql = @"
-select p.taxonomy_presentation_id, p.taxonomy_concept_id, p.depth, p.order_in_depth, p.parent_concept_id, p.parent_presentation_id
+select p.taxonomy_presentation_id, p.taxonomy_concept_id, p.depth, p.order_in_depth, p.parent_concept_id, p.parent_presentation_id, p.role_name
 from taxonomy_presentation p
 join taxonomy_concepts c on c.taxonomy_concept_id = p.taxonomy_concept_id
 where c.taxonomy_type_id = @taxonomy_type_id";
@@ -20,6 +20,7 @@ where c.taxonomy_type_id = @taxonomy_type_id";
     private static int _orderInDepthIndex = -1;
     private static int _parentConceptIdIndex = -1;
     private static int _parentPresentationIdIndex = -1;
+    private static int _roleNameIndex = -1;
 
     public GetTaxonomyPresentationsByTaxonomyTypeStmt(int taxonomyTypeId)
         : base(Sql, nameof(GetTaxonomyPresentationsByTaxonomyTypeStmt)) {
@@ -38,6 +39,7 @@ where c.taxonomy_type_id = @taxonomy_type_id";
         _orderInDepthIndex = reader.GetOrdinal("order_in_depth");
         _parentConceptIdIndex = reader.GetOrdinal("parent_concept_id");
         _parentPresentationIdIndex = reader.GetOrdinal("parent_presentation_id");
+        _roleNameIndex = reader.GetOrdinal("role_name");
     }
     protected override void ClearResults() => _presentations.Clear();
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters()
@@ -49,7 +51,8 @@ where c.taxonomy_type_id = @taxonomy_type_id";
             reader.GetInt32(_depthIndex),
             reader.GetInt32(_orderInDepthIndex),
             reader.GetInt64(_parentConceptIdIndex),
-            reader.GetInt64(_parentPresentationIdIndex)
+            reader.GetInt64(_parentPresentationIdIndex),
+            reader.GetString(_roleNameIndex)
         );
         _presentations.Add(dto);
         return true;

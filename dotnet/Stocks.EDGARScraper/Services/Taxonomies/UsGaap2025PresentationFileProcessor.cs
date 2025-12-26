@@ -84,6 +84,7 @@ public class UsGaap2025PresentationFileProcessor {
             bool hasDepth = false;
             bool hasOrder = false;
             bool hasParent = false;
+            bool hasRoleName = false;
             foreach (string h in header) {
                 if (h.Equals("prefix", StringComparison.OrdinalIgnoreCase))
                     hasPrefix = true;
@@ -95,15 +96,18 @@ public class UsGaap2025PresentationFileProcessor {
                     hasOrder = true;
                 else if (h.Equals("parent", StringComparison.OrdinalIgnoreCase))
                     hasParent = true;
+                else if (h.Equals("role_name", StringComparison.OrdinalIgnoreCase))
+                    hasRoleName = true;
             }
 
-            if (!hasPrefix || !hasName || !hasDepth || !hasOrder || !hasParent) {
+            if (!hasPrefix || !hasName || !hasDepth || !hasOrder || !hasParent || !hasRoleName) {
                 return Result.Failure(
                     ErrorCodes.ValidationError,
-                    "Unexpected presentation CSV format. Expected columns: prefix,name,depth,order,parent.");
+                    "Unexpected presentation CSV format. Expected columns: prefix,name,depth,order,parent,role_name.");
             }
 
             var parentChain = new List<PresentationDetails>();
+            string currentRoleName = string.Empty;
 
             while (await csv.ReadAsync()) {
                 ++rowNumber;
@@ -113,9 +117,15 @@ public class UsGaap2025PresentationFileProcessor {
                 string depthValue = csv.GetField("depth") ?? string.Empty;
                 string orderValue = csv.GetField("order") ?? string.Empty;
                 string parentValue = csv.GetField("parent") ?? string.Empty;
+                string roleName = csv.GetField("role_name") ?? string.Empty;
 
                 if (string.IsNullOrWhiteSpace(name))
                     continue;
+
+                if (!roleName.EqualsOrdinalIgnoreCase(currentRoleName)) {
+                    parentChain.Clear();
+                    currentRoleName = roleName;
+                }
 
                 if (!int.TryParse(depthValue, out int currentDepth))
                     return Result.Failure(ErrorCodes.ValidationError, $"Invalid depth '{depthValue}' for concept '{name}' at row {rowNumber}", name, $"{rowNumber}");
@@ -145,7 +155,7 @@ public class UsGaap2025PresentationFileProcessor {
                         $"{rowNumber}");
                 }
 
-                PresentationDetails currentNode = CreateRawPresentationDetails(prefix, name, depthValue, orderValue, parentNode);
+                PresentationDetails currentNode = CreateRawPresentationDetails(prefix, name, depthValue, orderValue, roleName, parentNode);
                 numNodesToRecord += currentNode.IsUsGaapPresentationDetail ? 1 : 0;
                 _rawPresentationDetails.Add(currentNode);
 
@@ -166,7 +176,7 @@ public class UsGaap2025PresentationFileProcessor {
         return Result.Success;
     }
 
-    private static PresentationDetails CreateRawPresentationDetails(string prefix, string name, string depth, string order, PresentationDetails? parent) {
+    private static PresentationDetails CreateRawPresentationDetails(string prefix, string name, string depth, string order, string roleName, PresentationDetails? parent) {
         bool isUsGaap = prefix == "us-gaap" && (parent?.IsUsGaapPresentationDetail ?? true);
         return new PresentationDetails(
             isUsGaap,
@@ -175,6 +185,7 @@ public class UsGaap2025PresentationFileProcessor {
             name,
             depth,
             order,
+            roleName,
             parent);
     }
 

@@ -71,65 +71,91 @@ public class UsGaap2025PresentationFileProcessor {
         try {
             using var reader = new StreamReader(_csvFilePath);
             using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-
-            PresentationDetails? parentNode = null;
-            int previousDepth = 0;
-            var parentsStack = new Stack<PresentationDetails>();
             int rowNumber = 0;
 
-            await foreach (dynamic r in csv.GetRecordsAsync<dynamic>(_ct)) {
+            if (!await csv.ReadAsync())
+                return Result.Failure(ErrorCodes.ValidationError, "Presentation CSV is empty.");
+            _ = csv.ReadHeader();
+            ++rowNumber;
+
+            string[] header = csv.HeaderRecord ?? [];
+            bool hasPrefix = false;
+            bool hasName = false;
+            bool hasDepth = false;
+            bool hasOrder = false;
+            bool hasParent = false;
+            foreach (string h in header) {
+                if (h.Equals("prefix", StringComparison.OrdinalIgnoreCase))
+                    hasPrefix = true;
+                else if (h.Equals("name", StringComparison.OrdinalIgnoreCase))
+                    hasName = true;
+                else if (h.Equals("depth", StringComparison.OrdinalIgnoreCase))
+                    hasDepth = true;
+                else if (h.Equals("order", StringComparison.OrdinalIgnoreCase))
+                    hasOrder = true;
+                else if (h.Equals("parent", StringComparison.OrdinalIgnoreCase))
+                    hasParent = true;
+            }
+
+            if (!hasPrefix || !hasName || !hasDepth || !hasOrder || !hasParent) {
+                return Result.Failure(
+                    ErrorCodes.ValidationError,
+                    "Unexpected presentation CSV format. Expected columns: prefix,name,depth,order,parent.");
+            }
+
+            var parentChain = new List<PresentationDetails>();
+
+            while (await csv.ReadAsync()) {
                 ++rowNumber;
 
-                if (!int.TryParse(r.depth, out int currentDepth))
-                    return Result.Failure(ErrorCodes.ValidationError, $"Invalid depth '{r.depth}' for concept '{r.name}' at row {rowNumber}", r.name, $"{rowNumber}");
+                string prefix = csv.GetField("prefix") ?? string.Empty;
+                string name = csv.GetField("name") ?? string.Empty;
+                string depthValue = csv.GetField("depth") ?? string.Empty;
+                string orderValue = csv.GetField("order") ?? string.Empty;
+                string parentValue = csv.GetField("parent") ?? string.Empty;
 
-                string parentName = r.parent.Trim();
-                if (!string.IsNullOrEmpty(parentName)) {
-                    int colonIndex = parentName.IndexOf(':') + 1;
-                    parentName = parentName[colonIndex..].Trim();
+                if (string.IsNullOrWhiteSpace(name))
+                    continue;
+
+                if (!int.TryParse(depthValue, out int currentDepth))
+                    return Result.Failure(ErrorCodes.ValidationError, $"Invalid depth '{depthValue}' for concept '{name}' at row {rowNumber}", name, $"{rowNumber}");
+
+                if (currentDepth == 0)
+                    parentChain.Clear();
+
+                int depthIndex = currentDepth > 0 ? currentDepth - 1 : 0;
+                if (currentDepth > 0 && parentChain.Count < depthIndex) {
+                    return Result.Failure(ErrorCodes.ValidationError, $"Missing parent for concept '{name}' at row {rowNumber}.", name, $"{rowNumber}");
                 }
 
-                if (currentDepth == 0) {
-                    parentsStack.Clear();
-
-                    parentNode = CreateRawPresentationDetails(r, null);
-                    numNodesToRecord += parentNode.IsUsGaapPresentationDetail ? 1 : 0;
-
-                    _rawPresentationDetails.Add(parentNode);
-                    previousDepth = 0;
-                } else if (currentDepth == previousDepth + 1) {
-                    parentsStack.Push(parentNode!);
-
-                    PresentationDetails currentNode = CreateRawPresentationDetails(r, parentNode);
-                    numNodesToRecord += currentNode.IsUsGaapPresentationDetail ? 1 : 0;
-
-                    _rawPresentationDetails.Add(currentNode);
-                    parentNode = currentNode;
-                    previousDepth = currentDepth;
-                } else if (currentDepth < previousDepth) {
-                    int numToPop = previousDepth - currentDepth;
-                    if (numToPop > parentsStack.Count)
-                        return Result.Failure(ErrorCodes.ValidationError, $"Invalid depth '{r.depth}' for concept '{r.name}' at row {rowNumber}.", r.name, $"{rowNumber}");
-                    for (int i = 0; i < numToPop; ++i)
-                        _ = parentsStack.Pop();
-                    parentNode = parentsStack.Peek();
-                    if (parentNode.ConceptName != parentName)
-                        return Result.Failure(ErrorCodes.ValidationError, $"Invalid parent '{parentName}' for concept '{r.name}' at row {rowNumber}.", r.name, $"{rowNumber}");
-
-                    PresentationDetails currentNode = CreateRawPresentationDetails(r, parentNode);
-                    numNodesToRecord += currentNode.IsUsGaapPresentationDetail ? 1 : 0;
-
-                    _rawPresentationDetails.Add(currentNode);
-                    parentNode = currentNode;
-                    previousDepth = currentDepth;
-                } else if (currentDepth == previousDepth) {
-                    PresentationDetails currentNode = CreateRawPresentationDetails(r, parentsStack.Peek());
-                    numNodesToRecord += currentNode.IsUsGaapPresentationDetail ? 1 : 0;
-
-                    _rawPresentationDetails.Add(currentNode);
-                    parentNode = currentNode;
-                    previousDepth = currentDepth;
+                PresentationDetails? parentNode = null;
+                if (currentDepth > 1 && parentChain.Count >= depthIndex)
+                    parentNode = parentChain[depthIndex - 1];
+                string expectedParentName = string.Empty;
+                if (!string.IsNullOrWhiteSpace(parentValue)) {
+                    int colonIndex = parentValue.IndexOf(':');
+                    expectedParentName = colonIndex >= 0 ? parentValue[(colonIndex + 1)..].Trim() : parentValue.Trim();
                 }
+
+                if (!string.IsNullOrEmpty(expectedParentName) && parentNode is not null && parentNode.ConceptName != expectedParentName) {
+                    return Result.Failure(
+                        ErrorCodes.ValidationError,
+                        $"Invalid parent '{expectedParentName}' for concept '{name}' at row {rowNumber}.",
+                        name,
+                        $"{rowNumber}");
+                }
+
+                PresentationDetails currentNode = CreateRawPresentationDetails(prefix, name, depthValue, orderValue, parentNode);
+                numNodesToRecord += currentNode.IsUsGaapPresentationDetail ? 1 : 0;
+                _rawPresentationDetails.Add(currentNode);
+
+                if (depthIndex == parentChain.Count) {
+                    parentChain.Add(currentNode);
+                } else if (depthIndex < parentChain.Count) {
+                    parentChain[depthIndex] = currentNode;
+                }
+                if (parentChain.Count > depthIndex + 1)
+                    parentChain.RemoveRange(depthIndex + 1, parentChain.Count - depthIndex - 1);
             }
         } catch (Exception ex) {
             return Result.Failure(ErrorCodes.ParsingError, "ParseTaxonomyPresentationFile - Error: " + ex.Message);
@@ -140,15 +166,15 @@ public class UsGaap2025PresentationFileProcessor {
         return Result.Success;
     }
 
-    private static PresentationDetails CreateRawPresentationDetails(dynamic r, PresentationDetails? parent) {
-        bool isUsGaap = r.prefix == "us-gaap" && (parent?.IsUsGaapPresentationDetail ?? true);
+    private static PresentationDetails CreateRawPresentationDetails(string prefix, string name, string depth, string order, PresentationDetails? parent) {
+        bool isUsGaap = prefix == "us-gaap" && (parent?.IsUsGaapPresentationDetail ?? true);
         return new PresentationDetails(
             isUsGaap,
             TaxonomyTypes.US_GAAP_2025,
-            r.prefix,
-            r.name,
-            r.depth,
-            r.order,
+            prefix,
+            name,
+            depth,
+            order,
             parent);
     }
 

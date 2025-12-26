@@ -5,11 +5,11 @@ using Stocks.Persistence.Database.DTO.Taxonomies;
 namespace Stocks.Persistence.Database.Statements;
 
 internal class GetTaxonomyPresentationsByTaxonomyTypeStmt : QueryDbStmtBase {
-    private const string Sql = @"""
-select presentation_id, concept_id, depth, order_in_depth, parent_concept_id, parent_presentation_id
-from taxonomy_presentations
-where taxonomy_type_id = @taxonomy_type_id
-""";
+    private const string Sql = @"
+select p.taxonomy_presentation_id, p.taxonomy_concept_id, p.depth, p.order_in_depth, p.parent_concept_id, p.parent_presentation_id
+from taxonomy_presentation p
+join taxonomy_concepts c on c.taxonomy_concept_id = p.taxonomy_concept_id
+where c.taxonomy_type_id = @taxonomy_type_id";
 
     private readonly int _taxonomyTypeId;
     private readonly List<PresentationDetailsDTO> _presentations = [];
@@ -32,8 +32,8 @@ where taxonomy_type_id = @taxonomy_type_id
         base.BeforeRowProcessing(reader);
         if (_presentationIdIndex != -1)
             return;
-        _presentationIdIndex = reader.GetOrdinal("presentation_id");
-        _conceptIdIndex = reader.GetOrdinal("concept_id");
+        _presentationIdIndex = reader.GetOrdinal("taxonomy_presentation_id");
+        _conceptIdIndex = reader.GetOrdinal("taxonomy_concept_id");
         _depthIndex = reader.GetOrdinal("depth");
         _orderInDepthIndex = reader.GetOrdinal("order_in_depth");
         _parentConceptIdIndex = reader.GetOrdinal("parent_concept_id");

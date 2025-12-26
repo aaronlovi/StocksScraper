@@ -503,6 +503,8 @@ internal partial class Program {
             await _dbm!.GetTaxonomyConceptsByTaxonomyType((int)TaxonomyTypes.US_GAAP_2025, default);
         if (taxonomyConceptsResult.IsSuccess) {
             foreach (ConceptDetailsDTO concept in taxonomyConceptsResult.Value!) {
+                if (concept.PeriodTypeId == (int)TaxonomyPeriodTypes.None)
+                    continue; // Skip non-item concepts (e.g., domain/axis/member) that have no period type
                 context.TaxonomyConceptIdsByFactName[concept.Name.Trim()] = concept.ConceptId;
             }
         } else {

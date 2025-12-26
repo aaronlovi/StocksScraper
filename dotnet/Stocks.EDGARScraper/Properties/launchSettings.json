@@ -7,9 +7,10 @@
             //"commandLineArgs": "--parse-bulk-edgar-submissions-list"
             //"commandLineArgs": "--parse-bulk-xbrl-archive"
             //"commandLineArgs": "--run-all"
-            "commandLineArgs": "--load-taxonomy-concepts"
+            //"commandLineArgs": "--load-taxonomy-concepts"
             //"commandLineArgs": "--load-taxonomy-presentations"
             //"commandLineArgs": "--print-statement --cik 320193 --list-statements"
+            "commandLineArgs": "--print-statement --cik 320193 --concept \"StatementOfFinancialPositionAbstract\" --date 2019-03-01 --format html"
         }
     }
 }

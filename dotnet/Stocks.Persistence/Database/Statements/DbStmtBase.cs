@@ -57,6 +57,7 @@ internal abstract class QueryDbStmtBase(string _sql, string _className) : DbStmt
 
         try {
             using var cmd = new NpgsqlCommand(_sql, conn);
+            cmd.CommandTimeout = CommandTimeoutSeconds;
             foreach (NpgsqlParameter boundParam in GetBoundParameters())
                 _ = cmd.Parameters.Add(boundParam);
             await cmd.PrepareAsync(ct);
@@ -110,6 +111,8 @@ internal abstract class QueryDbStmtBase(string _sql, string _className) : DbStmt
     protected virtual void BeforeRowProcessing(NpgsqlDataReader reader) { }
 
     protected virtual void AfterLastRowProcessing() { }
+
+    protected virtual int CommandTimeoutSeconds => 30;
 
     /// <summary>
     /// Processes the current row in the query result set.

@@ -6,11 +6,24 @@ using Stocks.DataModels;
 namespace Stocks.Persistence.Database.Statements;
 
 internal class GetDataPointsForSubmissionStmt : QueryDbStmtBase {
-    private const string Sql = @"""
-select data_point_id, company_id, fact_name, filing_reference, start_date, end_date, value, unit_id, unit_name, filed_date, submission_id, taxonomy_concept_id
-from data_points
-where company_id = @company_id and submission_id = @submission_id
-""";
+    private const string Sql = @"
+select
+    dp.data_point_id,
+    dp.company_id,
+    dp.fact_name,
+    s.filing_reference,
+    dp.start_date,
+    dp.end_date,
+    dp.value,
+    dp.unit_id,
+    u.data_point_unit_name as unit_name,
+    dp.filed_date,
+    dp.submission_id,
+    dp.taxonomy_concept_id
+from data_points dp
+join submissions s on s.submission_id = dp.submission_id
+join data_point_units u on u.data_point_unit_id = dp.unit_id
+where dp.company_id = @company_id and dp.submission_id = @submission_id";
 
     private readonly ulong _companyId;
     private readonly ulong _submissionId;
@@ -56,7 +69,10 @@ where company_id = @company_id and submission_id = @submission_id
     }
     protected override void ClearResults() => _dataPoints.Clear();
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() =>
-        [new NpgsqlParameter<ulong>("company_id", _companyId), new NpgsqlParameter<ulong>("submission_id", _submissionId)];
+        [
+            new NpgsqlParameter<long>("company_id", unchecked((long)_companyId)),
+            new NpgsqlParameter<long>("submission_id", unchecked((long)_submissionId))
+        ];
     protected override bool ProcessCurrentRow(NpgsqlDataReader reader) {
         var datePair = new DatePair(
             DateOnly.FromDateTime(reader.GetDateTime(_startDateIndex)),

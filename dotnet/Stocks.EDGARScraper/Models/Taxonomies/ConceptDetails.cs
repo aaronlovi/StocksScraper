@@ -55,6 +55,7 @@ internal record ConceptDetails(
         return PeriodType.Trim() switch {
             "duration" => Result<TaxonomyPeriodTypes>.Success(TaxonomyPeriodTypes.Duration),
             "instant" => Result<TaxonomyPeriodTypes>.Success(TaxonomyPeriodTypes.Instant),
+            "" => Result<TaxonomyPeriodTypes>.Success(TaxonomyPeriodTypes.None),
             _ => Result<TaxonomyPeriodTypes>.Failure(ErrorCodes.ValidationError, $"Invalid period type: {PeriodType}", PeriodType)
         };
     }

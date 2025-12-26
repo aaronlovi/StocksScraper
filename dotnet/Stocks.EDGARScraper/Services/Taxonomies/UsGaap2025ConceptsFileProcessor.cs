@@ -74,7 +74,8 @@ public class UsGaap2025ConceptsFileProcessor {
             foreach (ConceptDetails c in _rawConceptDetails) {
                 long id = (long)await _dbm.GetNextId64(_ct);
                 Result<ConceptDetailsDTO> toDtoResult = c.ToConceptDetailsDTO(id);
-                if (toDtoResult.IsFailure)                     return Result.Failure(toDtoResult);
+                if (toDtoResult.IsFailure)
+                    return Result.Failure(toDtoResult);
 
                 _conceptDetailsDtos.Add(toDtoResult.Value!);
             }

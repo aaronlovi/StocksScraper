@@ -2,7 +2,7 @@
 
 PROJECT="./Stocks.EDGARScraper.csproj"
 WORKING_DIR="./Stocks.EDGARScraper"
-OUTPUT_FILE="/tmp/1.html"
+OUTPUT_FILE="/mnt/c/temp/1.html"
 CIK="320193"
 CONCEPT="StatementOfFinancialPositionAbstract"
 DATE="2025-03-29"

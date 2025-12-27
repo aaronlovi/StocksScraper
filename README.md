@@ -45,13 +45,19 @@ python3 -m venv .venv-taxonomy
 . .venv-taxonomy/bin/activate
 pip install arelle-release
 
-# 2) Export raw presentation CSV from the entry point
+# 2) Export raw concept + presentation CSVs from the entry point
 arelleCmdLine \
   -f /var/lib/edgar-data/us-gaap-taxonomies/2025/us-gaap-2025/entire/us-gaap-entryPoint-all-2025.xsd \
+  --csvConcepts /var/lib/edgar-data/us-gaap-taxonomies/2025_concepts_raw.csv \
   --csvPre /var/lib/edgar-data/us-gaap-taxonomies/2025_pre_raw.csv \
   --relationshipCols=Name,LocalName
 
-# 3) Transform raw CSV to the project schema (adds role_name)
+# 3) Transform raw CSVs to the project schema
+python3 scripts/generate_taxonomy_concepts_csv.py \
+  --year 2025 \
+  --raw-concepts /var/lib/edgar-data/us-gaap-taxonomies/2025_concepts_raw.csv \
+  --out-dir /var/lib/edgar-data/us-gaap-taxonomies
+
 python3 scripts/generate_taxonomy_csvs.py \
   --year 2025 \
   --raw-pre /var/lib/edgar-data/us-gaap-taxonomies/2025_pre_raw.csv \
@@ -60,6 +66,7 @@ python3 scripts/generate_taxonomy_csvs.py \
 
 This produces:
 
+- `/var/lib/edgar-data/us-gaap-taxonomies/2025_GAAP_Taxonomy.worksheets.concepts.csv`
 - `/var/lib/edgar-data/us-gaap-taxonomies/2025_GAAP_Taxonomy.worksheets.presentation.csv`
 
 Repeat with `--year 2024` and a 2024 entry point to rebuild 2024.
@@ -87,13 +94,27 @@ unzip -q /var/lib/edgar-data/us-gaap-taxonomies/us-gaap-2025.zip \
   --csvPre /var/lib/edgar-data/us-gaap-taxonomies/2025_pre_raw.csv \
   --relationshipCols=Name,LocalName
 
-# 3) Transform to project schema (summary)
+# 3) Transform to project schema
+python3 scripts/generate_taxonomy_concepts_csv.py \
+  --year 2025 \
+  --raw-concepts /var/lib/edgar-data/us-gaap-taxonomies/2025_concepts_raw.csv \
+  --out-dir /var/lib/edgar-data/us-gaap-taxonomies
+
+python3 scripts/generate_taxonomy_csvs.py \
+  --year 2025 \
+  --raw-pre /var/lib/edgar-data/us-gaap-taxonomies/2025_pre_raw.csv \
+  --out-dir /var/lib/edgar-data/us-gaap-taxonomies
+
+# Output schemas
 # - Concepts: keep US-GAAP namespace rows; output columns:
 #   prefix, periodType, balance, abstract, name, label, documentation
 # - Presentations: track the current role header row, compute depth from the
 #   left-most non-empty column, and output columns:
 #   prefix, name, depth, order, parent (parent uses prefix:name), role_name
 #   (role_name is sourced from the role header row in the Arelle CSV output)
+# - Arelle concept CSV headers can include soft hyphens (e.g., "Abs­tract"),
+#   and do not always include a Prefix column. The concepts script normalizes
+#   headers and uses Namespace to identify US-GAAP rows.
 ```
 
 The same process was repeated for 2024. The final CSVs are placed at:

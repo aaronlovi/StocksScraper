@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -245,14 +246,28 @@ public class StatementPrinter {
         List<HierarchyNode> hierarchy = hierarchyResult.Value;
 
         // 7. Output in the requested format
-        await FormatOutput(hierarchy, conceptMap, dataPointMap);
+        var childrenMap = new Dictionary<long, List<HierarchyNode>>();
+        var rootNodes = new List<HierarchyNode>();
+        BuildChildrenMap(hierarchy, childrenMap, rootNodes);
+        var includedConceptIds = new HashSet<long>();
+        foreach (HierarchyNode rootNode in rootNodes)
+            _ = HasValueOrChildValue(rootNode.ConceptId, childrenMap, dataPointMap, includedConceptIds);
+        await FormatOutput(hierarchy, conceptMap, dataPointMap, childrenMap, rootNodes, includedConceptIds);
         return 0;
     }
 
-    private async Task FormatOutput(List<HierarchyNode> hierarchy, Dictionary<long, ConceptDetailsDTO> conceptMap, Dictionary<long, DataPoint> dataPointMap) {
+    private async Task FormatOutput(
+        List<HierarchyNode> hierarchy,
+        Dictionary<long, ConceptDetailsDTO> conceptMap,
+        Dictionary<long, DataPoint> dataPointMap,
+        Dictionary<long, List<HierarchyNode>> childrenMap,
+        List<HierarchyNode> rootNodes,
+        HashSet<long> includedConceptIds) {
         if (_format.Equals("csv", StringComparison.OrdinalIgnoreCase)) {
             await _stdout.WriteLineAsync("ConceptName,Label,Value,Depth,ParentConceptName");
             foreach (HierarchyNode node in hierarchy) {
+                if (!includedConceptIds.Contains(node.ConceptId))
+                    continue;
                 string value = string.Empty;
                 if (dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp))
                     value = dp.Value.ToString();
@@ -263,42 +278,89 @@ public class StatementPrinter {
             }
         } else if (_format.Equals("html", StringComparison.OrdinalIgnoreCase)) {
             await _stdout.WriteLineAsync("<ul>");
-            await WriteHtmlTree(hierarchy, conceptMap, dataPointMap, null, 0);
+            await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, null);
             await _stdout.WriteLineAsync("</ul>");
         } else if (_format.Equals("json", StringComparison.OrdinalIgnoreCase)) {
-            await _stdout.WriteLineAsync(System.Text.Json.JsonSerializer.Serialize(BuildJsonTree(hierarchy, conceptMap, dataPointMap, null)));
+            await _stdout.WriteLineAsync(System.Text.Json.JsonSerializer.Serialize(BuildJsonTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, null)));
         } else {
             await _stderr.WriteLineAsync($"ERROR: Unknown format '{_format}'.");
         }
     }
 
-    private async Task WriteHtmlTree(List<HierarchyNode> nodes, Dictionary<long, ConceptDetailsDTO> conceptMap, Dictionary<long, DataPoint> dataPointMap, long? parentId, int depth) {
-        foreach (HierarchyNode node in nodes) {
-            if (node.ParentConceptId != parentId)
+    private async Task WriteHtmlTree(
+        Dictionary<long, List<HierarchyNode>> childrenMap,
+        List<HierarchyNode> rootNodes,
+        HashSet<long> includedConceptIds,
+        Dictionary<long, DataPoint> dataPointMap,
+        long? parentId) {
+        List<HierarchyNode> nodesToRender = rootNodes;
+        if (parentId.HasValue) {
+            if (!childrenMap.TryGetValue(parentId.Value, out List<HierarchyNode>? children))
+                return;
+            nodesToRender = children;
+        }
+        foreach (HierarchyNode node in nodesToRender) {
+            if (!includedConceptIds.Contains(node.ConceptId))
                 continue;
-            string value = dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp) ? dp.Value.ToString() : string.Empty;
-            await _stdout.WriteLineAsync($"<li>{node.Name}: {value}");
-            bool hasChildren = nodes.Exists(n => n.ParentConceptId == node.ConceptId);
-            if (hasChildren) {
-                await _stdout.WriteLineAsync("<ul>");
-                await WriteHtmlTree(nodes, conceptMap, dataPointMap, node.ConceptId, depth + 1);
-                await _stdout.WriteLineAsync("</ul>");
+            string value = dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp)
+                ? FormatValueWithUnit(dp)
+                : string.Empty;
+            string formattedValue = string.IsNullOrEmpty(value)
+                ? string.Empty
+                : $"<span style=\"font-variant-numeric: tabular-nums;\">{value}</span>";
+            await _stdout.WriteLineAsync($"<li>{node.Name}: {formattedValue}");
+            if (childrenMap.TryGetValue(node.ConceptId, out List<HierarchyNode>? children)) {
+                bool hasIncludedChildren = false;
+                foreach (HierarchyNode child in children) {
+                    if (includedConceptIds.Contains(child.ConceptId)) {
+                        hasIncludedChildren = true;
+                        break;
+                    }
+                }
+                if (hasIncludedChildren) {
+                    await _stdout.WriteLineAsync("<ul>");
+                    await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, node.ConceptId);
+                    await _stdout.WriteLineAsync("</ul>");
+                }
             }
             await _stdout.WriteLineAsync("</li>");
         }
     }
 
-    private object? BuildJsonTree(List<HierarchyNode> nodes, Dictionary<long, ConceptDetailsDTO> conceptMap, Dictionary<long, DataPoint> dataPointMap, long? parentId) {
+    private static string FormatNumber(decimal value) {
+        return value.ToString("#,##0.################", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatValueWithUnit(DataPoint dataPoint) {
+        string formattedValue = FormatNumber(dataPoint.Value);
+        string unit = dataPoint.Units.UnitName;
+        if (string.IsNullOrWhiteSpace(unit))
+            return formattedValue;
+        return $"{formattedValue} {unit}";
+    }
+
+    private object? BuildJsonTree(
+        Dictionary<long, List<HierarchyNode>> childrenMap,
+        List<HierarchyNode> rootNodes,
+        HashSet<long> includedConceptIds,
+        Dictionary<long, DataPoint> dataPointMap,
+        long? parentId) {
         var result = new List<object>();
-        foreach (HierarchyNode node in nodes) {
-            if (node.ParentConceptId != parentId)
+        List<HierarchyNode> nodesToRender = rootNodes;
+        if (parentId.HasValue) {
+            if (!childrenMap.TryGetValue(parentId.Value, out List<HierarchyNode>? children))
+                return result;
+            nodesToRender = children;
+        }
+        foreach (HierarchyNode node in nodesToRender) {
+            if (!includedConceptIds.Contains(node.ConceptId))
                 continue;
             var obj = new Dictionary<string, object?> {
                 ["ConceptName"] = node.Name,
                 ["Label"] = node.Label,
                 ["Value"] = dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp) ? dp.Value : null
             };
-            object? children = BuildJsonTree(nodes, conceptMap, dataPointMap, node.ConceptId);
+            object? children = BuildJsonTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, node.ConceptId);
             if (children is List<object> list && list.Count > 0)
                 obj["Children"] = children;
             result.Add(obj);
@@ -336,7 +398,10 @@ public class StatementPrinter {
             ParentConceptId = ctx.ParentConceptId,
         });
         if (ctx.ParentToChildren.TryGetValue(ctx.ConceptId, out List<PresentationDetailsDTO>? children)) {
+            var seenChildConceptIds = new HashSet<long>();
             foreach (PresentationDetailsDTO child in children) {
+                if (!seenChildConceptIds.Add(child.ConceptId))
+                    continue;
                 TraverseContext childCtx = ctx with {
                     ConceptId = child.ConceptId,
                     Depth = ctx.Depth + 1,
@@ -349,6 +414,43 @@ public class StatementPrinter {
         }
         _ = ctx.Visited.Remove(ctx.ConceptId);
         return null;
+    }
+
+    private static void BuildChildrenMap(
+        List<HierarchyNode> nodes,
+        Dictionary<long, List<HierarchyNode>> childrenMap,
+        List<HierarchyNode> rootNodes) {
+        foreach (HierarchyNode node in nodes) {
+            if (node.ParentConceptId.HasValue) {
+                long parentId = node.ParentConceptId.Value;
+                if (!childrenMap.TryGetValue(parentId, out List<HierarchyNode>? children)) {
+                    children = [];
+                    childrenMap[parentId] = children;
+                }
+                children.Add(node);
+            } else {
+                rootNodes.Add(node);
+            }
+        }
+    }
+
+    private static bool HasValueOrChildValue(
+        long conceptId,
+        Dictionary<long, List<HierarchyNode>> childrenMap,
+        Dictionary<long, DataPoint> dataPointMap,
+        HashSet<long> includedConceptIds) {
+        bool hasValue = dataPointMap.ContainsKey(conceptId);
+        bool hasChildValue = false;
+        if (childrenMap.TryGetValue(conceptId, out List<HierarchyNode>? children)) {
+            foreach (HierarchyNode child in children) {
+                if (HasValueOrChildValue(child.ConceptId, childrenMap, dataPointMap, includedConceptIds)) {
+                    hasChildValue = true;
+                }
+            }
+        }
+        if (hasValue || hasChildValue)
+            includedConceptIds.Add(conceptId);
+        return hasValue || hasChildValue;
     }
 
     /// <summary>

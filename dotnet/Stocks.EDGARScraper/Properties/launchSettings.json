@@ -9,8 +9,8 @@
             //"commandLineArgs": "--run-all"
             //"commandLineArgs": "--load-taxonomy-concepts"
             //"commandLineArgs": "--load-taxonomy-presentations"
-            "commandLineArgs": "--print-statement --cik 320193 --list-statements"
-            //"commandLineArgs": "--print-statement --cik 320193 --concept \"StatementOfFinancialPositionAbstract\" --date 2019-03-01 --format html"
+            //"commandLineArgs": "--print-statement --cik 320193 --list-statements"
+            "commandLineArgs": "--print-statement --cik 320193 --concept StatementOfFinancialPositionAbstract --date 2025-03-29 --format html --role \"104000 - Statement - Statement of Financial Position, Classified\""
         }
     }
 }

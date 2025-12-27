@@ -79,22 +79,27 @@ where dp.company_id = @company_id and dp.submission_id = @submission_id";
             DateOnly.FromDateTime(reader.GetDateTime(_endDateIndex))
         );
         var unit = new DataPointUnit(
-            reader.GetFieldValue<ulong>(_unitIdIndex),
+            ReadUInt64(reader, _unitIdIndex),
             reader.GetString(_unitNameIndex)
         );
         var dp = new DataPoint(
-            reader.GetFieldValue<ulong>(_dataPointIdIndex),
-            reader.GetFieldValue<ulong>(_companyIdIndex),
+            ReadUInt64(reader, _dataPointIdIndex),
+            ReadUInt64(reader, _companyIdIndex),
             reader.GetString(_factNameIndex),
             reader.GetString(_filingReferenceIndex),
             datePair,
             reader.GetDecimal(_valueIndex),
             unit,
             DateOnly.FromDateTime(reader.GetDateTime(_filedDateIndex)),
-            reader.GetFieldValue<ulong>(_submissionIdIndex),
+            ReadUInt64(reader, _submissionIdIndex),
             reader.GetInt64(_taxonomyConceptIdIndex)
         );
         _dataPoints.Add(dp);
         return true;
+    }
+
+    private static ulong ReadUInt64(NpgsqlDataReader reader, int index) {
+        long value = reader.GetInt64(index);
+        return unchecked((ulong)value);
     }
 }

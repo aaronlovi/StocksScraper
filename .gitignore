@@ -2,3 +2,4 @@
 *.odt#
 /Kreya
 *.trx
+.venv-taxonomy/

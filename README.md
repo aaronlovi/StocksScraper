@@ -27,12 +27,19 @@ Use this when you need to rebuild the presentation CSV with `role_name`.
 
 Prerequisites:
 
-- FASB US-GAAP taxonomy ZIPs extracted under `/var/lib/edgar-data/us-gaap-taxonomies/<YEAR>/`.
+- FASB US-GAAP taxonomy ZIPs downloaded and extracted under `/var/lib/edgar-data/us-gaap-taxonomies/<YEAR>/`.
 - Arelle installed (example below uses a local venv).
 
 Steps (2025 example):
 
 ```bash
+# 0) Download and extract the FASB taxonomy package (one-time per year)
+mkdir -p /var/lib/edgar-data/us-gaap-taxonomies/2025
+curl -L -o /var/lib/edgar-data/us-gaap-taxonomies/us-gaap-2025.zip \
+  https://xbrl.fasb.org/us-gaap/2025/us-gaap-2025.zip
+unzip -q /var/lib/edgar-data/us-gaap-taxonomies/us-gaap-2025.zip \
+  -d /var/lib/edgar-data/us-gaap-taxonomies/2025
+
 # 1) Create a local venv and install Arelle (one-time)
 python3 -m venv .venv-taxonomy
 . .venv-taxonomy/bin/activate

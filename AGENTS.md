@@ -44,5 +44,6 @@
 ## Agent-Specific Instructions
 
 - Treat `dotnet/project_fact_sheet.md` and `dotnet/project_instructions.md` as the source of truth.
+- When iterating through dictionaries, use semantically meaningful names for key/value pairs (prefer deconstruction with descriptive names over generic `kvp`).
 - For new features, create or update requirements docs and ADRs under `dotnet/decisions/`.
 - After finishing work, check requirements/Kanban lists and ask before updating statuses.

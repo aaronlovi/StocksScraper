@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using EDGARScraper.Services;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
 using Stocks.DataModels.Enums;
@@ -112,6 +114,14 @@ internal partial class Program {
             }
             case "--print-statement": {
                 return await HandlePrintStatementAsync(args);
+            }
+            case "--download-sec-ticker-mappings": {
+                Result res = await DownloadSecTickerMappingsAsync();
+                if (res.IsFailure) {
+                    _logger.LogError("DownloadSecTickerMappings failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
             }
             default: {
                 _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
@@ -363,6 +373,21 @@ internal partial class Program {
             BulkInsertCompanyNames(companyNamesBatch, tasks);
             companyNamesBatch.Clear();
         }
+    }
+
+    private static async Task<Result> DownloadSecTickerMappingsAsync() {
+        IConfiguration configuration = _svp!.GetRequiredService<IConfiguration>();
+        string? outputDir = configuration["EdgarDataDir"];
+        if (string.IsNullOrWhiteSpace(outputDir))
+            return Result.Failure(ErrorCodes.GenericError, "Missing config: EdgarDataDir");
+
+        string userAgent = configuration["SecTickerMappings:UserAgent"] ?? "EDGARScraper (contact: inno.and.logic@gmail.com)";
+
+        IHttpClientFactory httpClientFactory = _svp!.GetRequiredService<IHttpClientFactory>();
+        HttpClient httpClient = httpClientFactory.CreateClient();
+        ILogger<SecTickerMappingsDownloader> logger = _svp!.GetRequiredService<ILogger<SecTickerMappingsDownloader>>();
+        var downloader = new SecTickerMappingsDownloader(httpClient, logger);
+        return await downloader.DownloadAsync(outputDir, userAgent, CancellationToken.None);
     }
 
     private static void BulkInsertCompanies(IReadOnlyCollection<Company> companies, List<Task> tasks) {

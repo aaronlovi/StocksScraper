@@ -14,6 +14,7 @@ display_menu() {
     echo "Select an option:"
     echo "1) Build the solution"
     echo "2) Run the application with specific parameters"
+    echo "3) Download SEC ticker mappings"
     echo "q) Exit"
 }
 
@@ -45,6 +46,32 @@ while true; do
                 --format $FORMAT --role "$ROLE" > $OUTPUT_FILE
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
+            fi
+            popd > /dev/null
+            ;;
+        3)
+            echo "Downloading SEC ticker mappings..."
+            pushd $WORKING_DIR > /dev/null
+            dotnet run --project $PROJECT -- --download-sec-ticker-mappings
+            if [ $? -ne 0 ]; then
+                echo "The application failed to run. Check the output for errors."
+            else
+                DOWNLOAD_DIR=$(rg -n "\"EdgarDataDir\"" appsettings.json | sed -E 's/.*: \"([^\"]+)\".*/\\1/')
+                if [ -n "$DOWNLOAD_DIR" ]; then
+                    echo "Downloaded ticker mappings to: $DOWNLOAD_DIR"
+                    TICKERS_FILE="$DOWNLOAD_DIR/company_tickers.json"
+                    EXCHANGE_FILE="$DOWNLOAD_DIR/company_tickers_exchange.json"
+                    if [ -f "$TICKERS_FILE" ]; then
+                        echo "  - $TICKERS_FILE"
+                    else
+                        echo "  - Missing: $TICKERS_FILE"
+                    fi
+                    if [ -f "$EXCHANGE_FILE" ]; then
+                        echo "  - $EXCHANGE_FILE"
+                    else
+                        echo "  - Missing: $EXCHANGE_FILE"
+                    fi
+                fi
             fi
             popd > /dev/null
             ;;

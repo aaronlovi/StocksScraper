@@ -393,10 +393,13 @@ public class StatementPrinterTests {
         string output = stdout.ToString();
         // Assert
         Assert.Equal(0, exitCode);
-        Assert.Contains("<ul>", output);
-        Assert.Contains("<li>Assets: 350000", output);
-        Assert.Contains("<li>CurrentAssets: 150000", output);
-        Assert.Contains("<li>Cash: 100000", output);
+        Assert.Contains("display:flex; flex-direction:column", output);
+        Assert.Contains("<span>Assets</span>", output);
+        Assert.Contains("350,000 USD", output);
+        Assert.Contains("<span>CurrentAssets</span>", output);
+        Assert.Contains("150,000 USD", output);
+        Assert.Contains("<span>Cash</span>", output);
+        Assert.Contains("100,000 USD", output);
     }
 
     [Fact]

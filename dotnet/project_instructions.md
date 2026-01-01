@@ -37,6 +37,7 @@ This document provides overarching instructions and best practices for working o
 - Prefer using the `Result`/`IResult` pattern (see `Stocks.Shared.Result`, `Stocks.Shared.IResult`, and the `Results.cs` file) for error handling instead of throwing exceptions, unless an exception is truly exceptional or unrecoverable.
 - Use record types or classes instead of tuples for method return values and complex data passing. Tuples are discouraged except for simple, local, and obvious cases, as records/classes provide better maintainability and self-documentation.
 - Avoid using LINQ in production code unless there is a clear, justified benefit for readability or performance. Prefer explicit loops and clear logic for maintainability and debuggability and fewer unexpected allocations.
+- When iterating through dictionaries, use semantically meaningful names for key/value pairs (prefer deconstruction with descriptive names over generic `kvp`).
 - Use clear, descriptive commit messages and pull request descriptions.
 - Write concise, meaningful comments where necessary, but prefer self-explanatory code.
 - Keep documentation (including this file and the fact sheet) clear, concise, and up to date.

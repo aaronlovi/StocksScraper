@@ -30,6 +30,7 @@ public class StatementPrinter {
     private readonly bool _listStatements;
     private readonly string? _roleName;
     private readonly CancellationToken _ct;
+    private int _htmlRowIndex;
 
     public StatementPrinter(
         IDbmService dbmService,
@@ -116,19 +117,19 @@ public class StatementPrinter {
             await _stdout.WriteLineAsync("RoleName,RootConceptName,RootLabel");
             if (roleRoots.Count == 0)
                 return 0;
-            foreach (var kvp in roleRoots) {
+            foreach ((string roleName, long rootConceptId) in roleRoots) {
                 ConceptDetailsDTO? root = null;
                 foreach (ConceptDetailsDTO c in concepts) {
-                    if (c.ConceptId == kvp.Value) {
+                    if (c.ConceptId == rootConceptId) {
                         root = c;
                         break;
                     }
                 }
                 if (root is null) {
-                    await _stdout.WriteLineAsync($"{kvp.Key},,");
+                    await _stdout.WriteLineAsync($"{roleName},,");
                     continue;
                 }
-                await _stdout.WriteLineAsync($"{kvp.Key},{root.Name},\"{root.Label}\"");
+                await _stdout.WriteLineAsync($"{roleName},{root.Name},\"{root.Label}\"");
             }
             return 0;
         }
@@ -277,9 +278,10 @@ public class StatementPrinter {
                 await _stdout.WriteLineAsync($"{node.Name},\"{node.Label}\",{value},{node.Depth},{parentName}");
             }
         } else if (_format.Equals("html", StringComparison.OrdinalIgnoreCase)) {
-            await _stdout.WriteLineAsync("<ul>");
-            await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, null);
-            await _stdout.WriteLineAsync("</ul>");
+            await _stdout.WriteLineAsync("<div style=\"display:flex; flex-direction:column; gap:2px;\">");
+            _htmlRowIndex = 0;
+            await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, conceptMap, dataPointMap, null);
+            await _stdout.WriteLineAsync("</div>");
         } else if (_format.Equals("json", StringComparison.OrdinalIgnoreCase)) {
             await _stdout.WriteLineAsync(System.Text.Json.JsonSerializer.Serialize(BuildJsonTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, null)));
         } else {
@@ -291,6 +293,7 @@ public class StatementPrinter {
         Dictionary<long, List<HierarchyNode>> childrenMap,
         List<HierarchyNode> rootNodes,
         HashSet<long> includedConceptIds,
+        Dictionary<long, ConceptDetailsDTO> conceptMap,
         Dictionary<long, DataPoint> dataPointMap,
         long? parentId) {
         List<HierarchyNode> nodesToRender = rootNodes;
@@ -302,13 +305,20 @@ public class StatementPrinter {
         foreach (HierarchyNode node in nodesToRender) {
             if (!includedConceptIds.Contains(node.ConceptId))
                 continue;
+            bool isAbstract = conceptMap.TryGetValue(node.ConceptId, out ConceptDetailsDTO? concept) && concept.IsAbstract;
+            string backgroundColor = GetRowBackgroundColor(_htmlRowIndex, isAbstract);
             string value = dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp)
                 ? FormatValueWithUnit(dp)
                 : string.Empty;
             string formattedValue = string.IsNullOrEmpty(value)
                 ? string.Empty
-                : $"<span style=\"font-variant-numeric: tabular-nums;\">{value}</span>";
-            await _stdout.WriteLineAsync($"<li>{node.Name}: {formattedValue}");
+                : $"<span style=\"text-align:right; min-width:220px; font-variant-numeric: tabular-nums;\">{value}</span>";
+            int indent = node.Depth * 20;
+            await _stdout.WriteLineAsync($"<div style=\"display:flex; justify-content:space-between; padding:2px 4px; padding-left:{indent}px; background-color:{backgroundColor};\">");
+            await _stdout.WriteLineAsync($"<span>{node.Name}</span>");
+            await _stdout.WriteLineAsync($"{formattedValue}");
+            await _stdout.WriteLineAsync("</div>");
+            _htmlRowIndex++;
             if (childrenMap.TryGetValue(node.ConceptId, out List<HierarchyNode>? children)) {
                 bool hasIncludedChildren = false;
                 foreach (HierarchyNode child in children) {
@@ -318,18 +328,14 @@ public class StatementPrinter {
                     }
                 }
                 if (hasIncludedChildren) {
-                    await _stdout.WriteLineAsync("<ul>");
-                    await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, node.ConceptId);
-                    await _stdout.WriteLineAsync("</ul>");
+                    await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, conceptMap, dataPointMap, node.ConceptId);
                 }
             }
-            await _stdout.WriteLineAsync("</li>");
         }
     }
 
-    private static string FormatNumber(decimal value) {
-        return value.ToString("#,##0.################", CultureInfo.InvariantCulture);
-    }
+    private static string FormatNumber(decimal value) =>
+        value.ToString("#,##0.################", CultureInfo.InvariantCulture);
 
     private static string FormatValueWithUnit(DataPoint dataPoint) {
         string formattedValue = FormatNumber(dataPoint.Value);
@@ -337,6 +343,13 @@ public class StatementPrinter {
         if (string.IsNullOrWhiteSpace(unit))
             return formattedValue;
         return $"{formattedValue} {unit}";
+    }
+
+    private static string GetRowBackgroundColor(int rowIndex, bool isAbstract) {
+        bool isEven = rowIndex % 2 == 0;
+        if (isAbstract)
+            return isEven ? "#dbe7ff" : "#cfe0ff";
+        return isEven ? "#ffffff" : "#f4f9ff";
     }
 
     private object? BuildJsonTree(
@@ -449,7 +462,7 @@ public class StatementPrinter {
             }
         }
         if (hasValue || hasChildValue)
-            includedConceptIds.Add(conceptId);
+            _ = includedConceptIds.Add(conceptId);
         return hasValue || hasChildValue;
     }
 
@@ -463,10 +476,9 @@ public class StatementPrinter {
     /// <summary>
     /// Ensures all required parameters are present and valid.
     /// </summary>
-    public static bool ValidateParameters(/* params */) {
+    public static bool ValidateParameters(/* params */) =>
         // TODO: Implement parameter validation
-        return true;
-    }
+        true;
 
     /// <summary>
     /// Builds a map from ParentConceptId to a list of child PresentationDetailsDTOs for efficient hierarchy traversal.

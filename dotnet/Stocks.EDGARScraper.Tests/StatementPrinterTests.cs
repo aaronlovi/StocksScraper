@@ -393,7 +393,9 @@ public class StatementPrinterTests {
         string output = stdout.ToString();
         // Assert
         Assert.Equal(0, exitCode);
-        Assert.Contains("display:flex; flex-direction:column", output);
+        Assert.Contains("statement-rows", output);
+        Assert.Contains("toggle-breadcrumbs", output);
+        Assert.Contains("breadcrumb", output);
         Assert.Contains("<span>Assets</span>", output);
         Assert.Contains("350,000 USD", output);
         Assert.Contains("<span>CurrentAssets</span>", output);

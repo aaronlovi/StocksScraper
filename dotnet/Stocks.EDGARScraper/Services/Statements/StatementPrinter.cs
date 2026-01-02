@@ -278,9 +278,17 @@ public class StatementPrinter {
                 await _stdout.WriteLineAsync($"{node.Name},\"{node.Label}\",{value},{node.Depth},{parentName}");
             }
         } else if (_format.Equals("html", StringComparison.OrdinalIgnoreCase)) {
-            await _stdout.WriteLineAsync("<div style=\"display:flex; flex-direction:column; gap:2px;\">");
+            await _stdout.WriteLineAsync("<div class=\"statement-root\" style=\"display:flex; flex-direction:column; gap:6px;\">");
+            await _stdout.WriteLineAsync("<style>");
+            await _stdout.WriteLineAsync(".breadcrumb { font-size: 11px; color: #5a6b85; }");
+            await _stdout.WriteLineAsync("#toggle-breadcrumbs:not(:checked) ~ .statement-rows .breadcrumb { display: none; }");
+            await _stdout.WriteLineAsync("</style>");
+            await _stdout.WriteLineAsync("<input type=\"checkbox\" id=\"toggle-breadcrumbs\" style=\"margin:0 6px 0 0;\" />");
+            await _stdout.WriteLineAsync("<label for=\"toggle-breadcrumbs\" style=\"font-size:12px;\">Show breadcrumbs</label>");
+            await _stdout.WriteLineAsync("<div class=\"statement-rows\" style=\"display:flex; flex-direction:column; gap:2px;\">");
             _htmlRowIndex = 0;
-            await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, conceptMap, dataPointMap, null);
+            await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, conceptMap, dataPointMap, null, string.Empty);
+            await _stdout.WriteLineAsync("</div>");
             await _stdout.WriteLineAsync("</div>");
         } else if (_format.Equals("json", StringComparison.OrdinalIgnoreCase)) {
             await _stdout.WriteLineAsync(System.Text.Json.JsonSerializer.Serialize(BuildJsonTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, null)));
@@ -295,18 +303,25 @@ public class StatementPrinter {
         HashSet<long> includedConceptIds,
         Dictionary<long, ConceptDetailsDTO> conceptMap,
         Dictionary<long, DataPoint> dataPointMap,
-        long? parentId) {
+        long? parentId,
+        string parentBreadcrumb) {
         List<HierarchyNode> nodesToRender = rootNodes;
         if (parentId.HasValue) {
             if (!childrenMap.TryGetValue(parentId.Value, out List<HierarchyNode>? children))
                 return;
             nodesToRender = children;
         }
+        var seenConceptIds = new HashSet<long>();
         foreach (HierarchyNode node in nodesToRender) {
+            if (!seenConceptIds.Add(node.ConceptId))
+                continue;
             if (!includedConceptIds.Contains(node.ConceptId))
                 continue;
             bool isAbstract = conceptMap.TryGetValue(node.ConceptId, out ConceptDetailsDTO? concept) && concept.IsAbstract;
             string backgroundColor = GetRowBackgroundColor(_htmlRowIndex, isAbstract);
+            string breadcrumb = string.IsNullOrEmpty(parentBreadcrumb)
+                ? node.Name
+                : $"{parentBreadcrumb} > {node.Name}";
             string value = dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp)
                 ? FormatValueWithUnit(dp)
                 : string.Empty;
@@ -315,7 +330,10 @@ public class StatementPrinter {
                 : $"<span style=\"text-align:right; min-width:220px; font-variant-numeric: tabular-nums;\">{value}</span>";
             int indent = node.Depth * 20;
             await _stdout.WriteLineAsync($"<div style=\"display:flex; justify-content:space-between; padding:2px 4px; padding-left:{indent}px; background-color:{backgroundColor};\">");
+            await _stdout.WriteLineAsync("<span style=\"display:flex; flex-direction:column; gap:2px;\">");
+            await _stdout.WriteLineAsync($"<span class=\"breadcrumb\">{breadcrumb}</span>");
             await _stdout.WriteLineAsync($"<span>{node.Name}</span>");
+            await _stdout.WriteLineAsync("</span>");
             await _stdout.WriteLineAsync($"{formattedValue}");
             await _stdout.WriteLineAsync("</div>");
             _htmlRowIndex++;
@@ -328,7 +346,7 @@ public class StatementPrinter {
                     }
                 }
                 if (hasIncludedChildren) {
-                    await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, conceptMap, dataPointMap, node.ConceptId);
+                    await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, conceptMap, dataPointMap, node.ConceptId, breadcrumb);
                 }
             }
         }

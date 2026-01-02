@@ -56,7 +56,7 @@ while true; do
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             else
-                DOWNLOAD_DIR=$(rg -n "\"EdgarDataDir\"" appsettings.json | sed -E 's/.*: \"([^\"]+)\".*/\\1/')
+                DOWNLOAD_DIR=$(rg -n "\"EdgarDataDir\"" appsettings.json | sed -E 's/.*: \"([^\"]+)\".*/\1/')
                 if [ -n "$DOWNLOAD_DIR" ]; then
                     echo "Downloaded ticker mappings to: $DOWNLOAD_DIR"
                     TICKERS_FILE="$DOWNLOAD_DIR/company_tickers.json"

@@ -36,7 +36,7 @@ public class SecTickerMappingsDownloader {
             HttpResponseMessage response;
             try {
                 using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Add("User-Agent", userAgent);
+                request.Headers.UserAgent.ParseAdd(userAgent);
                 response = await _httpClient.SendAsync(request, ct);
             } catch (Exception ex) {
                 _logger.LogWarning(ex, "Failed to download {Url}", url);

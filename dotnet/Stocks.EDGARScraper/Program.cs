@@ -12,8 +12,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Serilog;
 using EDGARScraper.Services;
+using EDGARScraper.Options;
 using Stocks.DataModels;
 using Stocks.DataModels.EdgarFileModels;
 using Stocks.DataModels.Enums;
@@ -119,6 +121,14 @@ internal partial class Program {
                 Result res = await DownloadSecTickerMappingsAsync();
                 if (res.IsFailure) {
                     _logger.LogError("DownloadSecTickerMappings failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
+            case "--download-prices-stooq": {
+                Result res = await DownloadStooqPricesAsync();
+                if (res.IsFailure) {
+                    _logger.LogError("DownloadStooqPrices failed: {Error}", res.ErrorMessage);
                     return 2;
                 }
                 return 0;
@@ -245,6 +255,8 @@ internal partial class Program {
                     .AddHttpClient()
                     .AddSingleton<PostgresExecutor>()
                     .AddSingleton<DbMigrations>()
+                    .Configure<StooqPricesOptions>(context.Configuration.GetSection("StooqPrices"))
+                    .Configure<SecTickerMappingsOptions>(context.Configuration.GetSection("SecTickerMappings"))
                     .ConfigureTaxonomyConceptsFileProcessor(context)
                     .AddTransient<Func<string, ParseBulkXbrlArchiveContext, XBRLFileParser>>(
                         sp => (content, context) => new XBRLFileParser(content, context, sp));
@@ -381,13 +393,38 @@ internal partial class Program {
         if (string.IsNullOrWhiteSpace(outputDir))
             return Result.Failure(ErrorCodes.GenericError, "Missing config: EdgarDataDir");
 
-        string userAgent = configuration["SecTickerMappings:UserAgent"] ?? "EDGARScraper (contact: inno.and.logic@gmail.com)";
+        IOptions<SecTickerMappingsOptions> options = _svp!.GetRequiredService<IOptions<SecTickerMappingsOptions>>();
+        string userAgent = options.Value.ResolveUserAgent();
 
         IHttpClientFactory httpClientFactory = _svp!.GetRequiredService<IHttpClientFactory>();
         HttpClient httpClient = httpClientFactory.CreateClient();
         ILogger<SecTickerMappingsDownloader> logger = _svp!.GetRequiredService<ILogger<SecTickerMappingsDownloader>>();
         var downloader = new SecTickerMappingsDownloader(httpClient, logger);
         return await downloader.DownloadAsync(outputDir, userAgent, CancellationToken.None);
+    }
+
+    private static async Task<Result> DownloadStooqPricesAsync() {
+        if (_svp is null)
+            return Result.Failure(ErrorCodes.ValidationError, "Service provider is not initialized.");
+
+        IConfiguration configuration = _svp.GetRequiredService<IConfiguration>();
+        string? edgarDataDir = configuration["EdgarDataDir"];
+        if (string.IsNullOrWhiteSpace(edgarDataDir))
+            return Result.Failure(ErrorCodes.GenericError, "Missing config: EdgarDataDir");
+
+        IOptions<StooqPricesOptions> options = _svp.GetRequiredService<IOptions<StooqPricesOptions>>();
+        StooqPricesOptions stooqOptions = options.Value;
+        string outputDir = stooqOptions.ResolveOutputDir(edgarDataDir);
+        string userAgent = stooqOptions.ResolveUserAgent();
+        int delayMilliseconds = stooqOptions.ResolveDelayMilliseconds();
+        int maxRetries = stooqOptions.ResolveMaxRetries();
+
+        IHttpClientFactory httpClientFactory = _svp.GetRequiredService<IHttpClientFactory>();
+
+        HttpClient httpClient = httpClientFactory.CreateClient();
+        ILogger<StooqPriceDownloader> logger = _svp.GetRequiredService<ILogger<StooqPriceDownloader>>();
+        var downloader = new StooqPriceDownloader(httpClient, logger);
+        return await downloader.DownloadBatchAsync(edgarDataDir, outputDir, userAgent, delayMilliseconds, maxRetries, CancellationToken.None);
     }
 
     private static void BulkInsertCompanies(IReadOnlyCollection<Company> companies, List<Task> tasks) {

@@ -253,6 +253,13 @@ public class StatementPrinter {
         var includedConceptIds = new HashSet<long>();
         foreach (HierarchyNode rootNode in rootNodes)
             _ = HasValueOrChildValue(rootNode.ConceptId, childrenMap, dataPointMap, includedConceptIds);
+        if (includedConceptIds.Count == 0) {
+            foreach (HierarchyNode rootNode in rootNodes) {
+                if (!dataPointMap.ContainsKey(rootNode.ConceptId)) {
+                    await _stderr.WriteLineAsync($"WARNING: No data point found for concept '{rootNode.Name}' (ConceptId: {rootNode.ConceptId}) in submission.");
+                }
+            }
+        }
         await FormatOutput(hierarchy, conceptMap, dataPointMap, childrenMap, rootNodes, includedConceptIds);
         return 0;
     }

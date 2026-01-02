@@ -15,6 +15,7 @@ display_menu() {
     echo "1) Build the solution"
     echo "2) Run the application with specific parameters"
     echo "3) Download SEC ticker mappings"
+    echo "4) Download Stooq prices (batch CSV)"
     echo "q) Exit"
 }
 
@@ -70,6 +71,30 @@ while true; do
                         echo "  - $EXCHANGE_FILE"
                     else
                         echo "  - Missing: $EXCHANGE_FILE"
+                    fi
+                fi
+            fi
+            popd > /dev/null
+            ;;
+        4)
+            echo "Downloading Stooq prices..."
+            pushd $WORKING_DIR > /dev/null
+            dotnet run --project $PROJECT -- --download-prices-stooq
+            if [ $? -ne 0 ]; then
+                echo "The application failed to run. Check the output for errors."
+            else
+                OUTPUT_DIR=$(rg -n "\"OutputDir\"" appsettings.json | sed -E 's/.*: \"([^\"]+)\".*/\1/')
+                if [ -z "$OUTPUT_DIR" ]; then
+                    DATA_DIR=$(rg -n "\"EdgarDataDir\"" appsettings.json | sed -E 's/.*: \"([^\"]+)\".*/\1/')
+                    if [ -n "$DATA_DIR" ]; then
+                        OUTPUT_DIR="$DATA_DIR/prices/stooq"
+                    fi
+                fi
+                if [ -n "$OUTPUT_DIR" ]; then
+                    if [ -d "$OUTPUT_DIR" ]; then
+                        echo "  - $OUTPUT_DIR"
+                    else
+                        echo "  - Missing: $OUTPUT_DIR"
                     fi
                 fi
             fi

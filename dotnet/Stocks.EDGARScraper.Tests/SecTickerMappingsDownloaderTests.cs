@@ -57,14 +57,9 @@ public class SecTickerMappingsDownloaderTests {
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
-            if (request.Headers.TryGetValues("User-Agent", out IEnumerable<string>? values)) {
-                foreach (string value in values) {
-                    if (string.Equals(value, _expectedUserAgent, StringComparison.Ordinal)) {
-                        SawExpectedUserAgent = true;
-                        break;
-                    }
-                }
-            }
+            string userAgent = request.Headers.UserAgent.ToString();
+            if (userAgent.Contains(_expectedUserAgent, StringComparison.Ordinal))
+                SawExpectedUserAgent = true;
 
             string requestUrl = request.RequestUri?.ToString() ?? string.Empty;
             if (_responses.TryGetValue(requestUrl, out string? content)) {

@@ -17,6 +17,7 @@ display_menu() {
     echo "3) Download SEC ticker mappings"
     echo "4) Download Stooq prices (batch CSV)"
     echo "5) Import price CSVs into the database"
+    echo "6) Import bulk Stooq files into the database"
     echo "q) Exit"
 }
 
@@ -105,6 +106,15 @@ while true; do
             echo "Importing price CSVs..."
             pushd $WORKING_DIR > /dev/null
             dotnet run --project $PROJECT -- --import-prices-stooq
+            if [ $? -ne 0 ]; then
+                echo "The application failed to run. Check the output for errors."
+            fi
+            popd > /dev/null
+            ;;
+        6)
+            echo "Importing bulk Stooq files..."
+            pushd $WORKING_DIR > /dev/null
+            dotnet run --project $PROJECT -- --import-prices-stooq-bulk
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             fi

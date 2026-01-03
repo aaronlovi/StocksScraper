@@ -133,6 +133,14 @@ internal partial class Program {
                 }
                 return 0;
             }
+            case "--import-prices-stooq": {
+                Result res = await ImportStooqPricesAsync();
+                if (res.IsFailure) {
+                    _logger.LogError("ImportStooqPrices failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
             default: {
                 _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
                 return 3;
@@ -256,6 +264,7 @@ internal partial class Program {
                     .AddSingleton<PostgresExecutor>()
                     .AddSingleton<DbMigrations>()
                     .Configure<StooqPricesOptions>(context.Configuration.GetSection("StooqPrices"))
+                    .Configure<StooqImportOptions>(context.Configuration.GetSection("StooqImport"))
                     .Configure<SecTickerMappingsOptions>(context.Configuration.GetSection("SecTickerMappings"))
                     .ConfigureTaxonomyConceptsFileProcessor(context)
                     .AddTransient<Func<string, ParseBulkXbrlArchiveContext, XBRLFileParser>>(
@@ -425,6 +434,27 @@ internal partial class Program {
         ILogger<StooqPriceDownloader> logger = _svp.GetRequiredService<ILogger<StooqPriceDownloader>>();
         var downloader = new StooqPriceDownloader(httpClient, logger);
         return await downloader.DownloadBatchAsync(edgarDataDir, outputDir, userAgent, delayMilliseconds, maxRetries, CancellationToken.None);
+    }
+
+    private static async Task<Result> ImportStooqPricesAsync() {
+        if (_svp is null)
+            return Result.Failure(ErrorCodes.ValidationError, "Service provider is not initialized.");
+
+        IConfiguration configuration = _svp.GetRequiredService<IConfiguration>();
+        string? edgarDataDir = configuration["EdgarDataDir"];
+        if (string.IsNullOrWhiteSpace(edgarDataDir))
+            return Result.Failure(ErrorCodes.GenericError, "Missing config: EdgarDataDir");
+
+        IOptions<StooqPricesOptions> pricesOptions = _svp.GetRequiredService<IOptions<StooqPricesOptions>>();
+        string outputDir = pricesOptions.Value.ResolveOutputDir(edgarDataDir);
+
+        IOptions<StooqImportOptions> importOptions = _svp.GetRequiredService<IOptions<StooqImportOptions>>();
+        int maxTickers = importOptions.Value.ResolveMaxTickersPerRun();
+        int batchSize = importOptions.Value.ResolveBatchSize();
+
+        ILogger<StooqPriceImporter> logger = _svp.GetRequiredService<ILogger<StooqPriceImporter>>();
+        var importer = new StooqPriceImporter(_dbm!, logger);
+        return await importer.ImportAsync(edgarDataDir, outputDir, maxTickers, batchSize, CancellationToken.None);
     }
 
     private static void BulkInsertCompanies(IReadOnlyCollection<Company> companies, List<Task> tasks) {

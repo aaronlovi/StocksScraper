@@ -340,6 +340,67 @@ public sealed class DbmService : IDisposable, IDbmService {
 
     #endregion
 
+    #region Prices
+
+    public async Task<Result<IReadOnlyCollection<PriceImportStatus>>> GetPriceImportStatuses(CancellationToken ct) {
+        var stmt = new GetPriceImportsStmt();
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetPriceImportStatuses success - Num imports: {NumImports}", stmt.Imports.Count);
+            return Result<IReadOnlyCollection<PriceImportStatus>>.Success(stmt.Imports);
+        } else {
+            _logger.LogWarning("GetPriceImportStatuses failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<PriceImportStatus>>.Failure(res);
+        }
+    }
+
+    public async Task<Result<IReadOnlyCollection<PriceRow>>> GetPricesByTicker(string ticker, CancellationToken ct) {
+        var stmt = new GetPricesByTickerStmt(ticker);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetPricesByTicker success - Ticker: {Ticker}, Num prices: {NumPrices}", ticker, stmt.Prices.Count);
+            return Result<IReadOnlyCollection<PriceRow>>.Success(stmt.Prices);
+        } else {
+            _logger.LogWarning("GetPricesByTicker failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<PriceRow>>.Failure(res);
+        }
+    }
+
+    public async Task<Result> UpsertPriceImport(PriceImportStatus status, CancellationToken ct) {
+        var stmt = new UpsertPriceImportStmt(status);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("UpsertPriceImport success - Ticker: {Ticker}, Cik: {Cik}, Exchange: {Exchange}",
+                status.Ticker, status.Cik, status.Exchange ?? string.Empty);
+        } else {
+            _logger.LogError("UpsertPriceImport failed with error {Error}", res.ErrorMessage);
+        }
+
+        return res;
+    }
+
+    public async Task<Result> DeletePricesForTicker(string ticker, CancellationToken ct) {
+        var stmt = new DeletePricesByTickerStmt(ticker);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("DeletePricesForTicker success - Ticker: {Ticker}", ticker);
+        else
+            _logger.LogError("DeletePricesForTicker failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result> BulkInsertPrices(List<PriceRow> prices, CancellationToken ct) {
+        var stmt = new BulkInsertPricesStmt(prices);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertPrices success - Num prices: {NumPrices}", prices.Count);
+        else
+            _logger.LogError("BulkInsertPrices failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    #endregion
+
     public void Dispose() {
         // Dispose of Postgres executor
         _exec.Dispose();

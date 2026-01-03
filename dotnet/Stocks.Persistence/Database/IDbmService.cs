@@ -48,4 +48,12 @@ public interface IDbmService {
 
     Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct);
     Task<Result> BulkInsertSubmissions(List<Submission> batch, CancellationToken none);
+
+    // Prices
+
+    Task<Result<IReadOnlyCollection<PriceImportStatus>>> GetPriceImportStatuses(CancellationToken ct);
+    Task<Result<IReadOnlyCollection<PriceRow>>> GetPricesByTicker(string ticker, CancellationToken ct);
+    Task<Result> UpsertPriceImport(PriceImportStatus status, CancellationToken ct);
+    Task<Result> DeletePricesForTicker(string ticker, CancellationToken ct);
+    Task<Result> BulkInsertPrices(List<PriceRow> prices, CancellationToken ct);
 }

@@ -61,6 +61,7 @@ public class StooqPriceDownloader {
             string url = $"https://stooq.com/q/d/l/?s={stooqSymbol}&i=d";
             Directory.CreateDirectory(outputDir);
             string tickerOutputPath = Path.Combine(outputDir, $"{normalizedTicker}.csv");
+            string tempOutputPath = Path.Combine(outputDir, $"{normalizedTicker}.{Guid.NewGuid():N}.tmp");
 
             bool wroteFile = false;
             int attempt = 0;
@@ -85,28 +86,40 @@ public class StooqPriceDownloader {
                 }
 
                 string content = await response.Content.ReadAsStringAsync(ct);
-                await using var writer = new StreamWriter(tickerOutputPath);
-                await writer.WriteLineAsync("Cik,Ticker,Exchange,StooqSymbol,Date,Open,High,Low,Close,Volume");
-                if (!TryWriteStooqCsv(content, mapping, normalizedTicker, stooqSymbol, writer, out string? reason)) {
-                    string snippet = content.Length > 1000 ? content[..1000] : content;
-                    if (IsDailyHitLimit(reason, content)) {
-                        _logger.LogWarning("Stooq daily hit limit reached while processing {Ticker}. Response: {Snippet}", normalizedTicker, snippet);
-                        hitDailyLimit = true;
-                        break;
-                    }
-                    if (!string.IsNullOrWhiteSpace(reason)) {
-                        _logger.LogWarning("Failed to parse Stooq CSV for {Ticker} on attempt {Attempt}. Status: {StatusCode}. Header: {Header}. Response: {Snippet}", normalizedTicker, attempt, response.StatusCode, reason, snippet);
-                    } else {
-                        _logger.LogWarning("Failed to parse Stooq CSV for {Ticker} on attempt {Attempt}. Status: {StatusCode}. Response: {Snippet}", normalizedTicker, attempt, response.StatusCode, snippet);
-                    }
+                bool parseSuccess = false;
+                try {
+                    await using var writer = new StreamWriter(tempOutputPath);
+                    await writer.WriteLineAsync("Cik,Ticker,Exchange,StooqSymbol,Date,Open,High,Low,Close,Volume");
+                    parseSuccess = TryWriteStooqCsv(content, mapping, normalizedTicker, stooqSymbol, writer, out string? reason);
+                    if (!parseSuccess) {
+                        string snippet = content.Length > 1000 ? content[..1000] : content;
+                        if (IsDailyHitLimit(reason, content)) {
+                            _logger.LogWarning("Stooq daily hit limit reached while processing {Ticker}. Response: {Snippet}", normalizedTicker, snippet);
+                            hitDailyLimit = true;
+                            break;
+                        }
+                        if (!string.IsNullOrWhiteSpace(reason)) {
+                            _logger.LogWarning("Failed to parse Stooq CSV for {Ticker} on attempt {Attempt}. Status: {StatusCode}. Header: {Header}. Response: {Snippet}", normalizedTicker, attempt, response.StatusCode, reason, snippet);
+                        } else {
+                            _logger.LogWarning("Failed to parse Stooq CSV for {Ticker} on attempt {Attempt}. Status: {StatusCode}. Response: {Snippet}", normalizedTicker, attempt, response.StatusCode, snippet);
+                        }
 
-                    if (attempt < maxRetries) {
-                        int backoffMs = delayMilliseconds > 0 ? delayMilliseconds * attempt : 250 * attempt;
-                        await Task.Delay(backoffMs, ct);
+                        if (attempt < maxRetries) {
+                            int backoffMs = delayMilliseconds > 0 ? delayMilliseconds * attempt : 250 * attempt;
+                            await Task.Delay(backoffMs, ct);
+                        }
+                        continue;
                     }
+                } finally {
+                    if (!parseSuccess && File.Exists(tempOutputPath))
+                        File.Delete(tempOutputPath);
+                }
+
+                if (!parseSuccess) {
                     continue;
                 }
 
+                File.Move(tempOutputPath, tickerOutputPath, true);
                 wroteFile = true;
             }
 

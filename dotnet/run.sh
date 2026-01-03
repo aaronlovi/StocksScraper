@@ -16,6 +16,7 @@ display_menu() {
     echo "2) Run the application with specific parameters"
     echo "3) Download SEC ticker mappings"
     echo "4) Download Stooq prices (batch CSV)"
+    echo "5) Import price CSVs into the database"
     echo "q) Exit"
 }
 
@@ -97,6 +98,15 @@ while true; do
                         echo "  - Missing: $OUTPUT_DIR"
                     fi
                 fi
+            fi
+            popd > /dev/null
+            ;;
+        5)
+            echo "Importing price CSVs..."
+            pushd $WORKING_DIR > /dev/null
+            dotnet run --project $PROJECT -- --import-prices-stooq
+            if [ $? -ne 0 ]; then
+                echo "The application failed to run. Check the output for errors."
             fi
             popd > /dev/null
             ;;

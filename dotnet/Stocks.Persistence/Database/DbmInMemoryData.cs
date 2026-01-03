@@ -7,7 +7,8 @@ namespace Stocks.Persistence.Database;
 public sealed class DbmInMemoryData {
     private readonly object _mutex = new();
     private readonly Dictionary<string, PriceImportStatus> _priceImports = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<PriceRow> _prices = new();
+    private readonly Dictionary<string, PriceDownloadStatus> _priceDownloads = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<PriceRow> _prices = [];
 
     public IReadOnlyCollection<PriceImportStatus> GetPriceImports() {
         lock (_mutex)
@@ -18,6 +19,17 @@ public sealed class DbmInMemoryData {
         string key = BuildImportKey(status.Cik, status.Ticker, status.Exchange);
         lock (_mutex)
             _priceImports[key] = status;
+    }
+
+    public IReadOnlyCollection<PriceDownloadStatus> GetPriceDownloads() {
+        lock (_mutex)
+            return [.. _priceDownloads.Values];
+    }
+
+    public void UpsertPriceDownload(PriceDownloadStatus status) {
+        string key = BuildImportKey(status.Cik, status.Ticker, status.Exchange);
+        lock (_mutex)
+            _priceDownloads[key] = status;
     }
 
     public void DeletePricesForTicker(string ticker) {

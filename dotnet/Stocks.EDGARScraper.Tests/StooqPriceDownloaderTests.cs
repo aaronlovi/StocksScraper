@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using EDGARScraper.Services;
 using Microsoft.Extensions.Logging.Abstractions;
+using Stocks.DataModels;
 using Stocks.Shared;
 
 namespace Stocks.EDGARScraper.Tests;
@@ -15,7 +16,7 @@ public class StooqPriceDownloaderTests {
     [Fact]
     public async Task DownloadBatchAsync_WritesBatchCsv() {
         string tempDir = Path.Combine(Path.GetTempPath(), $"stooq-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
+        _ = Directory.CreateDirectory(tempDir);
 
         string mappingsPath = Path.Combine(tempDir, "company_tickers.json");
         string exchangePath = Path.Combine(tempDir, "company_tickers_exchange.json");
@@ -31,11 +32,19 @@ public class StooqPriceDownloaderTests {
 
         var handler = new FakeHandler(responses);
         using var client = new HttpClient(handler);
-        var logger = NullLogger<StooqPriceDownloader>.Instance;
+        NullLogger<StooqPriceDownloader> logger = NullLogger<StooqPriceDownloader>.Instance;
         var downloader = new StooqPriceDownloader(client, logger);
 
         try {
-            Result result = await downloader.DownloadBatchAsync(tempDir, outputDir, "TestAgent/1.0", 0, 5, CancellationToken.None);
+            Result result = await downloader.DownloadBatchAsync(
+                tempDir,
+                outputDir,
+                "TestAgent/1.0",
+                0,
+                5,
+                Array.Empty<PriceDownloadStatus>(),
+                null,
+                CancellationToken.None);
             Assert.True(result.IsSuccess);
             string aaplPath = Path.Combine(outputDir, "AAPL.csv");
             string msftPath = Path.Combine(outputDir, "MSFT.csv");

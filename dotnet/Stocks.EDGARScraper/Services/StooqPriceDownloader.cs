@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Stocks.DataModels;
 using Stocks.Shared;
 using Stocks.Shared.Models;
 
@@ -27,6 +28,8 @@ public class StooqPriceDownloader {
         string userAgent,
         int delayMilliseconds,
         int maxRetries,
+        IReadOnlyCollection<PriceDownloadStatus> downloadStatuses,
+        Func<SecTickerMapping, Task<Result>>? onDownloaded,
         CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(mappingDir))
             return Result.Failure(ErrorCodes.ValidationError, "Mapping directory is required.");
@@ -40,8 +43,8 @@ public class StooqPriceDownloader {
         if (!File.Exists(baseMappingPath))
             return Result.Failure(ErrorCodes.NotFound, $"Missing mapping file: {baseMappingPath}");
 
-        Dictionary<ulong, string> exchangeByCik = new Dictionary<ulong, string>();
-        Dictionary<string, string> exchangeByTicker = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var exchangeByCik = new Dictionary<ulong, string>();
+        var exchangeByTicker = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (File.Exists(exchangeMappingPath))
             LoadExchangeMappings(exchangeMappingPath, exchangeByCik, exchangeByTicker);
 
@@ -49,17 +52,29 @@ public class StooqPriceDownloader {
         if (mappings.Count == 0)
             return Result.Failure(ErrorCodes.NotFound, "No ticker mappings found.");
 
+        var lastDownloadedByKey = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        foreach (PriceDownloadStatus status in downloadStatuses) {
+            string key = BuildDownloadKey(status.Cik, status.Ticker, status.Exchange);
+            if (!lastDownloadedByKey.ContainsKey(key))
+                lastDownloadedByKey[key] = status.LastDownloadedUtc;
+        }
+
+        List<DownloadCandidate> candidates = BuildCandidates(mappings, lastDownloadedByKey);
+        candidates.Sort(CompareCandidates);
+        LogSelectionPreview(candidates, _logger);
+
         int successCount = 0;
         int failureCount = 0;
 
-        foreach (SecTickerMapping mapping in mappings) {
+        foreach (DownloadCandidate candidate in candidates) {
+            SecTickerMapping mapping = candidate.Mapping;
             if (string.IsNullOrWhiteSpace(mapping.Ticker))
                 continue;
 
             string normalizedTicker = mapping.Ticker.Trim().ToUpperInvariant();
             string stooqSymbol = normalizedTicker.ToLowerInvariant() + ".us";
             string url = $"https://stooq.com/q/d/l/?s={stooqSymbol}&i=d";
-            Directory.CreateDirectory(outputDir);
+            _ = Directory.CreateDirectory(outputDir);
             string tickerOutputPath = Path.Combine(outputDir, $"{normalizedTicker}.csv");
             string tempOutputPath = Path.Combine(outputDir, $"{normalizedTicker}.{Guid.NewGuid():N}.tmp");
 
@@ -120,6 +135,14 @@ public class StooqPriceDownloader {
                 }
 
                 File.Move(tempOutputPath, tickerOutputPath, true);
+                if (onDownloaded is not null) {
+                    Result onDownloadedResult = await onDownloaded(mapping);
+                    if (onDownloadedResult.IsFailure) {
+                        _logger.LogWarning("Failed to record download for {Ticker}. Error: {Error}", normalizedTicker, onDownloadedResult.ErrorMessage);
+                        failureCount++;
+                        continue;
+                    }
+                }
                 wroteFile = true;
             }
 
@@ -135,8 +158,64 @@ public class StooqPriceDownloader {
                 await Task.Delay(delayMilliseconds, ct);
         }
 
-        _logger.LogInformation("Stooq price download completed. Success: {SuccessCount}, Failed: {FailureCount}", successCount, failureCount);
+        _logger.LogInformation("Stooq price download completed. Success: {SuccessCount}, Failed: {FailureCount}",
+            successCount, failureCount);
         return Result.Success;
+    }
+
+    private static List<DownloadCandidate> BuildCandidates(
+        IReadOnlyList<SecTickerMapping> mappings,
+        Dictionary<string, DateTime> lastDownloadedByKey) {
+        var candidates = new List<DownloadCandidate>(mappings.Count);
+        for (int i = 0; i < mappings.Count; i++) {
+            SecTickerMapping mapping = mappings[i];
+            string key = BuildDownloadKey(mapping.Cik, mapping.Ticker, mapping.Exchange);
+            DateTime lastDownloadedUtc = DateTime.MinValue;
+            if (lastDownloadedByKey.TryGetValue(key, out DateTime recorded))
+                lastDownloadedUtc = recorded;
+            candidates.Add(new DownloadCandidate(mapping, lastDownloadedUtc, i));
+        }
+        return candidates;
+    }
+
+    private static int CompareCandidates(DownloadCandidate left, DownloadCandidate right) {
+        int compareResult = DateTime.Compare(left.LastDownloadedUtc, right.LastDownloadedUtc);
+        if (compareResult != 0)
+            return compareResult;
+        return left.Index.CompareTo(right.Index);
+    }
+
+    private static string BuildDownloadKey(ulong cik, string ticker, string? exchange) {
+        string normalizedTicker = string.IsNullOrWhiteSpace(ticker) ? string.Empty : ticker.Trim().ToUpperInvariant();
+        string normalizedExchange = string.IsNullOrWhiteSpace(exchange) ? string.Empty : exchange.Trim().ToUpperInvariant();
+        return $"{cik}|{normalizedTicker}|{normalizedExchange}";
+    }
+
+    private sealed record DownloadCandidate(SecTickerMapping Mapping, DateTime LastDownloadedUtc, int Index);
+
+    private static void LogSelectionPreview(
+        IReadOnlyList<DownloadCandidate> candidates,
+        ILogger<StooqPriceDownloader> logger) {
+        if (candidates.Count == 0)
+            return;
+
+        const int PreviewCount = 10;
+        int count = candidates.Count < PreviewCount ? candidates.Count : PreviewCount;
+
+        logger.LogInformation("Stooq download order preview (first {Count})", count);
+        for (int i = 0; i < count; i++) {
+            DownloadCandidate candidate = candidates[i];
+            string normalizedTicker = candidate.Mapping.Ticker.Trim().ToUpperInvariant();
+            string lastDownloaded = candidate.LastDownloadedUtc == DateTime.MinValue
+                ? "never"
+                : candidate.LastDownloadedUtc.ToString("O", CultureInfo.InvariantCulture);
+            logger.LogInformation("  {Index}. {Ticker} (CIK {Cik}, Exchange {Exchange}, LastDownloaded {LastDownloaded})",
+                i + 1,
+                normalizedTicker,
+                candidate.Mapping.Cik,
+                candidate.Mapping.Exchange ?? string.Empty,
+                lastDownloaded);
+        }
     }
 
     private static bool TryWriteStooqCsv(
@@ -197,7 +276,7 @@ public class StooqPriceDownloader {
         Dictionary<ulong, string> exchangeByCik,
         Dictionary<string, string> exchangeByTicker) {
         var results = new List<SecTickerMapping>();
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(path));
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
         if (doc.RootElement.ValueKind == JsonValueKind.Object) {
             foreach (JsonProperty prop in doc.RootElement.EnumerateObject())
                 TryAddMapping(prop.Value, exchangeByCik, exchangeByTicker, results);
@@ -240,7 +319,7 @@ public class StooqPriceDownloader {
         string path,
         Dictionary<ulong, string> exchangeByCik,
         Dictionary<string, string> exchangeByTicker) {
-        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(path));
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
         if (TryLoadExchangeMappingsFromFields(doc.RootElement, exchangeByCik, exchangeByTicker))
             return;
 
@@ -401,8 +480,9 @@ public class StooqPriceDownloader {
                     if (value.ValueKind == JsonValueKind.Number && value.TryGetUInt64(out ulong result))
                         return result;
                     if (value.ValueKind == JsonValueKind.String &&
-                        ulong.TryParse(value.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out result))
+                        ulong.TryParse(value.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out result)) {
                         return result;
+                    }
                 }
             }
         }

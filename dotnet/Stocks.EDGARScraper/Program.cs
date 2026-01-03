@@ -433,7 +433,23 @@ internal partial class Program {
         HttpClient httpClient = httpClientFactory.CreateClient();
         ILogger<StooqPriceDownloader> logger = _svp.GetRequiredService<ILogger<StooqPriceDownloader>>();
         var downloader = new StooqPriceDownloader(httpClient, logger);
-        return await downloader.DownloadBatchAsync(edgarDataDir, outputDir, userAgent, delayMilliseconds, maxRetries, CancellationToken.None);
+        IReadOnlyCollection<PriceDownloadStatus> downloadStatuses = [];
+        if (_dbm is not null) {
+            Result<IReadOnlyCollection<PriceDownloadStatus>> statusResult =
+                await _dbm.GetPriceDownloadStatuses(CancellationToken.None);
+            if (statusResult.IsSuccess && statusResult.Value is not null)
+                downloadStatuses = statusResult.Value;
+        }
+        return await downloader.DownloadBatchAsync(
+            edgarDataDir,
+            outputDir,
+            userAgent,
+            delayMilliseconds,
+            maxRetries,
+            downloadStatuses,
+            _dbm is null ? null : mapping =>
+                _dbm.UpsertPriceDownload(new PriceDownloadStatus(mapping.Cik, mapping.Ticker, mapping.Exchange, DateTime.UtcNow), CancellationToken.None),
+            CancellationToken.None);
     }
 
     private static async Task<Result> ImportStooqPricesAsync() {

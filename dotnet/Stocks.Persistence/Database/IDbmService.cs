@@ -56,4 +56,9 @@ public interface IDbmService {
     Task<Result> UpsertPriceImport(PriceImportStatus status, CancellationToken ct);
     Task<Result> DeletePricesForTicker(string ticker, CancellationToken ct);
     Task<Result> BulkInsertPrices(List<PriceRow> prices, CancellationToken ct);
+
+    // Price downloads
+
+    Task<Result<IReadOnlyCollection<PriceDownloadStatus>>> GetPriceDownloadStatuses(CancellationToken ct);
+    Task<Result> UpsertPriceDownload(PriceDownloadStatus status, CancellationToken ct);
 }

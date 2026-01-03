@@ -401,6 +401,33 @@ public sealed class DbmService : IDisposable, IDbmService {
 
     #endregion
 
+    #region Price downloads
+
+    public async Task<Result<IReadOnlyCollection<PriceDownloadStatus>>> GetPriceDownloadStatuses(CancellationToken ct) {
+        var stmt = new GetPriceDownloadsStmt();
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetPriceDownloadStatuses success - Num downloads: {NumDownloads}", stmt.Downloads.Count);
+            return Result<IReadOnlyCollection<PriceDownloadStatus>>.Success(stmt.Downloads);
+        } else {
+            _logger.LogWarning("GetPriceDownloadStatuses failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<PriceDownloadStatus>>.Failure(res);
+        }
+    }
+
+    public async Task<Result> UpsertPriceDownload(PriceDownloadStatus status, CancellationToken ct) {
+        var stmt = new UpsertPriceDownloadStmt(status);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("UpsertPriceDownload success - Ticker: {Ticker}, Cik: {Cik}, Exchange: {Exchange}",
+                status.Ticker, status.Cik, status.Exchange ?? string.Empty);
+        else
+            _logger.LogError("UpsertPriceDownload failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    #endregion
+
     public void Dispose() {
         // Dispose of Postgres executor
         _exec.Dispose();

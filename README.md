@@ -4,8 +4,35 @@
 
 The taxonomy CSVs under `/var/lib/edgar-data/us-gaap-taxonomies/` are generated from the official FASB US-GAAP taxonomy packages hosted at:
 
+- 2022–present: `https://xbrl.fasb.org/us-gaap/<YEAR>/us-gaap-<YEAR>.zip`
+- 2011–2021: `https://xbrl.fasb.org/us-gaap/<YEAR>/us-gaap-<YEAR>-01-31.zip`
+Examples:
 - <https://xbrl.fasb.org/us-gaap/2024/us-gaap-2024.zip>
 - <https://xbrl.fasb.org/us-gaap/2025/us-gaap-2025.zip>
+
+Download helper (2011–present, no overwrite):
+
+```bash
+mkdir -p /var/lib/edgar-data/us-gaap-taxonomies
+for year in $(seq 2011 2025); do
+  if [ "$year" -le 2021 ]; then
+    suffix="-01-31"
+  else
+    suffix=""
+  fi
+  zip_path="/var/lib/edgar-data/us-gaap-taxonomies/us-gaap-${year}${suffix}.zip"
+  if [ -f "$zip_path" ]; then
+    echo "skip: $zip_path exists"
+    continue
+  fi
+  url="https://xbrl.fasb.org/us-gaap/${year}/us-gaap-${year}${suffix}.zip"
+  echo "downloading: $url"
+  if ! curl -fL --retry 2 --retry-delay 1 -o "$zip_path" "$url"; then
+    echo "failed: $url"
+    rm -f "$zip_path"
+  fi
+done
+```
 
 ## How the CSVs Were Generated (Brief)
 

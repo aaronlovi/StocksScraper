@@ -5,11 +5,10 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Stocks.DataModels;
-using Stocks.EDGARScraper.Models.Statements;
 using Stocks.Persistence.Database;
 using Stocks.Persistence.Database.DTO.Taxonomies;
+using Stocks.Persistence.Services;
 using Stocks.Shared;
-using Stocks.Shared.Models;
 
 namespace Stocks.EDGARScraper.Services.Statements;
 
@@ -18,6 +17,7 @@ namespace Stocks.EDGARScraper.Services.Statements;
 /// </summary>
 public class StatementPrinter {
     private readonly IDbmService _dbmService;
+    private readonly StatementDataService _statementDataService;
     private readonly TextWriter _stdout;
     private readonly TextWriter _stderr;
 
@@ -47,6 +47,7 @@ public class StatementPrinter {
         TextWriter? stderr = null,
         CancellationToken ct = default) {
         _dbmService = dbmService;
+        _statementDataService = new StatementDataService(dbmService);
         _cik = cik;
         _concept = concept;
         _date = date;
@@ -64,12 +65,14 @@ public class StatementPrinter {
     /// Main entry point for rendering the statement or listing available statements.
     /// </summary>
     public async Task<int> PrintStatement() {
-        // Only support EdgarDataSource for now
+        // Validate CIK
         const string DataSource = "EDGAR";
         if (!ulong.TryParse(_cik, out ulong cikNum)) {
             await _stderr.WriteLineAsync($"ERROR: Invalid CIK '{_cik}'.");
             return 2;
         }
+
+        // Look up company
         // TODO: Refactor to query for a single company by CIK in the database for better performance with large datasets.
         Result<IReadOnlyCollection<Company>> companiesResult = await _dbmService.GetAllCompaniesByDataSource(DataSource, _ct);
         if (companiesResult.IsFailure || companiesResult.Value is null) {
@@ -88,75 +91,58 @@ public class StatementPrinter {
             return 2;
         }
 
-        // 2. Load taxonomy concepts
-        Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult = await _dbmService.GetTaxonomyConceptsByTaxonomyType(_taxonomyTypeId, _ct);
-        if (conceptsResult.IsFailure || conceptsResult.Value is null) {
-            await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy concepts for taxonomy type {_taxonomyTypeId}.");
-            return 2;
-        }
-        IReadOnlyCollection<ConceptDetailsDTO> concepts = conceptsResult.Value;
-
-        // 3. Load presentation hierarchy for role-scoped traversal
-        Result<IReadOnlyCollection<PresentationDetailsDTO>> presentationsResult =
-            await _dbmService.GetTaxonomyPresentationsByTaxonomyType(_taxonomyTypeId, _ct);
-        if (presentationsResult.IsFailure || presentationsResult.Value is null) {
-            await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy presentation hierarchy for taxonomy type {_taxonomyTypeId}.");
-            return 2;
-        }
-        IReadOnlyCollection<PresentationDetailsDTO> presentations = presentationsResult.Value;
-
+        // Handle --list-statements via StatementDataService
         if (_listStatements) {
-            var roleRoots = new Dictionary<string, long>();
-            foreach (PresentationDetailsDTO p in presentations) {
-                if (p.Depth != 1)
-                    continue;
-                if (string.IsNullOrWhiteSpace(p.RoleName))
-                    continue;
-                if (!roleRoots.ContainsKey(p.RoleName))
-                    roleRoots[p.RoleName] = p.ConceptId;
+            Result<IReadOnlyCollection<StatementListItem>> listResult =
+                await _statementDataService.ListStatements(_taxonomyTypeId, _ct);
+            if (listResult.IsFailure) {
+                await _stderr.WriteLineAsync($"ERROR: {listResult.ErrorMessage}");
+                return 2;
             }
-
             await _stdout.WriteLineAsync("RoleName,RootConceptName,RootLabel");
-            if (roleRoots.Count == 0)
-                return 0;
-            foreach ((string roleName, long rootConceptId) in roleRoots) {
-                ConceptDetailsDTO? root = null;
-                foreach (ConceptDetailsDTO c in concepts) {
-                    if (c.ConceptId == rootConceptId) {
-                        root = c;
-                        break;
-                    }
-                }
-                if (root is null) {
-                    await _stdout.WriteLineAsync($"{roleName},,");
-                    continue;
-                }
-                await _stdout.WriteLineAsync($"{roleName},{root.Name},\"{root.Label}\"");
+            foreach (StatementListItem item in listResult.Value!) {
+                if (string.IsNullOrEmpty(item.RootConceptName))
+                    await _stdout.WriteLineAsync($"{item.RoleName},,");
+                else
+                    await _stdout.WriteLineAsync($"{item.RoleName},{item.RootConceptName},\"{item.RootLabel}\"");
             }
             return 0;
         }
 
-        ConceptDetailsDTO? rootConcept = null;
-        foreach (ConceptDetailsDTO c in concepts) {
+        // Validate concept exists before looking for submissions
+        Result<IReadOnlyCollection<ConceptDetailsDTO>> earlyConceptsResult =
+            await _dbmService.GetTaxonomyConceptsByTaxonomyType(_taxonomyTypeId, _ct);
+        if (earlyConceptsResult.IsFailure || earlyConceptsResult.Value is null) {
+            await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy concepts for taxonomy type {_taxonomyTypeId}.");
+            return 2;
+        }
+        Result<IReadOnlyCollection<PresentationDetailsDTO>> earlyPresentationsResult =
+            await _dbmService.GetTaxonomyPresentationsByTaxonomyType(_taxonomyTypeId, _ct);
+        if (earlyPresentationsResult.IsFailure || earlyPresentationsResult.Value is null) {
+            await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy presentation hierarchy for taxonomy type {_taxonomyTypeId}.");
+            return 2;
+        }
+        ConceptDetailsDTO? earlyRootConcept = null;
+        foreach (ConceptDetailsDTO c in earlyConceptsResult.Value) {
             if (c.Name.EqualsOrdinalIgnoreCase(_concept)) {
-                rootConcept = c;
+                earlyRootConcept = c;
                 break;
             }
             if (long.TryParse(_concept, out long conceptId) && c.ConceptId == conceptId) {
-                rootConcept = c;
+                earlyRootConcept = c;
                 break;
             }
         }
-        if (rootConcept is null) {
+        if (earlyRootConcept is null) {
             await _stderr.WriteLineAsync($"ERROR: Concept '{_concept}' not found in taxonomy.");
             return 2;
         }
 
-        string? roleNameToUse = _roleName;
-        if (string.IsNullOrWhiteSpace(roleNameToUse)) {
+        // Resolve role name early
+        if (string.IsNullOrWhiteSpace(_roleName)) {
             var matchingRoles = new List<string>();
-            foreach (PresentationDetailsDTO p in presentations) {
-                if (p.ConceptId != rootConcept.ConceptId)
+            foreach (PresentationDetailsDTO p in earlyPresentationsResult.Value) {
+                if (p.ConceptId != earlyRootConcept.ConceptId)
                     continue;
                 if (string.IsNullOrWhiteSpace(p.RoleName))
                     continue;
@@ -170,24 +156,20 @@ public class StatementPrinter {
                 if (!alreadyAdded)
                     matchingRoles.Add(p.RoleName);
             }
-            if (matchingRoles.Count == 1) {
-                roleNameToUse = matchingRoles[0];
-            } else if (matchingRoles.Count == 0) {
-                await _stderr.WriteLineAsync($"ERROR: No presentation role found for concept '{rootConcept.Name}'.");
+            if (matchingRoles.Count == 0) {
+                await _stderr.WriteLineAsync($"ERROR: No presentation role found for concept '{earlyRootConcept.Name}'.");
                 return 2;
-            } else {
-                await _stderr.WriteLineAsync($"ERROR: Multiple presentation roles found for concept '{rootConcept.Name}'. Please specify --role.");
+            }
+            if (matchingRoles.Count > 1) {
+                await _stderr.WriteLineAsync($"ERROR: Multiple presentation roles found for concept '{earlyRootConcept.Name}'. Please specify --role.");
                 return 2;
             }
         }
 
-        Dictionary<long, List<PresentationDetailsDTO>> parentToChildren =
-            BuildParentToChildrenMap(presentations, roleNameToUse!);
-
-        // 4. Find submission for the specified date
+        // Find submission for the specified date
         Result<IReadOnlyCollection<Submission>> submissionsResult = await _dbmService.GetSubmissions(_ct);
         if (submissionsResult.IsFailure || submissionsResult.Value is null) {
-            await _stderr.WriteLineAsync($"ERROR: Could not load submissions for company.");
+            await _stderr.WriteLineAsync("ERROR: Could not load submissions for company.");
             return 2;
         }
         Submission? selectedSubmission = null;
@@ -199,7 +181,6 @@ public class StatementPrinter {
             if (selectedSubmission == null || sub.ReportDate > selectedSubmission.ReportDate)
                 selectedSubmission = sub;
         }
-        // If no submission found, and there are submissions for this company, but all are after the requested date, return error
         bool hasAnySubmissionForCompany = false;
         foreach (Submission sub in submissionsResult.Value) {
             if (sub.CompanyId == company.CompanyId) {
@@ -208,61 +189,48 @@ public class StatementPrinter {
             }
         }
         if (selectedSubmission is null) {
-            if (hasAnySubmissionForCompany) {
+            if (hasAnySubmissionForCompany)
                 await _stderr.WriteLineAsync($"ERROR: No submission found for CIK '{_cik}' on or before {_date:yyyy-MM-dd}.");
-                return 2;
-            } else {
+            else
                 await _stderr.WriteLineAsync($"ERROR: No submissions exist for CIK '{_cik}'.");
-                return 2;
-            }
-        }
-
-        // 5. Load data points for the company and submission
-        Result<IReadOnlyCollection<DataPoint>> dataPointsResult = await _dbmService.GetDataPointsForSubmission(company.CompanyId, selectedSubmission.SubmissionId, _ct);
-        if (dataPointsResult.IsFailure || dataPointsResult.Value is null) {
-            await _stderr.WriteLineAsync($"ERROR: Could not load data points for company/submission.");
             return 2;
         }
-        var dataPointMap = new Dictionary<long, DataPoint>();
-        foreach (DataPoint dp in dataPointsResult.Value) {
-            dataPointMap[dp.TaxonomyConceptId] = dp;
-        }
 
-        // 6. Traverse the taxonomy tree and collect hierarchy nodes
-        Dictionary<long, ConceptDetailsDTO> conceptMap = [];
-        foreach (ConceptDetailsDTO c in concepts)
-            conceptMap[c.ConceptId] = c;
-        var ctx = new TraverseContext(
-            rootConcept!.ConceptId,
-            parentToChildren!,
-            conceptMap,
-            0,
+        // Get statement data via StatementDataService
+        Result<StatementData> dataResult = await _statementDataService.GetStatementData(
+            company.CompanyId,
+            selectedSubmission.SubmissionId,
+            _concept,
+            _taxonomyTypeId,
             _maxDepth,
-            null,
-            []
-        );
-        Result<List<HierarchyNode>> hierarchyResult = await TraverseConceptTree(ctx);
-        if (hierarchyResult.IsFailure || hierarchyResult.Value is null) {
-            await _stderr.WriteLineAsync($"ERROR: {hierarchyResult.ErrorMessage}");
+            _roleName,
+            _ct,
+            _stderr);
+        if (dataResult.IsFailure || dataResult.Value is null) {
+            await _stderr.WriteLineAsync($"ERROR: {dataResult.ErrorMessage}");
             return 2;
         }
-        List<HierarchyNode> hierarchy = hierarchyResult.Value;
 
-        // 7. Output in the requested format
-        var childrenMap = new Dictionary<long, List<HierarchyNode>>();
-        var rootNodes = new List<HierarchyNode>();
-        BuildChildrenMap(hierarchy, childrenMap, rootNodes);
-        var includedConceptIds = new HashSet<long>();
-        foreach (HierarchyNode rootNode in rootNodes)
-            _ = HasValueOrChildValue(rootNode.ConceptId, childrenMap, dataPointMap, includedConceptIds);
-        if (includedConceptIds.Count == 0) {
-            foreach (HierarchyNode rootNode in rootNodes) {
-                if (!dataPointMap.ContainsKey(rootNode.ConceptId)) {
+        StatementData data = dataResult.Value;
+
+        // Build concept map for formatting
+        Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult =
+            await _dbmService.GetTaxonomyConceptsByTaxonomyType(_taxonomyTypeId, _ct);
+        Dictionary<long, ConceptDetailsDTO> conceptMap = new();
+        if (conceptsResult.IsSuccess && conceptsResult.Value is not null) {
+            foreach (ConceptDetailsDTO c in conceptsResult.Value)
+                conceptMap[c.ConceptId] = c;
+        }
+
+        if (data.IncludedConceptIds.Count == 0) {
+            foreach (HierarchyNode rootNode in data.RootNodes) {
+                if (!data.DataPointMap.ContainsKey(rootNode.ConceptId))
                     await _stderr.WriteLineAsync($"WARNING: No data point found for concept '{rootNode.Name}' (ConceptId: {rootNode.ConceptId}) in submission.");
-                }
             }
         }
-        await FormatOutput(hierarchy, conceptMap, dataPointMap, childrenMap, rootNodes, includedConceptIds);
+
+        await FormatOutput(data.Hierarchy, conceptMap, data.DataPointMap,
+            data.ChildrenMap, data.RootNodes, data.IncludedConceptIds);
         return 0;
     }
 
@@ -346,17 +314,16 @@ public class StatementPrinter {
             await _stdout.WriteLineAsync($"{formattedValue}");
             await _stdout.WriteLineAsync("</div>");
             _htmlRowIndex++;
-            if (childrenMap.TryGetValue(node.ConceptId, out List<HierarchyNode>? children)) {
+            if (childrenMap.TryGetValue(node.ConceptId, out List<HierarchyNode>? nodeChildren)) {
                 bool hasIncludedChildren = false;
-                foreach (HierarchyNode child in children) {
+                foreach (HierarchyNode child in nodeChildren) {
                     if (includedConceptIds.Contains(child.ConceptId)) {
                         hasIncludedChildren = true;
                         break;
                     }
                 }
-                if (hasIncludedChildren) {
+                if (hasIncludedChildren)
                     await WriteHtmlTree(childrenMap, rootNodes, includedConceptIds, conceptMap, dataPointMap, node.ConceptId, breadcrumb);
-                }
             }
         }
     }
@@ -400,9 +367,9 @@ public class StatementPrinter {
                 ["Label"] = node.Label,
                 ["Value"] = dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp) ? dp.Value : null
             };
-            object? children = BuildJsonTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, node.ConceptId);
-            if (children is List<object> list && list.Count > 0)
-                obj["Children"] = children;
+            object? nodeChildren = BuildJsonTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, node.ConceptId);
+            if (nodeChildren is List<object> list && list.Count > 0)
+                obj["Children"] = nodeChildren;
             result.Add(obj);
         }
         if (parentId == null && result.Count == 1)
@@ -411,118 +378,9 @@ public class StatementPrinter {
     }
 
     /// <summary>
-    /// Recursively walks the taxonomy tree from the selected concept.
-    /// </summary>
-    private async Task<Result<List<HierarchyNode>>> TraverseConceptTree(TraverseContext ctx) {
-        var result = new List<HierarchyNode>();
-        string? error = await Traverse(ctx, result);
-        if (error is not null)
-            return Result<List<HierarchyNode>>.Failure(ErrorCodes.GenericError, error);
-        return Result<List<HierarchyNode>>.Success(result);
-    }
-
-    private async Task<string?> Traverse(TraverseContext ctx, List<HierarchyNode> result) {
-        if (ctx.Depth > ctx.MaxDepth)
-            return null;
-        if (!ctx.ConceptMap.TryGetValue(ctx.ConceptId, out ConceptDetailsDTO? concept))
-            return $"ConceptId {ctx.ConceptId} not found in concept map.";
-        if (!ctx.Visited.Add(ctx.ConceptId)) {
-            await _stderr.WriteLineAsync($"WARNING: Cycle detected at conceptId {ctx.ConceptId}, skipping to prevent infinite recursion.");
-            return null;
-        }
-        result.Add(new HierarchyNode {
-            ConceptId = concept.ConceptId,
-            Name = concept.Name ?? string.Empty,
-            Label = concept.Label ?? string.Empty,
-            Depth = ctx.Depth,
-            ParentConceptId = ctx.ParentConceptId,
-        });
-        if (ctx.ParentToChildren.TryGetValue(ctx.ConceptId, out List<PresentationDetailsDTO>? children)) {
-            var seenChildConceptIds = new HashSet<long>();
-            foreach (PresentationDetailsDTO child in children) {
-                if (!seenChildConceptIds.Add(child.ConceptId))
-                    continue;
-                TraverseContext childCtx = ctx with {
-                    ConceptId = child.ConceptId,
-                    Depth = ctx.Depth + 1,
-                    ParentConceptId = ctx.ConceptId
-                };
-                string? err = await Traverse(childCtx, result);
-                if (err is not null)
-                    return err;
-            }
-        }
-        _ = ctx.Visited.Remove(ctx.ConceptId);
-        return null;
-    }
-
-    private static void BuildChildrenMap(
-        List<HierarchyNode> nodes,
-        Dictionary<long, List<HierarchyNode>> childrenMap,
-        List<HierarchyNode> rootNodes) {
-        foreach (HierarchyNode node in nodes) {
-            if (node.ParentConceptId.HasValue) {
-                long parentId = node.ParentConceptId.Value;
-                if (!childrenMap.TryGetValue(parentId, out List<HierarchyNode>? children)) {
-                    children = [];
-                    childrenMap[parentId] = children;
-                }
-                children.Add(node);
-            } else {
-                rootNodes.Add(node);
-            }
-        }
-    }
-
-    private static bool HasValueOrChildValue(
-        long conceptId,
-        Dictionary<long, List<HierarchyNode>> childrenMap,
-        Dictionary<long, DataPoint> dataPointMap,
-        HashSet<long> includedConceptIds) {
-        bool hasValue = dataPointMap.ContainsKey(conceptId);
-        bool hasChildValue = false;
-        if (childrenMap.TryGetValue(conceptId, out List<HierarchyNode>? children)) {
-            foreach (HierarchyNode child in children) {
-                if (HasValueOrChildValue(child.ConceptId, childrenMap, dataPointMap, includedConceptIds)) {
-                    hasChildValue = true;
-                }
-            }
-        }
-        if (hasValue || hasChildValue)
-            _ = includedConceptIds.Add(conceptId);
-        return hasValue || hasChildValue;
-    }
-
-    /// <summary>
-    /// Handles output formatting for each supported format (CSV, HTML, JSON).
-    /// </summary>
-    private void FormatOutput(/* params */) {
-        // TODO: Implement output formatting
-    }
-
-    /// <summary>
     /// Ensures all required parameters are present and valid.
     /// </summary>
     public static bool ValidateParameters(/* params */) =>
         // TODO: Implement parameter validation
         true;
-
-    /// <summary>
-    /// Builds a map from ParentConceptId to a list of child PresentationDetailsDTOs for efficient hierarchy traversal.
-    /// </summary>
-    private static Dictionary<long, List<PresentationDetailsDTO>> BuildParentToChildrenMap(
-        IEnumerable<PresentationDetailsDTO> presentations,
-        string roleName) {
-        var parentToChildren = new Dictionary<long, List<PresentationDetailsDTO>>();
-        foreach (PresentationDetailsDTO pres in presentations) {
-            if (!string.Equals(pres.RoleName, roleName, StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (!parentToChildren.TryGetValue(pres.ParentConceptId, out List<PresentationDetailsDTO>? children)) {
-                children = [];
-                parentToChildren[pres.ParentConceptId] = children;
-            }
-            children.Add(pres);
-        }
-        return parentToChildren;
-    }
 }

@@ -15,8 +15,10 @@
   - Tests: DashboardStatsTests.cs (3 tests)
   - Committed: 30aa22e
 
-- [ ] Checkpoint 4: WebApi Project Scaffold
-  - (pending)
+- [x] Checkpoint 4: WebApi Project Scaffold
+  - Files: Stocks.WebApi.csproj, Program.cs, Stocks.WebApi.Tests.csproj, HealthCheckTests.cs, EDGARScraper.sln
+  - Tests: HealthCheckTests.cs (2 tests)
+  - Committed: 47beaa7
 
 - [ ] Checkpoint 5: StatementDataService Extraction
   - (pending)

@@ -180,6 +180,49 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
+    public async Task<Result<Company>> GetCompanyByCik(string cik, CancellationToken ct) {
+        if (!ulong.TryParse(cik, out ulong cikValue)) {
+            _logger.LogWarning("GetCompanyByCik failed - invalid CIK: {Cik}", cik);
+            return Result<Company>.Failure(ErrorCodes.NotFound, $"Invalid CIK: {cik}");
+        }
+
+        var stmt = new GetCompanyByCikStmt(cikValue);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess && stmt.Company.CompanyId != 0) {
+            _logger.LogInformation("GetCompanyByCik success - CIK: {Cik}", cik);
+            return Result<Company>.Success(stmt.Company);
+        } else {
+            _logger.LogWarning("GetCompanyByCik not found - CIK: {Cik}", cik);
+            return Result<Company>.Failure(ErrorCodes.NotFound, $"Company not found for CIK: {cik}");
+        }
+    }
+
+    #endregion
+
+    #region Company tickers
+
+    public async Task<Result> BulkInsertCompanyTickers(List<CompanyTicker> tickers, CancellationToken ct) {
+        var stmt = new BulkInsertCompanyTickersStmt(tickers);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertCompanyTickers success - Num tickers: {NumTickers}", tickers.Count);
+        else
+            _logger.LogError("BulkInsertCompanyTickers failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result<IReadOnlyCollection<CompanyTicker>>> GetCompanyTickersByCompanyId(ulong companyId, CancellationToken ct) {
+        var stmt = new GetCompanyTickersByCompanyIdStmt(companyId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetCompanyTickersByCompanyId success - CompanyId: {CompanyId}, Num tickers: {NumTickers}", companyId, stmt.Tickers.Count);
+            return Result<IReadOnlyCollection<CompanyTicker>>.Success(stmt.Tickers);
+        } else {
+            _logger.LogWarning("GetCompanyTickersByCompanyId failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<CompanyTicker>>.Failure(res);
+        }
+    }
+
     #endregion
 
     #region Data points
@@ -348,6 +391,18 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
+    public async Task<Result<IReadOnlyCollection<Submission>>> GetSubmissionsByCompanyId(ulong companyId, CancellationToken ct) {
+        var stmt = new GetSubmissionsByCompanyIdStmt(companyId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetSubmissionsByCompanyId success - CompanyId: {CompanyId}, Num submissions: {NumSubmissions}", companyId, stmt.Submissions.Count);
+            return Result<IReadOnlyCollection<Submission>>.Success(stmt.Submissions);
+        } else {
+            _logger.LogWarning("GetSubmissionsByCompanyId failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<Submission>>.Failure(res);
+        }
+    }
+
     public async Task<Result> BulkInsertSubmissions(List<Submission> batch, CancellationToken ct) {
         var stmt = new BulkInsertSubmissionsStmt(batch);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
@@ -478,11 +533,12 @@ public sealed class DbmService : IDisposable, IDbmService {
     public async Task<Result> UpsertPriceDownload(PriceDownloadStatus status, CancellationToken ct) {
         var stmt = new UpsertPriceDownloadStmt(status);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
-        if (res.IsSuccess)
+        if (res.IsSuccess) {
             _logger.LogInformation("UpsertPriceDownload success - Ticker: {Ticker}, Cik: {Cik}, Exchange: {Exchange}",
                 status.Ticker, status.Cik, status.Exchange ?? string.Empty);
-        else
+        } else {
             _logger.LogError("UpsertPriceDownload failed with error {Error}", res.ErrorMessage);
+        }
         return res;
     }
 

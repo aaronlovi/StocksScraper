@@ -33,6 +33,58 @@ public sealed class DbmInMemoryService : IDbmService {
         return ValueTask.FromResult(start);
     }
 
+    // Companies
+
+    public Task<Result<Company>> GetCompanyById(ulong companyId, CancellationToken ct) {
+        Company? company = _data.GetCompanyById(companyId);
+        if (company is null)
+            return Task.FromResult(Result<Company>.Failure(ErrorCodes.NotFound, "Company not found"));
+        return Task.FromResult(Result<Company>.Success(company));
+    }
+
+    public Task<Result> BulkInsertCompanies(List<Company> companies, CancellationToken ct) {
+        _data.AddCompanies(companies);
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct) {
+        _data.AddCompanyNames(companyNames);
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result<Company>> GetCompanyByCik(string cik, CancellationToken ct) {
+        if (!ulong.TryParse(cik, out ulong cikValue))
+            return Task.FromResult(Result<Company>.Failure(ErrorCodes.NotFound, $"Invalid CIK: {cik}"));
+        Company? company = _data.GetCompanyByCik(cikValue);
+        if (company is null)
+            return Task.FromResult(Result<Company>.Failure(ErrorCodes.NotFound, $"Company not found for CIK: {cik}"));
+        return Task.FromResult(Result<Company>.Success(company));
+    }
+
+    // Company tickers
+
+    public Task<Result> BulkInsertCompanyTickers(List<CompanyTicker> tickers, CancellationToken ct) {
+        _data.AddOrUpdateCompanyTickers(tickers);
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result<IReadOnlyCollection<CompanyTicker>>> GetCompanyTickersByCompanyId(ulong companyId, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<CompanyTicker>>.Success(_data.GetCompanyTickersByCompanyId(companyId)));
+
+    // Submissions
+
+    public Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct) => throw new NotSupportedException();
+
+    public Task<Result<IReadOnlyCollection<Submission>>> GetSubmissionsByCompanyId(ulong companyId, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<Submission>>.Success(_data.GetSubmissionsByCompanyId(companyId)));
+
+    public Task<Result> BulkInsertSubmissions(List<Submission> batch, CancellationToken none) {
+        _data.AddSubmissions(batch);
+        return Task.FromResult(Result.Success);
+    }
+
+    // Prices
+
     public Task<Result<IReadOnlyCollection<PriceImportStatus>>> GetPriceImportStatuses(CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<PriceImportStatus>>.Success(_data.GetPriceImports()));
 
@@ -62,6 +114,8 @@ public sealed class DbmInMemoryService : IDbmService {
         return Task.FromResult(Result.Success);
     }
 
+    // Taxonomy types
+
     public Task<Result<TaxonomyTypeInfo>> GetTaxonomyTypeByNameVersion(string name, int version, CancellationToken ct) {
         TaxonomyTypeInfo? existing = _data.GetTaxonomyType(name, version);
         if (existing is null)
@@ -80,12 +134,11 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<int>> GetTaxonomyPresentationCountByType(int taxonomyTypeId, CancellationToken ct) =>
         Task.FromResult(Result<int>.Success(_data.GetTaxonomyPresentationCount(taxonomyTypeId)));
 
-    public Task<Result<Company>> GetCompanyById(ulong companyId, CancellationToken ct) => throw new NotSupportedException();
+    // Not yet implemented
+
     public Task<Result<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(string dataSource, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result<PagedCompanies>> GetPagedCompaniesByDataSource(string dataSource, PaginationRequest pagination, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result> EmptyCompaniesTables(CancellationToken ct) => throw new NotSupportedException();
-    public Task<Result> BulkInsertCompanies(List<Company> companies, CancellationToken ct) => throw new NotSupportedException();
-    public Task<Result> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct) => throw new NotSupportedException();
     public Task<Result> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct) => throw new NotSupportedException();
@@ -94,6 +147,4 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result> BulkInsertTaxonomyPresentations(List<PresentationDetailsDTO> taxonomyPresentations, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result<IReadOnlyCollection<PresentationDetailsDTO>>> GetTaxonomyPresentationsByTaxonomyType(int taxonomyTypeId, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct) => throw new NotSupportedException();
-    public Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct) => throw new NotSupportedException();
-    public Task<Result> BulkInsertSubmissions(List<Submission> batch, CancellationToken none) => throw new NotSupportedException();
 }

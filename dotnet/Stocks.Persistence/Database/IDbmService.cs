@@ -27,6 +27,12 @@ public interface IDbmService {
     Task<Result> EmptyCompaniesTables(CancellationToken ct);
     Task<Result> BulkInsertCompanies(List<Company> companies, CancellationToken ct);
     Task<Result> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct);
+    Task<Result<Company>> GetCompanyByCik(string cik, CancellationToken ct);
+
+    // Company tickers
+
+    Task<Result> BulkInsertCompanyTickers(List<CompanyTicker> tickers, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<CompanyTicker>>> GetCompanyTickersByCompanyId(ulong companyId, CancellationToken ct);
 
     // Data points and data point units
 
@@ -47,6 +53,7 @@ public interface IDbmService {
     // Company submissions
 
     Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct);
+    Task<Result<IReadOnlyCollection<Submission>>> GetSubmissionsByCompanyId(ulong companyId, CancellationToken ct);
     Task<Result> BulkInsertSubmissions(List<Submission> batch, CancellationToken none);
 
     // Prices

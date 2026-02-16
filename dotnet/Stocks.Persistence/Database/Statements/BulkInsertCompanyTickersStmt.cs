@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Npgsql;
 using NpgsqlTypes;
 using Stocks.DataModels;

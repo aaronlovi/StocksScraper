@@ -1,5 +1,3 @@
-using System;
-
 namespace EDGARScraper.Options;
 
 public class StooqBulkImportOptions {

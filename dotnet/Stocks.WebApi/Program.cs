@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Stocks.Persistence.Database;
+using Stocks.WebApi.Endpoints;
 
 namespace Stocks.WebApi;
 
@@ -30,6 +30,11 @@ public class Program {
         _ = app.UseCors();
 
         _ = app.MapGet("/api/health", () => Results.Ok(new { status = "healthy" }));
+
+        app.MapCompanyEndpoints();
+        app.MapSubmissionEndpoints();
+        app.MapSearchEndpoints();
+        app.MapDashboardEndpoints();
 
         app.Run();
     }

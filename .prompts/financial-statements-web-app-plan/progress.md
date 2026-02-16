@@ -20,8 +20,10 @@
   - Tests: HealthCheckTests.cs (2 tests)
   - Committed: 47beaa7
 
-- [ ] Checkpoint 5: StatementDataService Extraction
-  - (pending)
+- [x] Checkpoint 5: StatementDataService Extraction
+  - Files: HierarchyNode.cs (moved), StatementData.cs, StatementListItem.cs, StatementDataService.cs, StatementPrinter.cs (refactored), deleted TraverseContext.cs
+  - Tests: StatementDataServiceTests.cs (4 tests), all 11 StatementPrinterTests still pass
+  - Committed: 99eaf69
 
 - [ ] Checkpoint 6: Core API Endpoints
   - (pending)

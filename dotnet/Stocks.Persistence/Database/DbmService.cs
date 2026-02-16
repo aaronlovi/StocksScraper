@@ -314,6 +314,24 @@ public sealed class DbmService : IDisposable, IDbmService {
         return Result<TaxonomyTypeInfo>.Success(created);
     }
 
+    public async Task<Result<int>> GetTaxonomyConceptCountByType(int taxonomyTypeId, CancellationToken ct) {
+        var stmt = new GetTaxonomyConceptCountByTypeStmt(taxonomyTypeId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            return Result<int>.Success(stmt.Count);
+        _logger.LogWarning("GetTaxonomyConceptCountByType failed - TypeId: {TypeId}, Error: {Error}", taxonomyTypeId, res.ErrorMessage);
+        return Result<int>.Failure(res);
+    }
+
+    public async Task<Result<int>> GetTaxonomyPresentationCountByType(int taxonomyTypeId, CancellationToken ct) {
+        var stmt = new GetTaxonomyPresentationCountByTypeStmt(taxonomyTypeId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            return Result<int>.Success(stmt.Count);
+        _logger.LogWarning("GetTaxonomyPresentationCountByType failed - TypeId: {TypeId}, Error: {Error}", taxonomyTypeId, res.ErrorMessage);
+        return Result<int>.Failure(res);
+    }
+
     #endregion
 
     #region Company submissions

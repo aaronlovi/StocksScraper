@@ -47,13 +47,35 @@ public sealed class UsGaapTaxonomyImporter {
 
         int taxonomyTypeId = taxonomyTypeResult.Value!.TaxonomyTypeId;
 
-        Result conceptsResult = await ImportConceptsAsync(conceptsPath, taxonomyTypeId, ct);
-        if (conceptsResult.IsFailure)
-            return conceptsResult;
+        Result<int> conceptCount = await _dbm.GetTaxonomyConceptCountByType(taxonomyTypeId, ct);
+        if (conceptCount.IsFailure)
+            return Result.Failure(conceptCount);
 
-        Result presentationsResult = await ImportPresentationsAsync(presentationPath, taxonomyTypeId, ct);
-        if (presentationsResult.IsFailure)
-            return presentationsResult;
+        Result<int> presentationCount = await _dbm.GetTaxonomyPresentationCountByType(taxonomyTypeId, ct);
+        if (presentationCount.IsFailure)
+            return Result.Failure(presentationCount);
+
+        if (conceptCount.Value > 0 && presentationCount.Value > 0) {
+            _logger.LogInformation("ImportYearAsync - Year {Year} already imported ({Concepts} concepts, {Presentations} presentations), skipping",
+                year, conceptCount.Value, presentationCount.Value);
+            return Result.Success;
+        }
+
+        if (conceptCount.Value == 0) {
+            Result conceptsResult = await ImportConceptsAsync(conceptsPath, taxonomyTypeId, ct);
+            if (conceptsResult.IsFailure)
+                return conceptsResult;
+        } else {
+            _logger.LogInformation("ImportYearAsync - Year {Year} concepts already loaded ({Count}), skipping", year, conceptCount.Value);
+        }
+
+        if (presentationCount.Value == 0) {
+            Result presentationsResult = await ImportPresentationsAsync(presentationPath, taxonomyTypeId, ct);
+            if (presentationsResult.IsFailure)
+                return presentationsResult;
+        } else {
+            _logger.LogInformation("ImportYearAsync - Year {Year} presentations already loaded ({Count}), skipping", year, presentationCount.Value);
+        }
 
         return Result.Success;
     }

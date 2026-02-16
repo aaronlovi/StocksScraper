@@ -66,4 +66,6 @@ public interface IDbmService {
 
     Task<Result<TaxonomyTypeInfo>> GetTaxonomyTypeByNameVersion(string name, int version, CancellationToken ct);
     Task<Result<TaxonomyTypeInfo>> EnsureTaxonomyType(string name, int version, CancellationToken ct);
+    Task<Result<int>> GetTaxonomyConceptCountByType(int taxonomyTypeId, CancellationToken ct);
+    Task<Result<int>> GetTaxonomyPresentationCountByType(int taxonomyTypeId, CancellationToken ct);
 }

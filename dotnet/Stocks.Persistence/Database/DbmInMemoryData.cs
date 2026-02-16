@@ -87,6 +87,10 @@ public sealed class DbmInMemoryData {
         }
     }
 
+    public int GetTaxonomyConceptCount(int taxonomyTypeId) => 0;
+
+    public int GetTaxonomyPresentationCount(int taxonomyTypeId) => 0;
+
     private static string BuildImportKey(ulong cik, string ticker, string? exchange) {
         string normalizedTicker = string.IsNullOrWhiteSpace(ticker) ? string.Empty : ticker.Trim().ToUpperInvariant();
         string normalizedExchange = string.IsNullOrWhiteSpace(exchange) ? string.Empty : exchange.Trim().ToUpperInvariant();

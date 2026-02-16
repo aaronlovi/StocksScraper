@@ -74,6 +74,12 @@ public sealed class DbmInMemoryService : IDbmService {
         return Task.FromResult(Result<TaxonomyTypeInfo>.Success(created));
     }
 
+    public Task<Result<int>> GetTaxonomyConceptCountByType(int taxonomyTypeId, CancellationToken ct) =>
+        Task.FromResult(Result<int>.Success(_data.GetTaxonomyConceptCount(taxonomyTypeId)));
+
+    public Task<Result<int>> GetTaxonomyPresentationCountByType(int taxonomyTypeId, CancellationToken ct) =>
+        Task.FromResult(Result<int>.Success(_data.GetTaxonomyPresentationCount(taxonomyTypeId)));
+
     public Task<Result<Company>> GetCompanyById(ulong companyId, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(string dataSource, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result<PagedCompanies>> GetPagedCompaniesByDataSource(string dataSource, PaginationRequest pagination, CancellationToken ct) => throw new NotSupportedException();

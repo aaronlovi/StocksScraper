@@ -51,6 +51,9 @@ public interface IDbmService {
     // Data points for a company and submission
     Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct);
 
+    // Dashboard
+    Task<Result<DashboardStats>> GetDashboardStats(CancellationToken ct);
+
     // Company submissions
 
     Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct);

@@ -5,8 +5,10 @@
   - Tests: CompanyTickersTests.cs (7 tests)
   - Committed: 064daba
 
-- [ ] Checkpoint 2: Unified Search with pg_trgm
-  - (pending)
+- [x] Checkpoint 2: Unified Search with pg_trgm
+  - Files: V011__AddTrigramSearch.sql, CompanySearchResult.cs, SearchCompaniesStmt.cs, IDbmService.cs, DbmService.cs, DbmInMemoryService.cs, DbmInMemoryData.cs
+  - Tests: CompanySearchTests.cs (5 tests)
+  - Committed: 35ea331
 
 - [ ] Checkpoint 3: Dashboard Statistics Statement
   - (pending)

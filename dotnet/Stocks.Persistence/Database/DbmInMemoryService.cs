@@ -76,6 +76,11 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<IReadOnlyCollection<CompanyTicker>>> GetCompanyTickersByCompanyId(ulong companyId, CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<CompanyTicker>>.Success(_data.GetCompanyTickersByCompanyId(companyId)));
 
+    // Dashboard
+
+    public Task<Result<DashboardStats>> GetDashboardStats(CancellationToken ct) =>
+        Task.FromResult(Result<DashboardStats>.Success(_data.GetDashboardStats()));
+
     // Submissions
 
     public Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct) => throw new NotSupportedException();
@@ -146,7 +151,10 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result> EmptyCompaniesTables(CancellationToken ct) => throw new NotSupportedException();
     public Task<Result<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct) => throw new NotSupportedException();
     public Task<Result> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct) => throw new NotSupportedException();
-    public Task<Result> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct) => throw new NotSupportedException();
+    public Task<Result> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct) {
+        _data.AddDataPoints(dataPoints);
+        return Task.FromResult(Result.Success);
+    }
     public Task<Result> BulkInsertTaxonomyConcepts(List<ConceptDetailsDTO> taxonomyConcepts, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result<IReadOnlyCollection<ConceptDetailsDTO>>> GetTaxonomyConceptsByTaxonomyType(int taxonomyTypeId, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result> BulkInsertTaxonomyPresentations(List<PresentationDetailsDTO> taxonomyPresentations, CancellationToken ct) => throw new NotSupportedException();

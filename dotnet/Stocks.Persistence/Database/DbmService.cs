@@ -389,6 +389,22 @@ public sealed class DbmService : IDisposable, IDbmService {
 
     #endregion
 
+    #region Dashboard
+
+    public async Task<Result<DashboardStats>> GetDashboardStats(CancellationToken ct) {
+        var stmt = new GetDashboardStatsStmt();
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetDashboardStats success");
+            return Result<DashboardStats>.Success(stmt.Stats);
+        } else {
+            _logger.LogError("GetDashboardStats failed with error {Error}", res.ErrorMessage);
+            return Result<DashboardStats>.Failure(res);
+        }
+    }
+
+    #endregion
+
     #region Company submissions
 
     public async Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct) {

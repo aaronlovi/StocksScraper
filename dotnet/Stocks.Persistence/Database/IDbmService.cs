@@ -28,6 +28,7 @@ public interface IDbmService {
     Task<Result> BulkInsertCompanies(List<Company> companies, CancellationToken ct);
     Task<Result> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct);
     Task<Result<Company>> GetCompanyByCik(string cik, CancellationToken ct);
+    Task<Result<PagedResults<CompanySearchResult>>> SearchCompanies(string query, PaginationRequest pagination, CancellationToken ct);
 
     // Company tickers
 

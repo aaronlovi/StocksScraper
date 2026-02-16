@@ -180,6 +180,18 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
+    public async Task<Result<PagedResults<CompanySearchResult>>> SearchCompanies(string query, PaginationRequest pagination, CancellationToken ct) {
+        var stmt = new SearchCompaniesStmt(query, pagination);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("SearchCompanies success - Query: {Query}, Results: {NumResults}", query, stmt.Results.Count);
+            return Result<PagedResults<CompanySearchResult>>.Success(stmt.GetPagedResults());
+        } else {
+            _logger.LogWarning("SearchCompanies failed with error {Error}", res.ErrorMessage);
+            return Result<PagedResults<CompanySearchResult>>.Failure(res);
+        }
+    }
+
     public async Task<Result<Company>> GetCompanyByCik(string cik, CancellationToken ct) {
         if (!ulong.TryParse(cik, out ulong cikValue)) {
             _logger.LogWarning("GetCompanyByCik failed - invalid CIK: {Cik}", cik);

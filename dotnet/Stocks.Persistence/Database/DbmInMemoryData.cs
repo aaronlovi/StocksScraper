@@ -104,6 +104,88 @@ public sealed class DbmInMemoryData {
         return results;
     }
 
+    // Search
+
+    public PagedResults<CompanySearchResult> SearchCompanies(string query, PaginationRequest pagination) {
+        var matches = new List<CompanySearchResult>();
+        string queryLower = query.ToLowerInvariant();
+
+        lock (_mutex) {
+            var seen = new HashSet<ulong>();
+
+            foreach (Company company in _companies) {
+                if (seen.Contains(company.CompanyId))
+                    continue;
+
+                bool matched = false;
+                string? matchedName = null;
+
+                // Check CIK exact match
+                if (company.Cik.ToString() == query) {
+                    matched = true;
+                }
+
+                // Check company names (case-insensitive substring)
+                if (!matched) {
+                    foreach (CompanyName cn in _companyNames) {
+                        if (cn.CompanyId == company.CompanyId
+                            && cn.Name.ToLowerInvariant().Contains(queryLower)) {
+                            matched = true;
+                            matchedName = cn.Name;
+                            break;
+                        }
+                    }
+                }
+
+                // Check tickers (case-insensitive substring)
+                string? matchedTicker = null;
+                string? matchedExchange = null;
+                foreach (CompanyTicker ct in _companyTickers) {
+                    if (ct.CompanyId == company.CompanyId) {
+                        if (!matched && ct.Ticker.ToLowerInvariant().Contains(queryLower))
+                            matched = true;
+                        if (matchedTicker is null) {
+                            matchedTicker = ct.Ticker;
+                            matchedExchange = ct.Exchange;
+                        }
+                    }
+                }
+
+                // Get first name if not matched by name
+                if (matched && matchedName is null) {
+                    foreach (CompanyName cn in _companyNames) {
+                        if (cn.CompanyId == company.CompanyId) {
+                            matchedName = cn.Name;
+                            break;
+                        }
+                    }
+                }
+
+                if (matched) {
+                    _ = seen.Add(company.CompanyId);
+                    matches.Add(new CompanySearchResult(
+                        company.CompanyId,
+                        company.Cik.ToString(),
+                        matchedName ?? string.Empty,
+                        matchedTicker,
+                        matchedExchange));
+                }
+            }
+        }
+
+        uint totalItems = (uint)matches.Count;
+        int offset = (int)((pagination.PageNumber - 1) * pagination.PageSize);
+        int limit = (int)pagination.PageSize;
+
+        var page = new List<CompanySearchResult>();
+        for (int i = offset; i < matches.Count && page.Count < limit; i++)
+            page.Add(matches[i]);
+
+        uint totalPages = totalItems == 0 ? 0 : (uint)System.Math.Ceiling(totalItems / (double)pagination.PageSize);
+        var paginationResponse = new PaginationResponse(pagination.PageNumber, totalItems, totalPages);
+        return new PagedResults<CompanySearchResult>(page, paginationResponse);
+    }
+
     // Prices
 
     public IReadOnlyCollection<PriceImportStatus> GetPriceImports() {

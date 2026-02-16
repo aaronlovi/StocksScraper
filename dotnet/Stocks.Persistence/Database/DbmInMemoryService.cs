@@ -52,6 +52,11 @@ public sealed class DbmInMemoryService : IDbmService {
         return Task.FromResult(Result.Success);
     }
 
+    public Task<Result<PagedResults<CompanySearchResult>>> SearchCompanies(string query, PaginationRequest pagination, CancellationToken ct) {
+        PagedResults<CompanySearchResult> results = _data.SearchCompanies(query, pagination);
+        return Task.FromResult(Result<PagedResults<CompanySearchResult>>.Success(results));
+    }
+
     public Task<Result<Company>> GetCompanyByCik(string cik, CancellationToken ct) {
         if (!ulong.TryParse(cik, out ulong cikValue))
             return Task.FromResult(Result<Company>.Failure(ErrorCodes.NotFound, $"Invalid CIK: {cik}"));

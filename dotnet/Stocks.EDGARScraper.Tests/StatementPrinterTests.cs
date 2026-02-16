@@ -50,6 +50,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: true,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -88,6 +89,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: true,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -130,6 +132,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: true,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -160,6 +163,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: true,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -190,6 +194,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: true,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -224,6 +229,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: true,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -266,6 +272,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: false,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -325,6 +332,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: false,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -385,6 +393,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "html",
             listStatements: false,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -450,6 +459,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "json",
             listStatements: false,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -509,6 +519,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: false,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -560,6 +571,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: false,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );
@@ -608,6 +620,7 @@ public class StatementPrinterTests {
             roleName: null,
             format: "csv",
             listStatements: false,
+            taxonomyTypeId: 1,
             stdout: stdout,
             stderr: stderr
         );

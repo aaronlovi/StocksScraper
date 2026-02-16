@@ -29,6 +29,7 @@ public class StatementPrinter {
     private readonly string _format;
     private readonly bool _listStatements;
     private readonly string? _roleName;
+    private readonly int _taxonomyTypeId;
     private readonly CancellationToken _ct;
     private int _htmlRowIndex;
 
@@ -41,6 +42,7 @@ public class StatementPrinter {
         string format,
         string? roleName,
         bool listStatements,
+        int taxonomyTypeId,
         TextWriter? stdout = null,
         TextWriter? stderr = null,
         CancellationToken ct = default) {
@@ -52,6 +54,7 @@ public class StatementPrinter {
         _format = format;
         _roleName = roleName;
         _listStatements = listStatements;
+        _taxonomyTypeId = taxonomyTypeId;
         _stdout = stdout ?? Console.Out;
         _stderr = stderr ?? Console.Error;
         _ct = ct;
@@ -85,20 +88,19 @@ public class StatementPrinter {
             return 2;
         }
 
-        // 2. Load taxonomy concepts (US-GAAP 2025 assumed for now)
-        const int UsGaap2025TaxonomyTypeId = 1; // TODO: Make configurable if needed
-        Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult = await _dbmService.GetTaxonomyConceptsByTaxonomyType(UsGaap2025TaxonomyTypeId, _ct);
+        // 2. Load taxonomy concepts
+        Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult = await _dbmService.GetTaxonomyConceptsByTaxonomyType(_taxonomyTypeId, _ct);
         if (conceptsResult.IsFailure || conceptsResult.Value is null) {
-            await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy concepts for US-GAAP 2025.");
+            await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy concepts for taxonomy type {_taxonomyTypeId}.");
             return 2;
         }
         IReadOnlyCollection<ConceptDetailsDTO> concepts = conceptsResult.Value;
 
         // 3. Load presentation hierarchy for role-scoped traversal
         Result<IReadOnlyCollection<PresentationDetailsDTO>> presentationsResult =
-            await _dbmService.GetTaxonomyPresentationsByTaxonomyType(UsGaap2025TaxonomyTypeId, _ct);
+            await _dbmService.GetTaxonomyPresentationsByTaxonomyType(_taxonomyTypeId, _ct);
         if (presentationsResult.IsFailure || presentationsResult.Value is null) {
-            await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy presentation hierarchy for US-GAAP 2025.");
+            await _stderr.WriteLineAsync($"ERROR: Could not load taxonomy presentation hierarchy for taxonomy type {_taxonomyTypeId}.");
             return 2;
         }
         IReadOnlyCollection<PresentationDetailsDTO> presentations = presentationsResult.Value;

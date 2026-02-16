@@ -185,9 +185,18 @@ internal partial class Program {
         }
 
         if (parsed.ShowUsage) {
-            Console.Error.WriteLine("USAGE: dotnet run --print-statement --cik <CIK> [--concept <ConceptName>] [--date <YYYY-MM-DD>] [--format <csv|html|json>] [--max-depth <N>] [--role <RoleName>] [--list-statements]");
+            Console.Error.WriteLine("USAGE: dotnet run --print-statement --cik <CIK> [--concept <ConceptName>] [--date <YYYY-MM-DD>] [--format <csv|html|json>] [--max-depth <N>] [--role <RoleName>] [--list-statements] [--taxonomy-year <YYYY>]");
             return 4;
         }
+
+        int taxonomyYear = parsed.TaxonomyYear ?? parsed.Date.Year;
+        Result<TaxonomyTypeInfo> taxonomyTypeResult = await _dbm!.GetTaxonomyTypeByNameVersion("us-gaap", taxonomyYear, CancellationToken.None);
+        if (taxonomyTypeResult.IsFailure || taxonomyTypeResult.Value is null) {
+            _logger.LogError("Could not find taxonomy type for us-gaap {Year}", taxonomyYear);
+            Console.Error.WriteLine($"ERROR: Could not find taxonomy type for us-gaap {taxonomyYear}.");
+            return 2;
+        }
+        int taxonomyTypeId = taxonomyTypeResult.Value.TaxonomyTypeId;
 
         var printer = new StatementPrinter(
             _dbm!,
@@ -198,6 +207,7 @@ internal partial class Program {
             parsed.Format,
             parsed.RoleName,
             parsed.ListStatements,
+            taxonomyTypeId,
             Console.Out,
             Console.Error,
             CancellationToken.None
@@ -214,6 +224,7 @@ internal partial class Program {
         string? roleName = null;
         bool listStatements = false;
         bool showUsage = false;
+        int? taxonomyYear = null;
 
         for (int i = 1; i < args.Length; i++) {
             switch (args[i]) {
@@ -263,13 +274,20 @@ internal partial class Program {
                     listStatements = true;
                     break;
                 }
+                case "--taxonomy-year": {
+                    if (i + 1 < args.Length && int.TryParse(args[++i], out int ty))
+                        taxonomyYear = ty;
+                    else
+                        showUsage = true;
+                    break;
+                }
                 case "--help": {
                     showUsage = true;
                     break;
                 }
             }
         }
-        return new PrintStatementArgs(cik, concept, date, maxDepth, format, roleName, listStatements, showUsage);
+        return new PrintStatementArgs(cik, concept, date, maxDepth, format, roleName, listStatements, showUsage, taxonomyYear);
     }
 
     private static IHost BuildHost<TStartup>(string[] args) where TStartup : class {

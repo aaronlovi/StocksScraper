@@ -10,5 +10,6 @@ public record PrintStatementArgs(
     string Format,
     string? RoleName,
     bool ListStatements,
-    bool ShowUsage
+    bool ShowUsage,
+    int? TaxonomyYear
 );

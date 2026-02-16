@@ -1,0 +1,36 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Stocks.Persistence.Database;
+
+namespace Stocks.WebApi;
+
+public class Program {
+    public static void Main(string[] args) {
+        WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+        _ = builder.Services.AddSingleton<PostgresExecutor>();
+
+        if (builder.Configuration.GetConnectionString(DbmService.StocksDataConnectionStringName) is not null)
+            _ = builder.Services.AddSingleton<IDbmService, DbmService>();
+
+        _ = builder.Services.AddCors(options => {
+            options.AddDefaultPolicy(policy => {
+                _ = policy
+                    .WithOrigins("http://localhost:4200")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            });
+        });
+
+        WebApplication app = builder.Build();
+
+        _ = app.UseCors();
+
+        _ = app.MapGet("/api/health", () => Results.Ok(new { status = "healthy" }));
+
+        app.Run();
+    }
+}

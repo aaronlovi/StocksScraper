@@ -10,8 +10,10 @@
   - Tests: CompanySearchTests.cs (5 tests)
   - Committed: 35ea331
 
-- [ ] Checkpoint 3: Dashboard Statistics Statement
-  - (pending)
+- [x] Checkpoint 3: Dashboard Statistics Statement
+  - Files: DashboardStats.cs, GetDashboardStatsStmt.cs, IDbmService.cs, DbmService.cs, DbmInMemoryService.cs, DbmInMemoryData.cs
+  - Tests: DashboardStatsTests.cs (3 tests)
+  - Committed: 30aa22e
 
 - [ ] Checkpoint 4: WebApi Project Scaffold
   - (pending)

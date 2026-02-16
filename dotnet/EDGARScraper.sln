@@ -44,6 +44,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "decisions", "decisions", "{
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.EDGARScraper.Tests", "Stocks.EDGARScraper.Tests\Stocks.EDGARScraper.Tests.csproj", "{BDA8BACD-5997-4AA5-CF17-731412D95463}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.WebApi", "Stocks.WebApi\Stocks.WebApi.csproj", "{5E8C2C25-B748-46BE-BF5C-37F6A3614D3B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stocks.WebApi.Tests", "Stocks.WebApi.Tests\Stocks.WebApi.Tests.csproj", "{A900B308-378E-41B4-920F-9D3DDCA85A27}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -74,6 +78,14 @@ Global
 		{BDA8BACD-5997-4AA5-CF17-731412D95463}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDA8BACD-5997-4AA5-CF17-731412D95463}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDA8BACD-5997-4AA5-CF17-731412D95463}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E8C2C25-B748-46BE-BF5C-37F6A3614D3B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E8C2C25-B748-46BE-BF5C-37F6A3614D3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E8C2C25-B748-46BE-BF5C-37F6A3614D3B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E8C2C25-B748-46BE-BF5C-37F6A3614D3B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A900B308-378E-41B4-920F-9D3DDCA85A27}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A900B308-378E-41B4-920F-9D3DDCA85A27}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A900B308-378E-41B4-920F-9D3DDCA85A27}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A900B308-378E-41B4-920F-9D3DDCA85A27}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

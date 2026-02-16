@@ -8,23 +8,27 @@ Extend taxonomy ingestion to import all available US-GAAP taxonomies (not just 2
 
 | ID | Requirement | Description | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Discover years | Detect available US-GAAP taxonomy years from the taxonomy data directory. | Proposed | Use on-disk CSVs as the source of truth. |
-| 2 | Taxonomy types | Insert missing years into `taxonomy_types` before import. | Proposed | Avoid duplicate rows; keep id stable. |
-| 3 | Concepts import | Import concepts for each year into `taxonomy_concepts`. | Proposed | Reuse existing CSV parsing logic. |
-| 4 | Presentation import | Import presentations for each year into `taxonomy_presentation`. | Proposed | Include role name and parent mapping. |
-| 5 | CLI workflow | Add a CLI switch to import all years (or a specific year). | Proposed | Default to all years. |
-| 6 | Safety | Make import idempotent and resumable. | Proposed | Skip years already imported unless forced. |
-| 7 | Tests | Add tests for year discovery and per-year import selection. | Proposed | No external network calls. |
+| 1 | Discover years | Detect available US-GAAP taxonomy years from the taxonomy data directory. | Done | `UsGaapTaxonomyImporter.DiscoverYears()` scans for `*_GAAP_Taxonomy.worksheets.concepts.csv` files. |
+| 2 | Taxonomy types | Insert missing years into `taxonomy_types` before import. | Done | `EnsureTaxonomyType` checks for existing row before inserting. |
+| 3 | Concepts import | Import concepts for each year into `taxonomy_concepts`. | Done | `ImportConceptsAsync` parses CSV and bulk inserts. |
+| 4 | Presentation import | Import presentations for each year into `taxonomy_presentation`. | Done | `ImportPresentationsAsync` handles role name, parent mapping, and cross-namespace parents (e.g., `dei:` concepts). |
+| 5 | CLI workflow | Add a CLI switch to import all years (or a specific year). | Done | `--load-taxonomy-all` and `--load-taxonomy-year --year YYYY`. |
+| 6 | Safety | Make import idempotent and resumable. | Partial | `EnsureTaxonomyType` is idempotent but concepts/presentations are not deduplicated on re-import. |
+| 7 | Tests | Add tests for year discovery and per-year import selection. | Done | `TaxonomyImportTests` covers year discovery. |
 | 8 | Downstream selection | Provide a way to select taxonomy year when loading concepts/presentations. | Proposed | Default to most recent year. |
 
 ## Kanban Task List (<= 2h each)
 
-- [ ] Inspect taxonomy storage layout and define year discovery rules.
-- [ ] Add repository/config options for taxonomy root directory.
-- [ ] Implement `taxonomy_types` upsert for multiple years.
-- [ ] Generalize concept/presentation processors to accept year.
-- [ ] Add CLI switch for multi-year import + optional `--year`.
-- [ ] Add tests for discovery and selection.
+- [x] Inspect taxonomy storage layout and define year discovery rules.
+- [x] Add repository/config options for taxonomy root directory. (`TaxonomyImport.RootDir` in appsettings.json)
+- [x] Implement `taxonomy_types` upsert for multiple years. (`EnsureTaxonomyType` in `DbmService`)
+- [x] Generalize concept/presentation processors to accept year. (`UsGaapTaxonomyImporter` replaces year-specific processors)
+- [x] Add CLI switch for multi-year import + optional `--year`. (`--load-taxonomy-all`, `--load-taxonomy-year --year YYYY`)
+- [x] Add tests for discovery and selection. (`TaxonomyImportTests`)
+- [x] Fix `generate_taxonomy_csvs_all.sh` entry point glob for pre-2022 FASB naming convention.
+- [x] Fix cross-namespace parent references (e.g., `dei:EntityDomain`) in older taxonomy presentations.
+- [x] Import all 15 taxonomy years (2011–2025) into the database.
+- [ ] Make concepts/presentations import fully idempotent (skip if already loaded for a given taxonomy type).
 - [ ] Update statement printing and report loading to pick a taxonomy year.
 - [ ] Create ADR for multi-year taxonomy strategy.
 
@@ -74,9 +78,9 @@ Extend taxonomy ingestion to import all available US-GAAP taxonomies (not just 2
 
 ## Open Questions
 
-- Where should the taxonomy root directory be configured (appsettings vs CLI)?
-- Should we store an explicit `taxonomy_type_id` mapping table by year, or resolve on demand?
-- Do we need to backfill `taxonomy_types` for years already imported if the table is empty?
+- ~~Where should the taxonomy root directory be configured (appsettings vs CLI)?~~ Resolved: `TaxonomyImport.RootDir` in appsettings.json.
+- ~~Should we store an explicit `taxonomy_type_id` mapping table by year, or resolve on demand?~~ Resolved: `taxonomy_types` table with `EnsureTaxonomyType` upsert.
+- ~~Do we need to backfill `taxonomy_types` for years already imported if the table is empty?~~ Resolved: `--load-taxonomy-all` discovers and inserts all available years.
 - Should statement printing default to the latest taxonomy year or to the filing year?
 
 ## Glossary

@@ -114,6 +114,27 @@ internal partial class Program {
                 _ = await processor.Process();
                 return 0;
             }
+            case "--load-taxonomy-year": {
+                int year = ParseYearArg(args);
+                if (year == 0) {
+                    _logger.LogError("Missing or invalid --year for --load-taxonomy-year");
+                    return 2;
+                }
+                Result res = await ImportTaxonomyYearAsync(year);
+                if (res.IsFailure) {
+                    _logger.LogError("ImportTaxonomyYear failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
+            case "--load-taxonomy-all": {
+                Result res = await ImportAllTaxonomiesAsync();
+                if (res.IsFailure) {
+                    _logger.LogError("ImportAllTaxonomies failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
             case "--print-statement": {
                 return await HandlePrintStatementAsync(args);
             }
@@ -274,6 +295,7 @@ internal partial class Program {
                     .Configure<StooqPricesOptions>(context.Configuration.GetSection("StooqPrices"))
                     .Configure<StooqImportOptions>(context.Configuration.GetSection("StooqImport"))
                     .Configure<StooqBulkImportOptions>(context.Configuration.GetSection("StooqBulkImport"))
+                    .Configure<TaxonomyImportOptions>(context.Configuration.GetSection("TaxonomyImport"))
                     .Configure<SecTickerMappingsOptions>(context.Configuration.GetSection("SecTickerMappings"))
                     .ConfigureTaxonomyConceptsFileProcessor(context)
                     .AddTransient<Func<string, ParseBulkXbrlArchiveContext, XBRLFileParser>>(
@@ -508,6 +530,54 @@ internal partial class Program {
         ILogger<StooqBulkPriceImporter> logger = _svp.GetRequiredService<ILogger<StooqBulkPriceImporter>>();
         var importer = new StooqBulkPriceImporter(_dbm!, logger);
         return await importer.ImportAsync(rootDir, edgarDataDir, batchSize, CancellationToken.None);
+    }
+
+    private static int ParseYearArg(string[] args) {
+        for (int i = 0; i < args.Length - 1; i++) {
+            if (string.Equals(args[i], "--year", StringComparison.OrdinalIgnoreCase)) {
+                if (int.TryParse(args[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out int year))
+                    return year;
+            }
+        }
+        return 0;
+    }
+
+    private static async Task<Result> ImportTaxonomyYearAsync(int year) {
+        if (_svp is null)
+            return Result.Failure(ErrorCodes.ValidationError, "Service provider is not initialized.");
+
+        IOptions<TaxonomyImportOptions> options = _svp.GetRequiredService<IOptions<TaxonomyImportOptions>>();
+        string rootDir = options.Value.ResolveRootDir();
+        if (string.IsNullOrWhiteSpace(rootDir))
+            return Result.Failure(ErrorCodes.ValidationError, "Missing taxonomy root dir.");
+
+        ILogger<UsGaapTaxonomyImporter> logger = _svp.GetRequiredService<ILogger<UsGaapTaxonomyImporter>>();
+        var importer = new UsGaapTaxonomyImporter(_dbm!, logger);
+        return await importer.ImportYearAsync(year, rootDir, CancellationToken.None);
+    }
+
+    private static async Task<Result> ImportAllTaxonomiesAsync() {
+        if (_svp is null)
+            return Result.Failure(ErrorCodes.ValidationError, "Service provider is not initialized.");
+
+        IOptions<TaxonomyImportOptions> options = _svp.GetRequiredService<IOptions<TaxonomyImportOptions>>();
+        string rootDir = options.Value.ResolveRootDir();
+        if (string.IsNullOrWhiteSpace(rootDir))
+            return Result.Failure(ErrorCodes.ValidationError, "Missing taxonomy root dir.");
+
+        ILogger<UsGaapTaxonomyImporter> logger = _svp.GetRequiredService<ILogger<UsGaapTaxonomyImporter>>();
+        var importer = new UsGaapTaxonomyImporter(_dbm!, logger);
+        IReadOnlyList<int> years = importer.DiscoverYears(rootDir);
+        if (years.Count == 0)
+            return Result.Failure(ErrorCodes.NotFound, $"No taxonomy years found in {rootDir}");
+
+        foreach (int year in years) {
+            Result res = await importer.ImportYearAsync(year, rootDir, CancellationToken.None);
+            if (res.IsFailure)
+                return res;
+        }
+
+        return Result.Success;
     }
 
     private static void BulkInsertCompanies(IReadOnlyCollection<Company> companies, List<Task> tasks) {

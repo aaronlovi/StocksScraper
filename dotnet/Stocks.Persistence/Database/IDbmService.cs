@@ -61,4 +61,9 @@ public interface IDbmService {
 
     Task<Result<IReadOnlyCollection<PriceDownloadStatus>>> GetPriceDownloadStatuses(CancellationToken ct);
     Task<Result> UpsertPriceDownload(PriceDownloadStatus status, CancellationToken ct);
+
+    // Taxonomy types
+
+    Task<Result<TaxonomyTypeInfo>> GetTaxonomyTypeByNameVersion(string name, int version, CancellationToken ct);
+    Task<Result<TaxonomyTypeInfo>> EnsureTaxonomyType(string name, int version, CancellationToken ct);
 }

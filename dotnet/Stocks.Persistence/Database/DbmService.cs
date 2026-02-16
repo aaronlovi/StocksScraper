@@ -274,6 +274,48 @@ public sealed class DbmService : IDisposable, IDbmService {
     }
     #endregion
 
+    #region Taxonomy types
+
+    public async Task<Result<TaxonomyTypeInfo>> GetTaxonomyTypeByNameVersion(string name, int version, CancellationToken ct) {
+        var stmt = new GetTaxonomyTypeByNameVersionStmt(name, version);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess && stmt.TaxonomyType is not null) {
+            _logger.LogInformation("GetTaxonomyTypeByNameVersion success - Name: {Name}, Version: {Version}", name, version);
+            return Result<TaxonomyTypeInfo>.Success(stmt.TaxonomyType);
+        } else {
+            string error = res.IsFailure ? res.ErrorMessage : "Taxonomy type not found";
+            _logger.LogWarning("GetTaxonomyTypeByNameVersion failed - Name: {Name}, Version: {Version}, Error: {Error}", name, version, error);
+            return Result<TaxonomyTypeInfo>.Failure(ErrorCodes.NotFound, error);
+        }
+    }
+
+    public async Task<Result<TaxonomyTypeInfo>> EnsureTaxonomyType(string name, int version, CancellationToken ct) {
+        Result<TaxonomyTypeInfo> existing = await GetTaxonomyTypeByNameVersion(name, version, ct);
+        if (existing.IsSuccess)
+            return existing;
+
+        var maxStmt = new GetMaxTaxonomyTypeIdStmt();
+        DbStmtResult maxRes = await _exec.ExecuteQueryWithRetry(maxStmt, ct);
+        if (maxRes.IsFailure) {
+            _logger.LogError("EnsureTaxonomyType failed to read max id. Error: {Error}", maxRes.ErrorMessage);
+            return Result<TaxonomyTypeInfo>.Failure(maxRes);
+        }
+
+        int nextId = maxStmt.MaxId + 1;
+        var insertStmt = new InsertTaxonomyTypeStmt(nextId, name, version);
+        DbStmtResult insertRes = await _exec.ExecuteWithRetry(insertStmt, ct);
+        if (insertRes.IsFailure) {
+            _logger.LogError("EnsureTaxonomyType failed to insert. Error: {Error}", insertRes.ErrorMessage);
+            return Result<TaxonomyTypeInfo>.Failure(insertRes);
+        }
+
+        var created = new TaxonomyTypeInfo(nextId, name, version);
+        _logger.LogInformation("EnsureTaxonomyType inserted - Name: {Name}, Version: {Version}, Id: {Id}", name, version, nextId);
+        return Result<TaxonomyTypeInfo>.Success(created);
+    }
+
+    #endregion
+
     #region Company submissions
 
     public async Task<Result<IReadOnlyCollection<Submission>>> GetSubmissions(CancellationToken ct) {

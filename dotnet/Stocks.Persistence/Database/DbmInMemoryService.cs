@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Stocks.DataModels;
 using Stocks.Persistence.Database.DTO.Taxonomies;
 using Stocks.Shared;
+using Stocks.Shared.Models;
 
 namespace Stocks.Persistence.Database;
 
@@ -59,6 +60,18 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result> UpsertPriceDownload(PriceDownloadStatus status, CancellationToken ct) {
         _data.UpsertPriceDownload(status);
         return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result<TaxonomyTypeInfo>> GetTaxonomyTypeByNameVersion(string name, int version, CancellationToken ct) {
+        TaxonomyTypeInfo? existing = _data.GetTaxonomyType(name, version);
+        if (existing is null)
+            return Task.FromResult(Result<TaxonomyTypeInfo>.Failure(ErrorCodes.NotFound, "Taxonomy type not found"));
+        return Task.FromResult(Result<TaxonomyTypeInfo>.Success(existing));
+    }
+
+    public Task<Result<TaxonomyTypeInfo>> EnsureTaxonomyType(string name, int version, CancellationToken ct) {
+        TaxonomyTypeInfo created = _data.AddTaxonomyType(name, version);
+        return Task.FromResult(Result<TaxonomyTypeInfo>.Success(created));
     }
 
     public Task<Result<Company>> GetCompanyById(ulong companyId, CancellationToken ct) => throw new NotSupportedException();

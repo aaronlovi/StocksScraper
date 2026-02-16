@@ -9,6 +9,7 @@ public sealed class DbmInMemoryData {
     private readonly Dictionary<string, PriceImportStatus> _priceImports = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, PriceDownloadStatus> _priceDownloads = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<PriceRow> _prices = [];
+    private readonly Dictionary<string, TaxonomyTypeInfo> _taxonomyTypes = new(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyCollection<PriceImportStatus> GetPriceImports() {
         lock (_mutex)
@@ -68,9 +69,32 @@ public sealed class DbmInMemoryData {
         return results;
     }
 
+    public TaxonomyTypeInfo? GetTaxonomyType(string name, int version) {
+        string key = BuildTaxonomyKey(name, version);
+        lock (_mutex)
+            return _taxonomyTypes.TryGetValue(key, out TaxonomyTypeInfo? value) ? value : null;
+    }
+
+    public TaxonomyTypeInfo AddTaxonomyType(string name, int version) {
+        string key = BuildTaxonomyKey(name, version);
+        lock (_mutex) {
+            if (_taxonomyTypes.TryGetValue(key, out TaxonomyTypeInfo? existing))
+                return existing;
+            int nextId = _taxonomyTypes.Count + 1;
+            var created = new TaxonomyTypeInfo(nextId, name, version);
+            _taxonomyTypes[key] = created;
+            return created;
+        }
+    }
+
     private static string BuildImportKey(ulong cik, string ticker, string? exchange) {
         string normalizedTicker = string.IsNullOrWhiteSpace(ticker) ? string.Empty : ticker.Trim().ToUpperInvariant();
         string normalizedExchange = string.IsNullOrWhiteSpace(exchange) ? string.Empty : exchange.Trim().ToUpperInvariant();
         return $"{cik}|{normalizedTicker}|{normalizedExchange}";
+    }
+
+    private static string BuildTaxonomyKey(string name, int version) {
+        string normalizedName = string.IsNullOrWhiteSpace(name) ? string.Empty : name.Trim().ToLowerInvariant();
+        return $"{normalizedName}|{version}";
     }
 }

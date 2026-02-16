@@ -15,7 +15,7 @@ Extend taxonomy ingestion to import all available US-GAAP taxonomies (not just 2
 | 5 | CLI workflow | Add a CLI switch to import all years (or a specific year). | Done | `--load-taxonomy-all` and `--load-taxonomy-year --year YYYY`. |
 | 6 | Safety | Make import idempotent and resumable. | Done | Checks concept/presentation counts before import; skips phases already loaded. |
 | 7 | Tests | Add tests for year discovery and per-year import selection. | Done | `TaxonomyImportTests` covers year discovery. |
-| 8 | Downstream selection | Provide a way to select taxonomy year when loading concepts/presentations. | Proposed | Default to most recent year. |
+| 8 | Downstream selection | Provide a way to select taxonomy year when loading concepts/presentations. | Done | Taxonomy year inferred from `--date`; optional `--taxonomy-year` CLI override. |
 
 ## Kanban Task List (<= 2h each)
 
@@ -29,8 +29,8 @@ Extend taxonomy ingestion to import all available US-GAAP taxonomies (not just 2
 - [x] Fix cross-namespace parent references (e.g., `dei:EntityDomain`) in older taxonomy presentations.
 - [x] Import all 15 taxonomy years (2011–2025) into the database.
 - [x] Make concepts/presentations import fully idempotent (skip if already loaded for a given taxonomy type).
-- [ ] Update statement printing and report loading to pick a taxonomy year.
-- [ ] Create ADR for multi-year taxonomy strategy.
+- [x] Update statement printing and report loading to pick a taxonomy year.
+- [x] Create ADR for multi-year taxonomy strategy.
 
 ## High-Level Design
 

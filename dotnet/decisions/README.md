@@ -16,3 +16,4 @@ This folder contains Architecture Decision Records for the StocksScraper solutio
 | 8 | API Protocol Choice | Accepted | 2025-06-14 | [0008-api-protocol-choice.md](0008-api-protocol-choice.md) |
 | 9 | Migration Tooling | Accepted | 2025-06-14 | [0009-migration-tooling.md](0009-migration-tooling.md) |
 | 10 | Folder Structure for ADRs | Accepted | 2025-06-14 | [0010-folder-structure-for-adrs.md](0010-folder-structure-for-adrs.md) |
+| 11 | Multi-Year Taxonomy Strategy | Accepted | 2026-02-16 | [0011-multi-year-taxonomy-strategy.md](0011-multi-year-taxonomy-strategy.md) |

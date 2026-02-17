@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Stocks.Persistence.Database;
+using Stocks.Persistence.Database.Migrations;
 using Stocks.Persistence.Services;
 using Stocks.WebApi.Endpoints;
 using Stocks.WebApi.Services;
@@ -14,18 +15,19 @@ public class Program {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
         _ = builder.Services.AddSingleton<PostgresExecutor>();
+        _ = builder.Services.AddSingleton<DbMigrations>();
 
-        if (builder.Configuration.GetConnectionString(DbmService.StocksDataConnectionStringName) is not null)
+        if (builder.Configuration.GetConnectionString(DbmService.StocksDataConnectionStringName) is not null) {
             _ = builder.Services.AddSingleton<IDbmService, DbmService>();
-
-        _ = builder.Services.AddSingleton<StatementDataService>();
-        _ = builder.Services.AddSingleton<TypeaheadTrieService>();
-        _ = builder.Services.AddHostedService(sp => sp.GetRequiredService<TypeaheadTrieService>());
+            _ = builder.Services.AddSingleton<StatementDataService>();
+            _ = builder.Services.AddSingleton<TypeaheadTrieService>();
+            _ = builder.Services.AddHostedService(sp => sp.GetRequiredService<TypeaheadTrieService>());
+        }
 
         _ = builder.Services.AddCors(options => {
             options.AddDefaultPolicy(policy => {
                 _ = policy
-                    .WithOrigins("http://localhost:4200")
+                    .WithOrigins("http://localhost:4201")
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });

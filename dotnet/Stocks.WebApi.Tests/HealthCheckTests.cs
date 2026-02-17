@@ -32,13 +32,13 @@ public class HealthCheckTests : IClassFixture<WebApplicationFactory<Program>> {
         HttpClient client = _factory.CreateClient();
 
         var request = new HttpRequestMessage(HttpMethod.Get, "/api/health");
-        request.Headers.Add("Origin", "http://localhost:4200");
+        request.Headers.Add("Origin", "http://localhost:4201");
 
         HttpResponseMessage response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(response.Headers.Contains("Access-Control-Allow-Origin"));
-        Assert.Contains("http://localhost:4200",
+        Assert.Contains("http://localhost:4201",
             response.Headers.GetValues("Access-Control-Allow-Origin"));
     }
 }

@@ -52,6 +52,13 @@ export interface StatementListItem {
   rootLabel: string;
 }
 
+export interface StatementTreeNode {
+  conceptName: string;
+  label: string;
+  value: string | null;
+  children?: StatementTreeNode[];
+}
+
 export interface TypeaheadResult {
   text: string;
   type: string;
@@ -84,6 +91,14 @@ export class ApiService {
     return this.http.get<StatementListItem[]>(
       `/api/companies/${cik}/submissions/${submissionId}/statements`
     );
+  }
+
+  getStatement(cik: string, submissionId: number, concept: string, taxonomyYear?: number): Observable<StatementTreeNode> {
+    let url = `/api/companies/${cik}/submissions/${submissionId}/statements/${concept}`;
+    if (taxonomyYear) {
+      url += `?taxonomyYear=${taxonomyYear}`;
+    }
+    return this.http.get<StatementTreeNode>(url);
   }
 
   getTypeahead(query: string): Observable<TypeaheadResult[]> {

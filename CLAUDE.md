@@ -27,7 +27,7 @@ dotnet run --project dotnet/Stocks.DataService
 docker compose -f docker-scripts/docker-compose.yml up
 
 # Interactive build/run menu
-bash dotnet/run.sh
+bash run.sh
 ```
 
 ## Project Sources of Truth

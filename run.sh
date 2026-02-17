@@ -1,7 +1,7 @@
 #!/bin/bash
 
-PROJECT="./Stocks.EDGARScraper.csproj"
-WORKING_DIR="./Stocks.EDGARScraper"
+PROJECT="dotnet/Stocks.EDGARScraper/Stocks.EDGARScraper.csproj"
+WORKING_DIR="dotnet/Stocks.EDGARScraper"
 OUTPUT_FILE="/mnt/c/temp/1.html"
 CIK="320193"
 CONCEPT="StatementOfFinancialPositionAbstract"
@@ -29,7 +29,7 @@ display_menu() {
 # Function to build the solution
 build_solution() {
     echo "Building the solution..."
-    dotnet build
+    dotnet build dotnet/EDGARScraper.sln
     if [ $? -eq 0 ]; then
         echo "Build succeeded."
     else
@@ -45,7 +45,7 @@ while true; do
     case $choice in
         t)
             echo "Running .NET tests..."
-            dotnet test EDGARScraper.sln
+            dotnet test dotnet/EDGARScraper.sln
             if [ $? -eq 0 ]; then
                 echo -e "\n=== .NET TESTS: PASS ==="
             else
@@ -54,7 +54,7 @@ while true; do
             ;;
         u)
             echo "Running Angular tests..."
-            pushd ../frontend/stocks-frontend > /dev/null
+            pushd frontend/stocks-frontend > /dev/null
             npx ng test --watch=false
             ANGULAR_EXIT=$?
             popd > /dev/null
@@ -66,9 +66,9 @@ while true; do
             ;;
         s)
             echo "Starting .NET Web API + Angular dev server..."
-            dotnet run --project Stocks.WebApi &
+            dotnet run --project dotnet/Stocks.WebApi &
             DOTNET_PID=$!
-            pushd ../frontend/stocks-frontend > /dev/null
+            pushd frontend/stocks-frontend > /dev/null
             npx ng serve &
             NG_PID=$!
             popd > /dev/null
@@ -80,11 +80,11 @@ while true; do
             ;;
         w)
             echo "Starting .NET Web API..."
-            dotnet run --project Stocks.WebApi
+            dotnet run --project dotnet/Stocks.WebApi
             ;;
         a)
             echo "Starting Angular dev server..."
-            pushd ../frontend/stocks-frontend > /dev/null
+            pushd frontend/stocks-frontend > /dev/null
             npx ng serve
             popd > /dev/null
             ;;
@@ -94,7 +94,7 @@ while true; do
         2)
             echo "Running the application..."
             pushd $WORKING_DIR > /dev/null
-            dotnet run --project $PROJECT \
+            dotnet run --project Stocks.EDGARScraper.csproj \
                 -- --print-statement --cik $CIK --concept $CONCEPT --date $DATE \
                 --format $FORMAT --role "$ROLE" > $OUTPUT_FILE
             if [ $? -ne 0 ]; then
@@ -105,7 +105,7 @@ while true; do
         3)
             echo "Downloading SEC ticker mappings..."
             pushd $WORKING_DIR > /dev/null
-            dotnet run --project $PROJECT -- --download-sec-ticker-mappings
+            dotnet run --project Stocks.EDGARScraper.csproj -- --download-sec-ticker-mappings
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             else
@@ -131,7 +131,7 @@ while true; do
         4)
             echo "Downloading Stooq prices..."
             pushd $WORKING_DIR > /dev/null
-            dotnet run --project $PROJECT -- --download-prices-stooq
+            dotnet run --project Stocks.EDGARScraper.csproj -- --download-prices-stooq
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             else
@@ -155,7 +155,7 @@ while true; do
         5)
             echo "Importing price CSVs..."
             pushd $WORKING_DIR > /dev/null
-            dotnet run --project $PROJECT -- --import-prices-stooq
+            dotnet run --project Stocks.EDGARScraper.csproj -- --import-prices-stooq
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             fi
@@ -164,7 +164,7 @@ while true; do
         6)
             echo "Importing bulk Stooq files..."
             pushd $WORKING_DIR > /dev/null
-            dotnet run --project $PROJECT -- --import-prices-stooq-bulk
+            dotnet run --project Stocks.EDGARScraper.csproj -- --import-prices-stooq-bulk
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             fi

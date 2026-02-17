@@ -45,8 +45,10 @@
   - Tests: dashboard.component.spec.ts (3), search.component.spec.ts (3), titlebar.component.spec.ts (4)
   - Committed: (pending)
 
-- [ ] Checkpoint 10: Company Semi-Detail View
-  - (pending)
+- [x] Checkpoint 10: Company Semi-Detail View
+  - Files: api.service.ts (updated), company.component.ts, company.component.spec.ts
+  - Tests: company.component.spec.ts (5 tests)
+  - Committed: bd3f12c
 
 - [ ] Checkpoint 11: Report Detail View
   - (pending)

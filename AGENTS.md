@@ -17,7 +17,7 @@
 - `dotnet test dotnet/EDGARScraper.sln` runs xUnit tests.
 - `dotnet run --project dotnet/Stocks.EDGARScraper -- --run-all` runs the scraper workflow.
 - `dotnet run --project dotnet/Stocks.DataService` starts the gRPC data service.
-- `bash dotnet/run.sh` offers a simple build menu wrapper.
+- `bash run.sh` offers a simple build menu wrapper.
 - `docker compose -f docker-scripts/docker-compose.yml up` starts local infra (Postgres/Redis).
 
 ## Coding Style & Naming Conventions

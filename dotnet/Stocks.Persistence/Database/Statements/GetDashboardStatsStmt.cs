@@ -8,14 +8,15 @@ namespace Stocks.Persistence.Database.Statements;
 internal sealed class GetDashboardStatsStmt : QueryDbStmtBase {
     private const string sql = @"
 WITH company_count AS (SELECT COUNT(*) AS cnt FROM companies),
-     submission_count AS (SELECT COUNT(*) AS cnt FROM submissions),
+     submission_count AS (SELECT COUNT(*) AS cnt FROM submissions WHERE report_date <= CURRENT_DATE),
      datapoint_count AS (SELECT COUNT(*) AS cnt FROM data_points),
-     filing_dates AS (SELECT MIN(report_date) AS earliest, MAX(report_date) AS latest FROM submissions),
+     filing_dates AS (SELECT MIN(report_date) AS earliest, MAX(report_date) AS latest FROM submissions WHERE report_date <= CURRENT_DATE),
      price_companies AS (SELECT COUNT(DISTINCT ticker) AS cnt FROM price_imports),
      submissions_by_type AS (
          SELECT ft.filing_type_name AS filing_type, COUNT(*) AS cnt
          FROM submissions s
          JOIN filing_types ft ON ft.filing_type_id = s.filing_type
+         WHERE s.report_date <= CURRENT_DATE
          GROUP BY ft.filing_type_name
      )
 SELECT cc.cnt AS total_companies,

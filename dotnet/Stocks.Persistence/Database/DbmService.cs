@@ -170,8 +170,17 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
-    public Task<Result<IReadOnlyCollection<CompanyName>>> GetAllCompanyNames(CancellationToken ct) =>
-        throw new NotImplementedException("GetAllCompanyNames not yet implemented for PostgreSQL");
+    public async Task<Result<IReadOnlyCollection<CompanyName>>> GetAllCompanyNames(CancellationToken ct) {
+        var stmt = new GetAllCompanyNamesStmt();
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetAllCompanyNames success - Num names: {NumNames}", stmt.Names.Count);
+            return Result<IReadOnlyCollection<CompanyName>>.Success(stmt.Names);
+        } else {
+            _logger.LogWarning("GetAllCompanyNames failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<CompanyName>>.Failure(res);
+        }
+    }
 
     public async Task<Result> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct) {
         var stmt = new BulkInsertCompanyNamesStmt(companyNames);
@@ -238,8 +247,17 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
-    public Task<Result<IReadOnlyCollection<CompanyTicker>>> GetAllCompanyTickers(CancellationToken ct) =>
-        throw new NotImplementedException("GetAllCompanyTickers not yet implemented for PostgreSQL");
+    public async Task<Result<IReadOnlyCollection<CompanyTicker>>> GetAllCompanyTickers(CancellationToken ct) {
+        var stmt = new GetAllCompanyTickersStmt();
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetAllCompanyTickers success - Num tickers: {NumTickers}", stmt.Tickers.Count);
+            return Result<IReadOnlyCollection<CompanyTicker>>.Success(stmt.Tickers);
+        } else {
+            _logger.LogWarning("GetAllCompanyTickers failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<CompanyTicker>>.Failure(res);
+        }
+    }
 
     #endregion
 

@@ -11,7 +11,7 @@ public class TaxonomyImportTests {
     [Fact]
     public void DiscoverYears_ReturnsSortedYears() {
         string tempDir = Path.Combine(Path.GetTempPath(), $"taxonomy-import-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
+        _ = Directory.CreateDirectory(tempDir);
 
         try {
             File.WriteAllText(Path.Combine(tempDir, "2024_GAAP_Taxonomy.worksheets.concepts.csv"), "header");

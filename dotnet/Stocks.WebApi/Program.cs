@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Stocks.Persistence.Database;
+using Stocks.Persistence.Services;
 using Stocks.WebApi.Endpoints;
+using Stocks.WebApi.Services;
 
 namespace Stocks.WebApi;
 
@@ -15,6 +17,10 @@ public class Program {
 
         if (builder.Configuration.GetConnectionString(DbmService.StocksDataConnectionStringName) is not null)
             _ = builder.Services.AddSingleton<IDbmService, DbmService>();
+
+        _ = builder.Services.AddSingleton<StatementDataService>();
+        _ = builder.Services.AddSingleton<TypeaheadTrieService>();
+        _ = builder.Services.AddHostedService(sp => sp.GetRequiredService<TypeaheadTrieService>());
 
         _ = builder.Services.AddCors(options => {
             options.AddDefaultPolicy(policy => {
@@ -35,6 +41,8 @@ public class Program {
         app.MapSubmissionEndpoints();
         app.MapSearchEndpoints();
         app.MapDashboardEndpoints();
+        app.MapStatementEndpoints();
+        app.MapTypeaheadEndpoints();
 
         app.Run();
     }

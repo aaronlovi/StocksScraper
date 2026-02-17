@@ -25,11 +25,15 @@
   - Tests: StatementDataServiceTests.cs (4 tests), all 11 StatementPrinterTests still pass
   - Committed: 99eaf69
 
-- [ ] Checkpoint 6: Core API Endpoints
-  - (pending)
+- [x] Checkpoint 6: Core API Endpoints
+  - Files: ResultExtensions.cs, CompanyEndpoints.cs, SubmissionEndpoints.cs, SearchEndpoints.cs, DashboardEndpoints.cs, Program.cs
+  - Tests: CompanyEndpointsTests.cs (2), SubmissionEndpointsTests.cs (2), SearchEndpointsTests.cs (3), DashboardEndpointsTests.cs (1)
+  - Committed: 3822147
 
-- [ ] Checkpoint 7: Statement Rendering and Typeahead Endpoints
-  - (pending)
+- [x] Checkpoint 7: Statement Rendering and Typeahead Endpoints
+  - Files: StatementEndpoints.cs, TypeaheadEndpoints.cs, TypeaheadTrieService.cs, Program.cs, IDbmService.cs, DbmService.cs, DbmInMemoryService.cs, DbmInMemoryData.cs
+  - Tests: StatementEndpointsTests.cs (3), TypeaheadTests.cs (3)
+  - Committed: (pending)
 
 - [ ] Checkpoint 8: Angular Workspace and Layout Shell
   - (pending)

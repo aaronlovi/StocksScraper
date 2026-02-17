@@ -66,6 +66,11 @@ public sealed class DbmInMemoryService : IDbmService {
         return Task.FromResult(Result<Company>.Success(company));
     }
 
+    // Company names
+
+    public Task<Result<IReadOnlyCollection<CompanyName>>> GetAllCompanyNames(CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<CompanyName>>.Success(_data.GetCompanyNames()));
+
     // Company tickers
 
     public Task<Result> BulkInsertCompanyTickers(List<CompanyTicker> tickers, CancellationToken ct) {
@@ -75,6 +80,9 @@ public sealed class DbmInMemoryService : IDbmService {
 
     public Task<Result<IReadOnlyCollection<CompanyTicker>>> GetCompanyTickersByCompanyId(ulong companyId, CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<CompanyTicker>>.Success(_data.GetCompanyTickersByCompanyId(companyId)));
+
+    public Task<Result<IReadOnlyCollection<CompanyTicker>>> GetAllCompanyTickers(CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<CompanyTicker>>.Success(_data.GetAllCompanyTickers()));
 
     // Dashboard
 
@@ -146,7 +154,8 @@ public sealed class DbmInMemoryService : IDbmService {
 
     // Not yet implemented
 
-    public Task<Result<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(string dataSource, CancellationToken ct) => throw new NotSupportedException();
+    public Task<Result<IReadOnlyCollection<Company>>> GetAllCompaniesByDataSource(string dataSource, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<Company>>.Success(_data.GetAllCompaniesByDataSource(dataSource)));
     public Task<Result<PagedCompanies>> GetPagedCompaniesByDataSource(string dataSource, PaginationRequest pagination, CancellationToken ct) => throw new NotSupportedException();
     public Task<Result> EmptyCompaniesTables(CancellationToken ct) => throw new NotSupportedException();
     public Task<Result<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct) => throw new NotSupportedException();
@@ -155,9 +164,22 @@ public sealed class DbmInMemoryService : IDbmService {
         _data.AddDataPoints(dataPoints);
         return Task.FromResult(Result.Success);
     }
-    public Task<Result> BulkInsertTaxonomyConcepts(List<ConceptDetailsDTO> taxonomyConcepts, CancellationToken ct) => throw new NotSupportedException();
-    public Task<Result<IReadOnlyCollection<ConceptDetailsDTO>>> GetTaxonomyConceptsByTaxonomyType(int taxonomyTypeId, CancellationToken ct) => throw new NotSupportedException();
-    public Task<Result> BulkInsertTaxonomyPresentations(List<PresentationDetailsDTO> taxonomyPresentations, CancellationToken ct) => throw new NotSupportedException();
-    public Task<Result<IReadOnlyCollection<PresentationDetailsDTO>>> GetTaxonomyPresentationsByTaxonomyType(int taxonomyTypeId, CancellationToken ct) => throw new NotSupportedException();
-    public Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct) => throw new NotSupportedException();
+    public Task<Result> BulkInsertTaxonomyConcepts(List<ConceptDetailsDTO> taxonomyConcepts, CancellationToken ct) {
+        _data.AddTaxonomyConcepts(taxonomyConcepts);
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result<IReadOnlyCollection<ConceptDetailsDTO>>> GetTaxonomyConceptsByTaxonomyType(int taxonomyTypeId, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<ConceptDetailsDTO>>.Success(_data.GetTaxonomyConceptsByTaxonomyType(taxonomyTypeId)));
+
+    public Task<Result> BulkInsertTaxonomyPresentations(List<PresentationDetailsDTO> taxonomyPresentations, CancellationToken ct) {
+        _data.AddTaxonomyPresentations(taxonomyPresentations);
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result<IReadOnlyCollection<PresentationDetailsDTO>>> GetTaxonomyPresentationsByTaxonomyType(int taxonomyTypeId, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<PresentationDetailsDTO>>.Success(_data.GetTaxonomyPresentationsByTaxonomyType(taxonomyTypeId)));
+
+    public Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<DataPoint>>.Success(_data.GetDataPointsForSubmission(companyId, submissionId)));
 }

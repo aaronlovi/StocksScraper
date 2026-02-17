@@ -170,6 +170,9 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
+    public Task<Result<IReadOnlyCollection<CompanyName>>> GetAllCompanyNames(CancellationToken ct) =>
+        throw new NotImplementedException("GetAllCompanyNames not yet implemented for PostgreSQL");
+
     public async Task<Result> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct) {
         var stmt = new BulkInsertCompanyNamesStmt(companyNames);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
@@ -234,6 +237,9 @@ public sealed class DbmService : IDisposable, IDbmService {
             return Result<IReadOnlyCollection<CompanyTicker>>.Failure(res);
         }
     }
+
+    public Task<Result<IReadOnlyCollection<CompanyTicker>>> GetAllCompanyTickers(CancellationToken ct) =>
+        throw new NotImplementedException("GetAllCompanyTickers not yet implemented for PostgreSQL");
 
     #endregion
 

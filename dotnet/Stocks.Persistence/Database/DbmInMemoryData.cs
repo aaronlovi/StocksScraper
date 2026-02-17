@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Stocks.DataModels;
 using Stocks.DataModels.Enums;
+using Stocks.Persistence.Database.DTO.Taxonomies;
 
 namespace Stocks.Persistence.Database;
 
@@ -32,6 +33,17 @@ public sealed class DbmInMemoryData {
             }
         }
         return null;
+    }
+
+    public IReadOnlyCollection<Company> GetAllCompaniesByDataSource(string dataSource) {
+        var results = new List<Company>();
+        lock (_mutex) {
+            foreach (Company company in _companies) {
+                if (string.Equals(company.DataSource, dataSource, StringComparison.OrdinalIgnoreCase))
+                    results.Add(company);
+            }
+        }
+        return results;
     }
 
     public Company? GetCompanyByCik(ulong cik) {
@@ -74,6 +86,11 @@ public sealed class DbmInMemoryData {
                     _companyTickers.Add(ticker);
             }
         }
+    }
+
+    public IReadOnlyCollection<CompanyTicker> GetAllCompanyTickers() {
+        lock (_mutex)
+            return [.. _companyTickers];
     }
 
     public IReadOnlyCollection<CompanyTicker> GetCompanyTickersByCompanyId(ulong companyId) {
@@ -320,6 +337,60 @@ public sealed class DbmInMemoryData {
     public int GetTaxonomyConceptCount(int taxonomyTypeId) => 0;
 
     public int GetTaxonomyPresentationCount(int taxonomyTypeId) => 0;
+
+    // Taxonomy concepts
+
+    private readonly List<ConceptDetailsDTO> _taxonomyConcepts = [];
+
+    public void AddTaxonomyConcepts(IReadOnlyCollection<ConceptDetailsDTO> concepts) {
+        lock (_mutex)
+            _taxonomyConcepts.AddRange(concepts);
+    }
+
+    public IReadOnlyCollection<ConceptDetailsDTO> GetTaxonomyConceptsByTaxonomyType(int taxonomyTypeId) {
+        var results = new List<ConceptDetailsDTO>();
+        lock (_mutex) {
+            foreach (ConceptDetailsDTO c in _taxonomyConcepts) {
+                if (c.TaxonomyTypeId == taxonomyTypeId)
+                    results.Add(c);
+            }
+        }
+        return results;
+    }
+
+    // Taxonomy presentations
+
+    private readonly List<PresentationDetailsDTO> _taxonomyPresentations = [];
+
+    public void AddTaxonomyPresentations(IReadOnlyCollection<PresentationDetailsDTO> presentations) {
+        lock (_mutex)
+            _taxonomyPresentations.AddRange(presentations);
+    }
+
+    public IReadOnlyCollection<PresentationDetailsDTO> GetTaxonomyPresentationsByTaxonomyType(int taxonomyTypeId) {
+        var results = new List<PresentationDetailsDTO>();
+        lock (_mutex) {
+            foreach (PresentationDetailsDTO p in _taxonomyPresentations) {
+                // PresentationDetailsDTO doesn't have TaxonomyTypeId, so return all
+                // In production, the SQL filters by taxonomy_type_id via JOIN
+                results.Add(p);
+            }
+        }
+        return results;
+    }
+
+    // Data points by submission
+
+    public IReadOnlyCollection<DataPoint> GetDataPointsForSubmission(ulong companyId, ulong submissionId) {
+        var results = new List<DataPoint>();
+        lock (_mutex) {
+            foreach (DataPoint dp in _dataPoints) {
+                if (dp.CompanyId == companyId && dp.SubmissionId == submissionId)
+                    results.Add(dp);
+            }
+        }
+        return results;
+    }
 
     // Helpers
 

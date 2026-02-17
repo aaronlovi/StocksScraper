@@ -30,10 +30,15 @@ public interface IDbmService {
     Task<Result<Company>> GetCompanyByCik(string cik, CancellationToken ct);
     Task<Result<PagedResults<CompanySearchResult>>> SearchCompanies(string query, PaginationRequest pagination, CancellationToken ct);
 
+    // Company names
+
+    Task<Result<IReadOnlyCollection<CompanyName>>> GetAllCompanyNames(CancellationToken ct);
+
     // Company tickers
 
     Task<Result> BulkInsertCompanyTickers(List<CompanyTicker> tickers, CancellationToken ct);
     Task<Result<IReadOnlyCollection<CompanyTicker>>> GetCompanyTickersByCompanyId(ulong companyId, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<CompanyTicker>>> GetAllCompanyTickers(CancellationToken ct);
 
     // Data points and data point units
 

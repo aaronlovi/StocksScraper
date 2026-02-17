@@ -33,8 +33,8 @@ public class StatementEndpointsTests : IClassFixture<WebApplicationFactory<Progr
                 new DateOnly(2024, 9, 28), null)
         ], CancellationToken.None);
 
-        // Create taxonomy type for year 2024
-        _ = await _dbm.EnsureTaxonomyType("us-gaap", 2024, CancellationToken.None);
+        // Create taxonomy type for year 2025 (the import taxonomy used for all data points)
+        _ = await _dbm.EnsureTaxonomyType("us-gaap", 2025, CancellationToken.None);
     }
 
     [Fact]

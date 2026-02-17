@@ -12,6 +12,10 @@ using Stocks.WebApi.Middleware;
 namespace Stocks.WebApi.Endpoints;
 
 public static class StatementEndpoints {
+    // Data points are imported against a single taxonomy year. Default to that
+    // year so concept IDs in data points match the loaded taxonomy hierarchy.
+    private const int DefaultTaxonomyYear = 2025;
+
     public static void MapStatementEndpoints(this IEndpointRouteBuilder app) {
         _ = app.MapGet("/api/companies/{cik}/submissions/{submissionId}/statements",
             async (string cik, ulong submissionId, IDbmService dbm, StatementDataService sds, CancellationToken ct) => {
@@ -19,27 +23,10 @@ public static class StatementEndpoints {
                 if (companyResult.IsFailure)
                     return companyResult.ToHttpResult();
 
-                // Derive taxonomy year from submission report date
-                Result<IReadOnlyCollection<Submission>> subsResult =
-                    await dbm.GetSubmissionsByCompanyId(companyResult.Value!.CompanyId, ct);
-                if (subsResult.IsFailure)
-                    return subsResult.ToHttpResult();
-
-                Submission? matchedSub = null;
-                foreach (Submission s in subsResult.Value!) {
-                    if (s.SubmissionId == submissionId) {
-                        matchedSub = s;
-                        break;
-                    }
-                }
-                if (matchedSub is null)
-                    return Results.NotFound(new { error = $"Submission {submissionId} not found for company." });
-
-                int taxonomyYear = matchedSub.ReportDate.Year;
                 Result<TaxonomyTypeInfo> taxResult =
-                    await dbm.GetTaxonomyTypeByNameVersion("us-gaap", taxonomyYear, ct);
+                    await dbm.GetTaxonomyTypeByNameVersion("us-gaap", DefaultTaxonomyYear, ct);
                 if (taxResult.IsFailure)
-                    return Results.NotFound(new { error = $"No taxonomy found for year {taxonomyYear}." });
+                    return Results.NotFound(new { error = "No taxonomy found." });
 
                 Result<IReadOnlyCollection<StatementListItem>> listResult =
                     await sds.ListStatementsForSubmission(
@@ -61,23 +48,7 @@ public static class StatementEndpoints {
 
                 Company company = companyResult.Value!;
 
-                // Find the submission to get report date for taxonomy year
-                Result<IReadOnlyCollection<Submission>> subsResult =
-                    await dbm.GetSubmissionsByCompanyId(company.CompanyId, ct);
-                if (subsResult.IsFailure)
-                    return subsResult.ToHttpResult();
-
-                Submission? matchedSub = null;
-                foreach (Submission s in subsResult.Value!) {
-                    if (s.SubmissionId == submissionId) {
-                        matchedSub = s;
-                        break;
-                    }
-                }
-                if (matchedSub is null)
-                    return Results.NotFound(new { error = $"Submission {submissionId} not found for company." });
-
-                int resolvedTaxYear = taxonomyYear ?? matchedSub.ReportDate.Year;
+                int resolvedTaxYear = taxonomyYear ?? DefaultTaxonomyYear;
                 Result<TaxonomyTypeInfo> taxResult =
                     await dbm.GetTaxonomyTypeByNameVersion("us-gaap", resolvedTaxYear, ct);
                 if (taxResult.IsFailure)

@@ -200,6 +200,111 @@ public class StatementDataService {
         return Result<IReadOnlyCollection<StatementListItem>>.Success(items);
     }
 
+    public async Task<Result<IReadOnlyCollection<StatementListItem>>> ListStatementsForSubmission(
+        ulong companyId,
+        ulong submissionId,
+        int taxonomyTypeId,
+        CancellationToken ct) {
+
+        // 1. Load taxonomy concepts
+        Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult =
+            await _dbmService.GetTaxonomyConceptsByTaxonomyType(taxonomyTypeId, ct);
+        if (conceptsResult.IsFailure || conceptsResult.Value is null) {
+            return Result<IReadOnlyCollection<StatementListItem>>.Failure(ErrorCodes.GenericError,
+                $"Could not load taxonomy concepts for taxonomy type {taxonomyTypeId}.");
+        }
+
+        IReadOnlyCollection<ConceptDetailsDTO> concepts = conceptsResult.Value;
+
+        // 2. Load presentation hierarchy
+        Result<IReadOnlyCollection<PresentationDetailsDTO>> presentationsResult =
+            await _dbmService.GetTaxonomyPresentationsByTaxonomyType(taxonomyTypeId, ct);
+        if (presentationsResult.IsFailure || presentationsResult.Value is null) {
+            return Result<IReadOnlyCollection<StatementListItem>>.Failure(ErrorCodes.GenericError,
+                $"Could not load taxonomy presentation hierarchy for taxonomy type {taxonomyTypeId}.");
+        }
+
+        IReadOnlyCollection<PresentationDetailsDTO> presentations = presentationsResult.Value;
+
+        // 3. Load data points for the submission
+        Result<IReadOnlyCollection<DataPoint>> dataPointsResult =
+            await _dbmService.GetDataPointsForSubmission(companyId, submissionId, ct);
+        if (dataPointsResult.IsFailure || dataPointsResult.Value is null) {
+            return Result<IReadOnlyCollection<StatementListItem>>.Failure(ErrorCodes.GenericError,
+                "Could not load data points for company/submission.");
+        }
+
+        var dataPointMap = new Dictionary<long, DataPoint>();
+        foreach (DataPoint dp in dataPointsResult.Value)
+            dataPointMap[dp.TaxonomyConceptId] = dp;
+
+        // 4. Build concept map
+        Dictionary<long, ConceptDetailsDTO> conceptMap = new();
+        foreach (ConceptDetailsDTO c in concepts)
+            conceptMap[c.ConceptId] = c;
+
+        // 5. Find role roots (depth-1 presentation entries)
+        var roleRoots = new Dictionary<string, long>();
+        foreach (PresentationDetailsDTO p in presentations) {
+            if (p.Depth != 1)
+                continue;
+            if (string.IsNullOrWhiteSpace(p.RoleName))
+                continue;
+            if (!roleRoots.ContainsKey(p.RoleName))
+                roleRoots[p.RoleName] = p.ConceptId;
+        }
+
+        // 6. For each role root, check if subtree has any data
+        var items = new List<StatementListItem>();
+        foreach ((string roleNameEntry, long rootConceptId) in roleRoots) {
+            Dictionary<long, List<PresentationDetailsDTO>> parentToChildren =
+                BuildParentToChildrenMap(presentations, roleNameEntry);
+
+            var traverseCtx = new TraverseContext(
+                rootConceptId,
+                parentToChildren,
+                conceptMap,
+                0,
+                10,
+                null,
+                new HashSet<long>()
+            );
+            Result<List<HierarchyNode>> hierarchyResult = TraverseConceptTree(traverseCtx, null);
+            if (hierarchyResult.IsFailure || hierarchyResult.Value is null)
+                continue;
+
+            List<HierarchyNode> hierarchy = hierarchyResult.Value;
+            var childrenMap = new Dictionary<long, List<HierarchyNode>>();
+            var rootNodes = new List<HierarchyNode>();
+            BuildChildrenMap(hierarchy, childrenMap, rootNodes);
+
+            bool hasData = false;
+            foreach (HierarchyNode rootNode in rootNodes) {
+                if (HasValueOrChildValue(rootNode.ConceptId, childrenMap, dataPointMap, new HashSet<long>())) {
+                    hasData = true;
+                    break;
+                }
+            }
+
+            if (!hasData)
+                continue;
+
+            ConceptDetailsDTO? root = null;
+            foreach (ConceptDetailsDTO c in concepts) {
+                if (c.ConceptId == rootConceptId) {
+                    root = c;
+                    break;
+                }
+            }
+            items.Add(new StatementListItem(
+                roleNameEntry,
+                root?.Name ?? string.Empty,
+                root?.Label ?? string.Empty));
+        }
+
+        return Result<IReadOnlyCollection<StatementListItem>>.Success(items);
+    }
+
     // --- Internal helpers ---
 
     private static Result<List<HierarchyNode>> TraverseConceptTree(TraverseContext ctx, TextWriter? warningWriter) {

@@ -16,6 +16,9 @@ const mockActivatedRoute = {
         };
         return map[key] ?? null;
       }
+    },
+    queryParamMap: {
+      get: (_key: string) => null
     }
   }
 };
@@ -129,6 +132,18 @@ describe('ReportComponent', () => {
 
     const rows = fixture.nativeElement.querySelectorAll('.tree-row');
     expect(rows.length).toBe(2);
+  });
+
+  it('should show no-data message when response has no children and no value', () => {
+    const fixture = TestBed.createComponent(ReportComponent);
+    fixture.detectChanges();
+
+    const req = httpMock.expectOne(r => r.url.includes('/statements/BalanceSheetAbstract'));
+    req.flush({ conceptName: 'BalanceSheetAbstract', label: 'Balance Sheet', value: null });
+    fixture.detectChanges();
+
+    const noData = fixture.nativeElement.querySelector('.no-data');
+    expect(noData?.textContent).toContain('No data reported');
   });
 
   it('should reload with taxonomy year when selector changes', () => {

@@ -42,7 +42,9 @@ public static class StatementEndpoints {
                     return Results.NotFound(new { error = $"No taxonomy found for year {taxonomyYear}." });
 
                 Result<IReadOnlyCollection<StatementListItem>> listResult =
-                    await sds.ListStatements(taxResult.Value!.TaxonomyTypeId, ct);
+                    await sds.ListStatementsForSubmission(
+                        companyResult.Value!.CompanyId, submissionId,
+                        taxResult.Value!.TaxonomyTypeId, ct);
                 if (listResult.IsFailure)
                     return listResult.ToHttpResult();
 

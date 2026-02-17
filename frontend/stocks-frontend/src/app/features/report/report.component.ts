@@ -51,6 +51,8 @@ interface RoleOption {
       </div>
 
       <app-tree-table [nodes]="treeNodes()" />
+    } @else if (noData()) {
+      <p class="no-data">No data reported for this statement in this filing.</p>
     } @else if (error()) {
       <p class="error">{{ error() }}</p>
     } @else {
@@ -110,6 +112,10 @@ interface RoleOption {
     .role-picker button:hover {
       background: #e2e8f0;
     }
+    .no-data {
+      color: #64748b;
+      font-style: italic;
+    }
     .error {
       color: #dc2626;
     }
@@ -126,6 +132,7 @@ export class ReportComponent implements OnInit {
   treeData = signal<StatementTreeNode | null>(null);
   treeNodes = signal<StatementTreeNode[]>([]);
   availableRoles = signal<RoleOption[]>([]);
+  noData = signal(false);
   error = signal<string | null>(null);
 
   constructor(
@@ -139,12 +146,19 @@ export class ReportComponent implements OnInit {
     this.submissionId = parseInt(params.get('submissionId') ?? '0', 10);
     this.concept = params.get('concept') ?? '';
 
+    const queryParams = this.route.snapshot.queryParamMap;
+    const roleName = queryParams.get('roleName');
+    if (roleName) {
+      this.selectedRole = roleName;
+    }
+
     this.loadStatement();
   }
 
   onYearChange(): void {
     this.treeData.set(null);
     this.treeNodes.set([]);
+    this.noData.set(false);
     this.error.set(null);
     this.loadStatement();
   }
@@ -160,6 +174,11 @@ export class ReportComponent implements OnInit {
       this.selectedYear ?? undefined, this.selectedRole ?? undefined
     ).subscribe({
       next: data => {
+        const isEmpty = !data || (!data.value && (!data.children || data.children.length === 0));
+        if (isEmpty) {
+          this.noData.set(true);
+          return;
+        }
         this.treeData.set(data);
         this.treeNodes.set(data.children ?? [data]);
       },

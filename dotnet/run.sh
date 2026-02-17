@@ -12,6 +12,11 @@ ROLE="104000 - Statement - Statement of Financial Position, Classified"
 # Function to display the menu
 display_menu() {
     echo "Select an option:"
+    echo "t) Run .NET tests"
+    echo "u) Run Angular tests"
+    echo "s) Start Web API + Angular dev server"
+    echo "w) Start .NET Web API"
+    echo "a) Start Angular dev server"
     echo "1) Build the solution"
     echo "2) Run the application with specific parameters"
     echo "3) Download SEC ticker mappings"
@@ -38,6 +43,51 @@ while true; do
     read -p "Enter your choice: " choice
 
     case $choice in
+        t)
+            echo "Running .NET tests..."
+            dotnet test EDGARScraper.sln
+            if [ $? -eq 0 ]; then
+                echo -e "\n=== .NET TESTS: PASS ==="
+            else
+                echo -e "\n=== .NET TESTS: FAIL ==="
+            fi
+            ;;
+        u)
+            echo "Running Angular tests..."
+            pushd ../frontend/stocks-frontend > /dev/null
+            npx ng test --watch=false
+            ANGULAR_EXIT=$?
+            popd > /dev/null
+            if [ $ANGULAR_EXIT -eq 0 ]; then
+                echo -e "\n=== ANGULAR TESTS: PASS ==="
+            else
+                echo -e "\n=== ANGULAR TESTS: FAIL ==="
+            fi
+            ;;
+        s)
+            echo "Starting .NET Web API + Angular dev server..."
+            dotnet run --project Stocks.WebApi &
+            DOTNET_PID=$!
+            pushd ../frontend/stocks-frontend > /dev/null
+            npx ng serve &
+            NG_PID=$!
+            popd > /dev/null
+            echo "Web API PID: $DOTNET_PID, Angular PID: $NG_PID"
+            echo "Press Enter to stop both..."
+            read
+            kill $DOTNET_PID $NG_PID 2>/dev/null
+            wait $DOTNET_PID $NG_PID 2>/dev/null
+            ;;
+        w)
+            echo "Starting .NET Web API..."
+            dotnet run --project Stocks.WebApi
+            ;;
+        a)
+            echo "Starting Angular dev server..."
+            pushd ../frontend/stocks-frontend > /dev/null
+            npx ng serve
+            popd > /dev/null
+            ;;
         1)
             build_solution
             ;;

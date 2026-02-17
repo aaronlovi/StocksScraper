@@ -35,8 +35,10 @@
   - Tests: StatementEndpointsTests.cs (3), TypeaheadTests.cs (3)
   - Committed: (pending)
 
-- [ ] Checkpoint 8: Angular Workspace and Layout Shell
-  - (pending)
+- [x] Checkpoint 8: Angular Workspace and Layout Shell
+  - Files: Angular workspace (frontend/stocks-frontend/), app.ts, app.routes.ts, app.config.ts, sidebar.component.ts, titlebar.component.ts, api.service.ts, proxy.conf.json, placeholder components (dashboard, search, company, report)
+  - Tests: app.spec.ts (4), sidebar.component.spec.ts (3), titlebar.component.spec.ts (3), api.service.spec.ts (3)
+  - Committed: (pending)
 
 - [ ] Checkpoint 9: Dashboard and Search Views
   - (pending)

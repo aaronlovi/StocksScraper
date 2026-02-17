@@ -40,8 +40,10 @@
   - Tests: app.spec.ts (4), sidebar.component.spec.ts (3), titlebar.component.spec.ts (3), api.service.spec.ts (3)
   - Committed: (pending)
 
-- [ ] Checkpoint 9: Dashboard and Search Views
-  - (pending)
+- [x] Checkpoint 9: Dashboard and Search Views
+  - Files: dashboard.component.ts, search.component.ts, titlebar.component.ts (updated with typeahead)
+  - Tests: dashboard.component.spec.ts (3), search.component.spec.ts (3), titlebar.component.spec.ts (4)
+  - Committed: (pending)
 
 - [ ] Checkpoint 10: Company Semi-Detail View
   - (pending)

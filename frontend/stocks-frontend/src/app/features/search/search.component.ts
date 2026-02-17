@@ -1,8 +1,170 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { ApiService, CompanySearchResult, PaginationResponse } from '../../core/services/api.service';
 
 @Component({
   selector: 'app-search',
   standalone: true,
-  template: '<h2>Search</h2>'
+  imports: [FormsModule, RouterLink],
+  template: `
+    <h2>Search Companies</h2>
+    <div class="search-bar">
+      <input
+        type="text"
+        placeholder="Search by name, ticker, or CIK..."
+        [(ngModel)]="query"
+        (keydown.enter)="doSearch()"
+      />
+      <button (click)="doSearch()">Search</button>
+    </div>
+
+    @if (results().length > 0) {
+      <table>
+        <thead>
+          <tr>
+            <th>Company Name</th>
+            <th>CIK</th>
+            <th>Ticker</th>
+            <th>Exchange</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of results(); track r.companyId) {
+            <tr>
+              <td><a [routerLink]="['/company', r.cik]">{{ r.companyName }}</a></td>
+              <td>{{ r.cik }}</td>
+              <td>{{ r.ticker ?? '' }}</td>
+              <td>{{ r.exchange ?? '' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      @if (pagination()) {
+        <div class="pagination">
+          <button [disabled]="page() <= 1" (click)="goToPage(page() - 1)">Previous</button>
+          <span>Page {{ page() }} of {{ pagination()!.totalPages }}</span>
+          <button [disabled]="page() >= pagination()!.totalPages" (click)="goToPage(page() + 1)">Next</button>
+        </div>
+      }
+    } @else if (searched() && results().length === 0) {
+      <p class="no-results">No results found.</p>
+    }
+  `,
+  styles: [`
+    .search-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .search-bar input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+    }
+    .search-bar button {
+      padding: 8px 16px;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+    a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .pagination button {
+      padding: 6px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .pagination button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .no-results {
+      color: #64748b;
+    }
+  `]
 })
-export class SearchComponent {}
+export class SearchComponent implements OnInit {
+  query = '';
+  page = signal(1);
+  pageSize = 25;
+  results = signal<CompanySearchResult[]>([]);
+  pagination = signal<PaginationResponse | null>(null);
+  searched = signal(false);
+
+  constructor(
+    private api: ApiService,
+    private route: ActivatedRoute,
+    private router: Router
+  ) {}
+
+  ngOnInit(): void {
+    this.route.queryParams.subscribe(params => {
+      const q = params['q'] ?? '';
+      const p = parseInt(params['page'] ?? '1', 10);
+      if (q) {
+        this.query = q;
+        this.page.set(p);
+        this.fetchResults();
+      }
+    });
+  }
+
+  doSearch(): void {
+    this.page.set(1);
+    this.router.navigate([], {
+      queryParams: { q: this.query, page: 1 },
+      queryParamsHandling: 'merge'
+    });
+    this.fetchResults();
+  }
+
+  goToPage(p: number): void {
+    this.page.set(p);
+    this.router.navigate([], {
+      queryParams: { page: p },
+      queryParamsHandling: 'merge'
+    });
+    this.fetchResults();
+  }
+
+  private fetchResults(): void {
+    this.api.searchCompanies(this.query, this.page(), this.pageSize).subscribe({
+      next: data => {
+        this.results.set(data.items);
+        this.pagination.set(data.pagination);
+        this.searched.set(true);
+      }
+    });
+  }
+}

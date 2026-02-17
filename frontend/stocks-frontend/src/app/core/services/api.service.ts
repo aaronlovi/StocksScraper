@@ -46,6 +46,12 @@ export interface DashboardStats {
   submissionsByFilingType: Record<string, number>;
 }
 
+export interface StatementListItem {
+  roleName: string;
+  rootConceptName: string;
+  rootLabel: string;
+}
+
 export interface TypeaheadResult {
   text: string;
   type: string;
@@ -72,6 +78,12 @@ export class ApiService {
 
   getDashboardStats(): Observable<DashboardStats> {
     return this.http.get<DashboardStats>('/api/dashboard/stats');
+  }
+
+  listStatements(cik: string, submissionId: number): Observable<StatementListItem[]> {
+    return this.http.get<StatementListItem[]>(
+      `/api/companies/${cik}/submissions/${submissionId}/statements`
+    );
   }
 
   getTypeahead(query: string): Observable<TypeaheadResult[]> {

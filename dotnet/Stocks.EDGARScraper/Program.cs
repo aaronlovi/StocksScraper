@@ -146,6 +146,14 @@ internal partial class Program {
                 }
                 return 0;
             }
+            case "--import-sec-ticker-mappings": {
+                Result res = await ImportSecTickerMappingsAsync();
+                if (res.IsFailure) {
+                    _logger.LogError("ImportSecTickerMappings failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
             case "--download-prices-stooq": {
                 Result res = await DownloadStooqPricesAsync();
                 if (res.IsFailure) {
@@ -459,6 +467,21 @@ internal partial class Program {
         ILogger<SecTickerMappingsDownloader> logger = _svp!.GetRequiredService<ILogger<SecTickerMappingsDownloader>>();
         var downloader = new SecTickerMappingsDownloader(httpClient, logger);
         return await downloader.DownloadAsync(outputDir, userAgent, CancellationToken.None);
+    }
+
+    private static async Task<Result> ImportSecTickerMappingsAsync() {
+        if (_svp is null)
+            return Result.Failure(ErrorCodes.ValidationError, "Service provider is not initialized.");
+
+        IConfiguration configuration = _svp.GetRequiredService<IConfiguration>();
+        string? edgarDataDir = configuration["EdgarDataDir"];
+        if (string.IsNullOrWhiteSpace(edgarDataDir))
+            return Result.Failure(ErrorCodes.GenericError, "Missing config: EdgarDataDir");
+
+        const int batchSize = 1000;
+        ILogger<SecTickerMappingsImporter> logger = _svp.GetRequiredService<ILogger<SecTickerMappingsImporter>>();
+        var importer = new SecTickerMappingsImporter(_dbm!, logger);
+        return await importer.ImportAsync(edgarDataDir, batchSize, CancellationToken.None);
     }
 
     private static async Task<Result> DownloadStooqPricesAsync() {

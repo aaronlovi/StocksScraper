@@ -101,6 +101,36 @@ describe('ReportComponent', () => {
     expect(error?.textContent).toContain('Failed to load');
   });
 
+  it('should show role picker when multiple roles returned', () => {
+    const fixture = TestBed.createComponent(ReportComponent);
+    fixture.detectChanges();
+
+    const req = httpMock.expectOne(r => r.url.includes('/statements/BalanceSheetAbstract'));
+    req.flush(
+      { error: 'Multiple roles available. Specify roleName.', roles: [
+        { roleName: 'Role A - Balance Sheet', rootLabel: 'Balance Sheet' },
+        { roleName: 'Role B - Balance Sheet Alt', rootLabel: 'Balance Sheet Alt' }
+      ]},
+      { status: 300, statusText: 'Multiple Choices' }
+    );
+    fixture.detectChanges();
+
+    const buttons = fixture.nativeElement.querySelectorAll('.role-picker button');
+    expect(buttons.length).toBe(2);
+    expect(buttons[0].textContent).toContain('Role A');
+
+    // Select a role
+    const component = fixture.componentInstance;
+    component.selectRole('Role A - Balance Sheet');
+
+    const req2 = httpMock.expectOne(r => r.url.includes('roleName=Role'));
+    req2.flush(mockStatementResponse);
+    fixture.detectChanges();
+
+    const rows = fixture.nativeElement.querySelectorAll('.tree-row');
+    expect(rows.length).toBe(2);
+  });
+
   it('should reload with taxonomy year when selector changes', () => {
     const fixture = TestBed.createComponent(ReportComponent);
     fixture.detectChanges();

@@ -86,8 +86,23 @@ public static class StatementEndpoints {
 
                 Result<StatementData> dataResult = await sds.GetStatementData(
                     company.CompanyId, submissionId, concept, taxonomyTypeId, depth, roleName, ct);
-                if (dataResult.IsFailure)
+                if (dataResult.IsFailure) {
+                    if (dataResult.ErrorMessage is not null && dataResult.ErrorMessage.Contains("Multiple presentation roles")) {
+                        // Extract available roles and return them so the client can prompt
+                        Result<IReadOnlyCollection<StatementListItem>> rolesResult =
+                            await sds.ListStatements(taxonomyTypeId, ct);
+                        var availableRoles = new List<object>();
+                        if (rolesResult.IsSuccess) {
+                            foreach (StatementListItem item in rolesResult.Value!) {
+                                if (item.RootConceptName.EqualsOrdinalIgnoreCase(concept))
+                                    availableRoles.Add(new { roleName = item.RoleName, rootLabel = item.RootLabel });
+                            }
+                        }
+                        return Results.Json(new { error = "Multiple roles available. Specify roleName.", roles = availableRoles },
+                            statusCode: 300);
+                    }
                     return dataResult.ToHttpResult();
+                }
 
                 StatementData data = dataResult.Value!;
                 object? jsonTree = BuildJsonTree(data.ChildrenMap, data.RootNodes,

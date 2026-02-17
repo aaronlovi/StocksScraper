@@ -93,11 +93,12 @@ export class ApiService {
     );
   }
 
-  getStatement(cik: string, submissionId: number, concept: string, taxonomyYear?: number): Observable<StatementTreeNode> {
+  getStatement(cik: string, submissionId: number, concept: string, taxonomyYear?: number, roleName?: string): Observable<StatementTreeNode> {
+    const params: string[] = [];
+    if (taxonomyYear) params.push(`taxonomyYear=${taxonomyYear}`);
+    if (roleName) params.push(`roleName=${encodeURIComponent(roleName)}`);
     let url = `/api/companies/${cik}/submissions/${submissionId}/statements/${concept}`;
-    if (taxonomyYear) {
-      url += `?taxonomyYear=${taxonomyYear}`;
-    }
+    if (params.length > 0) url += '?' + params.join('&');
     return this.http.get<StatementTreeNode>(url);
   }
 

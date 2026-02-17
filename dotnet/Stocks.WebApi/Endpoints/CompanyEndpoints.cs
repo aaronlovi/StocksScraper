@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using Microsoft.AspNetCore.Builder;
@@ -20,17 +21,50 @@ public static class CompanyEndpoints {
             Company company = companyResult.Value!;
             Result<IReadOnlyCollection<CompanyTicker>> tickersResult =
                 await dbm.GetCompanyTickersByCompanyId(company.CompanyId, ct);
+            Result<IReadOnlyCollection<CompanyName>> namesResult =
+                await dbm.GetCompanyNamesByCompanyId(company.CompanyId, ct);
 
             var tickers = new List<object>();
+            string? firstTicker = null;
             if (tickersResult.IsSuccess && tickersResult.Value is not null) {
-                foreach (CompanyTicker t in tickersResult.Value)
+                foreach (CompanyTicker t in tickersResult.Value) {
                     tickers.Add(new { t.Ticker, t.Exchange });
+                    firstTicker ??= t.Ticker;
+                }
+            }
+
+            string? companyName = null;
+            if (namesResult.IsSuccess && namesResult.Value is not null) {
+                foreach (CompanyName n in namesResult.Value) {
+                    companyName = n.Name;
+                    break;
+                }
+            }
+
+            decimal? latestPrice = null;
+            string? latestPriceDate = null;
+            if (firstTicker is not null) {
+                Result<IReadOnlyCollection<PriceRow>> pricesResult =
+                    await dbm.GetPricesByTicker(firstTicker, ct);
+                if (pricesResult.IsSuccess && pricesResult.Value is not null) {
+                    DateOnly maxDate = DateOnly.MinValue;
+                    foreach (PriceRow price in pricesResult.Value) {
+                        if (price.PriceDate > maxDate) {
+                            maxDate = price.PriceDate;
+                            latestPrice = price.Close;
+                            latestPriceDate = price.PriceDate.ToString("yyyy-MM-dd");
+                        }
+                    }
+                }
             }
 
             return Results.Ok(new {
                 company.CompanyId,
                 company.Cik,
                 company.DataSource,
+                CompanyName = companyName,
+                LatestPrice = latestPrice,
+                LatestPriceDate = latestPriceDate,
                 Tickers = tickers
             });
         });

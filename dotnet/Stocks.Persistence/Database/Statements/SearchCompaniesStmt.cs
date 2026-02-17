@@ -30,9 +30,17 @@ WITH matches AS (
         CASE WHEN c.cik::text = @query THEN 1.0 ELSE 0 END
     ) DESC
 )
-SELECT company_id, cik, company_name, ticker, exchange, rank,
-    COUNT(*) OVER() AS total_count
-FROM matches
+SELECT m.company_id, m.cik, m.company_name, m.ticker, m.exchange, m.rank,
+    COUNT(*) OVER() AS total_count,
+    lp.latest_price, lp.latest_price_date
+FROM matches m
+LEFT JOIN LATERAL (
+    SELECT p.close AS latest_price, p.price_date AS latest_price_date
+    FROM prices p
+    WHERE p.ticker = m.ticker
+    ORDER BY p.price_date DESC
+    LIMIT 1
+) lp ON true
 ORDER BY rank DESC, company_name ASC
 LIMIT @limit OFFSET @offset;
 ";
@@ -47,6 +55,8 @@ LIMIT @limit OFFSET @offset;
     private static int _tickerIndex = -1;
     private static int _exchangeIndex = -1;
     private static int _totalCountIndex = -1;
+    private static int _latestPriceIndex = -1;
+    private static int _latestPriceDateIndex = -1;
 
     public SearchCompaniesStmt(string query, PaginationRequest pagination)
         : base(sql, nameof(SearchCompaniesStmt)) {
@@ -73,6 +83,8 @@ LIMIT @limit OFFSET @offset;
         _tickerIndex = reader.GetOrdinal("ticker");
         _exchangeIndex = reader.GetOrdinal("exchange");
         _totalCountIndex = reader.GetOrdinal("total_count");
+        _latestPriceIndex = reader.GetOrdinal("latest_price");
+        _latestPriceDateIndex = reader.GetOrdinal("latest_price_date");
     }
 
     protected override void ClearResults() {
@@ -95,13 +107,17 @@ LIMIT @limit OFFSET @offset;
 
         string? ticker = reader.IsDBNull(_tickerIndex) ? null : reader.GetString(_tickerIndex);
         string? exchange = reader.IsDBNull(_exchangeIndex) ? null : reader.GetString(_exchangeIndex);
+        decimal? latestPrice = reader.IsDBNull(_latestPriceIndex) ? null : reader.GetDecimal(_latestPriceIndex);
+        DateOnly? latestPriceDate = reader.IsDBNull(_latestPriceDateIndex) ? null : DateOnly.FromDateTime(reader.GetDateTime(_latestPriceDateIndex));
 
         var result = new CompanySearchResult(
             (ulong)reader.GetInt64(_companyIdIndex),
             reader.GetInt64(_cikIndex).ToString(),
             reader.GetString(_companyNameIndex),
             ticker,
-            exchange);
+            exchange,
+            latestPrice,
+            latestPriceDate);
         _results.Add(result);
         return true;
     }

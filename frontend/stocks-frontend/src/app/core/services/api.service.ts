@@ -6,6 +6,9 @@ export interface CompanyDetail {
   companyId: number;
   cik: number;
   dataSource: string;
+  companyName: string | null;
+  latestPrice: number | null;
+  latestPriceDate: string | null;
   tickers: { ticker: string; exchange: string }[];
 }
 
@@ -23,6 +26,8 @@ export interface CompanySearchResult {
   companyName: string;
   ticker: string | null;
   exchange: string | null;
+  latestPrice: number | null;
+  latestPriceDate: string | null;
 }
 
 export interface PaginationResponse {

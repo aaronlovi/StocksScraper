@@ -14,7 +14,16 @@ import {
   template: `
     @if (company()) {
       <div class="company-header">
-        <h2>{{ company()!.cik }}</h2>
+        <h2>{{ company()!.companyName ?? ('CIK ' + company()!.cik) }}</h2>
+        <div class="company-subtitle">
+          <span class="cik-label">CIK {{ company()!.cik }}</span>
+          @if (company()!.latestPrice != null) {
+            <span class="price-label">\${{ company()!.latestPrice!.toFixed(2) }}</span>
+            @if (company()!.latestPriceDate) {
+              <span class="price-date">as of {{ company()!.latestPriceDate }}</span>
+            }
+          }
+        </div>
         @if (company()!.tickers.length > 0) {
           <div class="tickers">
             @for (t of company()!.tickers; track (t.ticker + t.exchange)) {
@@ -79,6 +88,25 @@ import {
     .company-header {
       margin-bottom: 16px;
     }
+    .company-subtitle {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 4px;
+      font-size: 14px;
+      color: #64748b;
+    }
+    .cik-label {
+      font-weight: 500;
+    }
+    .price-label {
+      font-weight: 600;
+      color: #059669;
+    }
+    .price-date {
+      font-weight: 400;
+      color: #94a3b8;
+    }
     .tickers {
       display: flex;
       gap: 8px;
@@ -103,7 +131,7 @@ import {
     }
     th, td {
       text-align: left;
-      padding: 8px 12px;
+      padding: 4px 12px;
       border-bottom: 1px solid #e2e8f0;
     }
     th {

@@ -68,6 +68,17 @@ public sealed class DbmInMemoryData {
             return [.. _companyNames];
     }
 
+    public IReadOnlyCollection<CompanyName> GetCompanyNamesByCompanyId(ulong companyId) {
+        var results = new List<CompanyName>();
+        lock (_mutex) {
+            foreach (CompanyName name in _companyNames) {
+                if (name.CompanyId == companyId)
+                    results.Add(name);
+            }
+        }
+        return results;
+    }
+
     // Company tickers
 
     public void AddOrUpdateCompanyTickers(IReadOnlyCollection<CompanyTicker> tickers) {
@@ -182,12 +193,29 @@ public sealed class DbmInMemoryData {
 
                 if (matched) {
                     _ = seen.Add(company.CompanyId);
+
+                    decimal? latestPrice = null;
+                    DateOnly? latestPriceDate = null;
+                    if (matchedTicker is not null) {
+                        DateOnly maxDate = DateOnly.MinValue;
+                        foreach (PriceRow price in _prices) {
+                            if (string.Equals(price.Ticker, matchedTicker, StringComparison.OrdinalIgnoreCase)
+                                && price.PriceDate > maxDate) {
+                                maxDate = price.PriceDate;
+                                latestPrice = price.Close;
+                                latestPriceDate = price.PriceDate;
+                            }
+                        }
+                    }
+
                     matches.Add(new CompanySearchResult(
                         company.CompanyId,
                         company.Cik.ToString(),
                         matchedName ?? string.Empty,
                         matchedTicker,
-                        matchedExchange));
+                        matchedExchange,
+                        latestPrice,
+                        latestPriceDate));
                 }
             }
         }

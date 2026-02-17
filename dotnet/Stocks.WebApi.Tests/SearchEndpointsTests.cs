@@ -1,3 +1,4 @@
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -37,6 +38,10 @@ public class SearchEndpointsTests : IClassFixture<WebApplicationFactory<Program>
             new CompanyTicker(2, "MSFT", "NASDAQ"),
             new CompanyTicker(3, "AMZN", "NASDAQ")
         ], CancellationToken.None);
+        _ = await _dbm.BulkInsertPrices([
+            new PriceRow(1, 320193, "AAPL", "NASDAQ", "AAPL.US", new DateOnly(2025, 6, 13), 195.00m, 198.50m, 194.00m, 197.25m, 50000000),
+            new PriceRow(2, 320193, "AAPL", "NASDAQ", "AAPL.US", new DateOnly(2025, 6, 12), 193.00m, 196.00m, 192.50m, 195.00m, 45000000)
+        ], CancellationToken.None);
     }
 
     [Fact]
@@ -48,6 +53,8 @@ public class SearchEndpointsTests : IClassFixture<WebApplicationFactory<Program>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         string body = await response.Content.ReadAsStringAsync();
         Assert.Contains("Apple", body);
+        Assert.Contains("197.25", body);
+        Assert.Contains("2025-06-13", body);
     }
 
     [Fact]

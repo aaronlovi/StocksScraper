@@ -39,7 +39,7 @@ import { StatementTreeNode } from '../../../core/services/api.service';
       border-collapse: collapse;
     }
     th, td {
-      padding: 6px 12px;
+      padding: 4px 12px;
       border-bottom: 1px solid #e2e8f0;
       text-align: left;
     }

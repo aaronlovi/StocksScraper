@@ -24,18 +24,22 @@ import { ApiService, CompanySearchResult, PaginationResponse } from '../../core/
         <thead>
           <tr>
             <th>Company Name</th>
-            <th>CIK</th>
+            <th class="right">CIK</th>
             <th>Ticker</th>
             <th>Exchange</th>
+            <th class="right">Latest Price ($)</th>
+            <th>Price Date</th>
           </tr>
         </thead>
         <tbody>
           @for (r of results(); track r.companyId) {
             <tr>
               <td><a [routerLink]="['/company', r.cik]">{{ r.companyName }}</a></td>
-              <td>{{ r.cik }}</td>
+              <td class="right">{{ r.cik }}</td>
               <td>{{ r.ticker ?? '' }}</td>
               <td>{{ r.exchange ?? '' }}</td>
+              <td class="right">{{ r.latestPrice != null ? r.latestPrice.toFixed(2) : '—' }}</td>
+              <td>{{ r.latestPriceDate ?? '—' }}</td>
             </tr>
           }
         </tbody>
@@ -78,7 +82,7 @@ import { ApiService, CompanySearchResult, PaginationResponse } from '../../core/
     }
     th, td {
       text-align: left;
-      padding: 8px 12px;
+      padding: 4px 12px;
       border-bottom: 1px solid #e2e8f0;
     }
     th {
@@ -108,6 +112,9 @@ import { ApiService, CompanySearchResult, PaginationResponse } from '../../core/
     .pagination button:disabled {
       opacity: 0.5;
       cursor: default;
+    }
+    .right {
+      text-align: right;
     }
     .no-results {
       color: #64748b;

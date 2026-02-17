@@ -33,6 +33,7 @@ public interface IDbmService {
     // Company names
 
     Task<Result<IReadOnlyCollection<CompanyName>>> GetAllCompanyNames(CancellationToken ct);
+    Task<Result<IReadOnlyCollection<CompanyName>>> GetCompanyNamesByCompanyId(ulong companyId, CancellationToken ct);
 
     // Company tickers
 

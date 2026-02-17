@@ -39,6 +39,9 @@ describe('CompanyComponent', () => {
       companyId: 1,
       cik: 320193,
       dataSource: 'SEC',
+      companyName: 'Apple Inc',
+      latestPrice: 191.50,
+      latestPriceDate: '2025-06-13',
       tickers: [
         { ticker: 'AAPL', exchange: 'NASDAQ' },
         { ticker: 'AAPL', exchange: 'NYSE' }
@@ -70,7 +73,7 @@ describe('CompanyComponent', () => {
     fixture.detectChanges();
 
     const heading = fixture.nativeElement.querySelector('h2');
-    expect(heading.textContent).toContain('320193');
+    expect(heading.textContent).toContain('Apple Inc');
 
     const badges = fixture.nativeElement.querySelectorAll('.badge');
     expect(badges.length).toBe(2);

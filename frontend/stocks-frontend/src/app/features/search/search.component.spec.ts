@@ -40,8 +40,8 @@ describe('SearchComponent', () => {
     const req = httpMock.expectOne(r => r.url.includes('/api/search'));
     req.flush({
       items: [
-        { companyId: 1, cik: '320193', companyName: 'Apple Inc', ticker: 'AAPL', exchange: 'NASDAQ' },
-        { companyId: 2, cik: '789019', companyName: 'Apple Hospitality', ticker: null, exchange: null }
+        { companyId: 1, cik: '320193', companyName: 'Apple Inc', ticker: 'AAPL', exchange: 'NASDAQ', latestPrice: 197.25, latestPriceDate: '2025-06-13' },
+        { companyId: 2, cik: '789019', companyName: 'Apple Hospitality', ticker: null, exchange: null, latestPrice: null, latestPriceDate: null }
       ],
       pagination: { pageNumber: 1, totalItems: 2, totalPages: 1 }
     });

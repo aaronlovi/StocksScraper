@@ -71,6 +71,9 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<IReadOnlyCollection<CompanyName>>> GetAllCompanyNames(CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<CompanyName>>.Success(_data.GetCompanyNames()));
 
+    public Task<Result<IReadOnlyCollection<CompanyName>>> GetCompanyNamesByCompanyId(ulong companyId, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<CompanyName>>.Success(_data.GetCompanyNamesByCompanyId(companyId)));
+
     // Company tickers
 
     public Task<Result> BulkInsertCompanyTickers(List<CompanyTicker> tickers, CancellationToken ct) {

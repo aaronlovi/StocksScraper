@@ -182,6 +182,18 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
+    public async Task<Result<IReadOnlyCollection<CompanyName>>> GetCompanyNamesByCompanyId(ulong companyId, CancellationToken ct) {
+        var stmt = new GetCompanyNamesByCompanyIdStmt(companyId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetCompanyNamesByCompanyId success - CompanyId: {CompanyId}, Num names: {NumNames}", companyId, stmt.Names.Count);
+            return Result<IReadOnlyCollection<CompanyName>>.Success(stmt.Names);
+        } else {
+            _logger.LogWarning("GetCompanyNamesByCompanyId failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<CompanyName>>.Failure(res);
+        }
+    }
+
     public async Task<Result> BulkInsertCompanyNames(List<CompanyName> companyNames, CancellationToken ct) {
         var stmt = new BulkInsertCompanyNamesStmt(companyNames);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);

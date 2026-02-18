@@ -358,6 +358,89 @@ public class ScoringServiceTests {
         Assert.Equal(0m, result);
     }
 
+    [Fact]
+    public void ResolveWorkingCapitalChange_PrefersGeneralOtherAssetsOverCurrentNoncurrent() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInOtherOperatingAssets"] = 500m,
+            ["IncreaseDecreaseInOtherCurrentAssets"] = 200m,
+            ["IncreaseDecreaseInOtherNoncurrentAssets"] = 300m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(500m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_FallsBackToCurrentAndNoncurrentAssets() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInOtherCurrentAssets"] = 200m,
+            ["IncreaseDecreaseInOtherNoncurrentAssets"] = 300m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(500m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_PrefersGeneralOtherLiabilitiesOverCurrentNoncurrent() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInOtherOperatingLiabilities"] = 400m,
+            ["IncreaseDecreaseInOtherCurrentLiabilities"] = 150m,
+            ["IncreaseDecreaseInOtherNoncurrentLiabilities"] = 250m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(400m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_FallsBackToCurrentAndNoncurrentLiabilities() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInOtherCurrentLiabilities"] = 150m,
+            ["IncreaseDecreaseInOtherNoncurrentLiabilities"] = 250m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(400m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_IncludesAccruedIncomeTaxesPayable() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsReceivable"] = 100m,
+            ["IncreaseDecreaseInAccruedIncomeTaxesPayable"] = -38m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(62m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_MsftStyleFullComponentSum() {
+        // Simulates MSFT's reporting pattern: no aggregate, uses current/noncurrent split
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsReceivable"] = 10581m,
+            ["IncreaseDecreaseInInventories"] = -309m,
+            ["IncreaseDecreaseInAccountsPayable"] = 569m,
+            ["IncreaseDecreaseInContractWithCustomerLiability"] = 5438m,
+            ["IncreaseDecreaseInOtherCurrentAssets"] = 3044m,
+            ["IncreaseDecreaseInOtherCurrentLiabilities"] = 5922m,
+            ["IncreaseDecreaseInOtherNoncurrentAssets"] = 2950m,
+            ["IncreaseDecreaseInOtherNoncurrentLiabilities"] = -975m,
+            ["IncreaseDecreaseInAccruedIncomeTaxesPayable"] = -38m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        // 10581 - 309 + 569 + 5438 + 3044 + 5922 + 2950 - 975 - 38 = 27182
+        Assert.Equal(27182m, result);
+    }
+
     #endregion
 
     #region ComputeDerivedMetrics tests

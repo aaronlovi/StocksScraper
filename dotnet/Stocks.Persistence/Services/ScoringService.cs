@@ -70,6 +70,12 @@ public class ScoringService {
         "IncreaseDecreaseInContractWithCustomerLiability",
         "IncreaseDecreaseInOtherOperatingAssets",
         "IncreaseDecreaseInOtherOperatingLiabilities",
+        // More granular current/noncurrent variants (fallback when general Other concepts are missing)
+        "IncreaseDecreaseInOtherCurrentAssets",
+        "IncreaseDecreaseInOtherNoncurrentAssets",
+        "IncreaseDecreaseInOtherCurrentLiabilities",
+        "IncreaseDecreaseInOtherNoncurrentLiabilities",
+        "IncreaseDecreaseInAccruedIncomeTaxesPayable",
         "DeferredIncomeTaxExpenseBenefit",
         "DeferredIncomeTaxesAndTaxCredits",
         "Depletion",
@@ -361,11 +367,33 @@ public class ScoringService {
             if (contractLiab.HasValue) { sum += contractLiab.Value; foundAny = true; }
         }
 
-        // Other operating assets and liabilities
+        // Other operating assets: prefer general, else current + noncurrent
         decimal? otherAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingAssets"], null);
-        if (otherAssets.HasValue) { sum += otherAssets.Value; foundAny = true; }
+        if (otherAssets.HasValue) {
+            sum += otherAssets.Value;
+            foundAny = true;
+        } else {
+            decimal? otherCurAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherCurrentAssets"], null);
+            decimal? otherNoncurAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherNoncurrentAssets"], null);
+            if (otherCurAssets.HasValue) { sum += otherCurAssets.Value; foundAny = true; }
+            if (otherNoncurAssets.HasValue) { sum += otherNoncurAssets.Value; foundAny = true; }
+        }
+
+        // Other operating liabilities: prefer general, else current + noncurrent
         decimal? otherLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingLiabilities"], null);
-        if (otherLiab.HasValue) { sum += otherLiab.Value; foundAny = true; }
+        if (otherLiab.HasValue) {
+            sum += otherLiab.Value;
+            foundAny = true;
+        } else {
+            decimal? otherCurLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherCurrentLiabilities"], null);
+            decimal? otherNoncurLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherNoncurrentLiabilities"], null);
+            if (otherCurLiab.HasValue) { sum += otherCurLiab.Value; foundAny = true; }
+            if (otherNoncurLiab.HasValue) { sum += otherNoncurLiab.Value; foundAny = true; }
+        }
+
+        // Accrued income taxes payable (standalone, not subsumed by other groups)
+        decimal? accruedTax = ResolveField(yearData, ["IncreaseDecreaseInAccruedIncomeTaxesPayable"], null);
+        if (accruedTax.HasValue) { sum += accruedTax.Value; foundAny = true; }
 
         return foundAny ? sum : 0m;
     }

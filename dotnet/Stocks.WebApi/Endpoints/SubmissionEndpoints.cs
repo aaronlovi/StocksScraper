@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Stocks.DataModels;
+using Stocks.DataModels.Enums;
 using Stocks.Persistence.Database;
 using Stocks.Shared;
 using Stocks.WebApi.Middleware;
@@ -26,7 +27,7 @@ public static class SubmissionEndpoints {
             foreach (Submission s in subsResult.Value!) {
                 items.Add(new {
                     s.SubmissionId,
-                    FilingType = s.FilingType.ToString(),
+                    FilingType = s.FilingType.ToDisplayName(),
                     FilingCategory = s.FilingCategory.ToString(),
                     ReportDate = s.ReportDate.ToString("yyyy-MM-dd"),
                     s.FilingReference

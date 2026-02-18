@@ -763,19 +763,6 @@ internal partial class Program {
 
         var context = new ParseBulkXbrlArchiveContext(_svp!);
 
-        // Load taxonomy concepts into a dictionary for fast lookup
-        Result<IReadOnlyCollection<ConceptDetailsDTO>> taxonomyConceptsResult =
-            await _dbm!.GetTaxonomyConceptsByTaxonomyType((int)TaxonomyTypes.US_GAAP_2025, default);
-        if (taxonomyConceptsResult.IsSuccess) {
-            foreach (ConceptDetailsDTO concept in taxonomyConceptsResult.Value!) {
-                if (concept.PeriodTypeId == (int)TaxonomyPeriodTypes.None)
-                    continue; // Skip non-item concepts (e.g., domain/axis/member) that have no period type
-                context.TaxonomyConceptIdsByFactName[concept.Name.Trim()] = concept.ConceptId;
-            }
-        } else {
-            _logger.LogError("Failed to load taxonomy concepts: {Error}", taxonomyConceptsResult.ErrorMessage);
-            return;
-        }
         // For collecting unmatched fact_names
         var unmatchedFactNames = new List<(string FactName, ulong CompanyId, string FileName)>();
 
@@ -806,9 +793,47 @@ internal partial class Program {
             return;
         }
 
+        // Collect distinct report years from submissions to load per-year taxonomy concepts
+        var reportYears = new HashSet<int>();
         foreach (Submission s in submissionResults.Value!) {
             List<Submission> companySubmissions = context.SubmissionsByCompanyId.GetOrCreateEntry(s.CompanyId);
             companySubmissions.Add(s);
+            reportYears.Add(s.ReportDate.Year);
+        }
+
+        // Load taxonomy concepts for each report year
+        int latestYear = 0;
+        foreach (int year in reportYears) {
+            Result<TaxonomyTypeInfo> taxTypeResult =
+                await _dbm!.GetTaxonomyTypeByNameVersion("us-gaap", year, CancellationToken.None);
+            if (taxTypeResult.IsFailure || taxTypeResult.Value is null)
+                continue;
+
+            Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult =
+                await _dbm!.GetTaxonomyConceptsByTaxonomyType(taxTypeResult.Value.TaxonomyTypeId, CancellationToken.None);
+            if (conceptsResult.IsFailure || conceptsResult.Value is null)
+                continue;
+
+            var yearMap = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (ConceptDetailsDTO concept in conceptsResult.Value) {
+                if (concept.PeriodTypeId == (int)TaxonomyPeriodTypes.None)
+                    continue;
+                yearMap[concept.Name.Trim()] = concept.ConceptId;
+            }
+
+            context.TaxonomyConceptIdsByYear[year] = yearMap;
+            if (year > latestYear)
+                latestYear = year;
+
+            _logger.LogInformation("ParseBulkXbrlArchive - Loaded {Count} concepts for taxonomy year {Year}",
+                yearMap.Count, year);
+        }
+
+        context.LatestTaxonomyYear = latestYear;
+
+        if (context.TaxonomyConceptIdsByYear.Count == 0) {
+            _logger.LogError("ParseBulkXbrlArchive - No taxonomy concepts loaded for any year. Aborting.");
+            return;
         }
 
         foreach (string fileName in zipReader.EnumerateFileNames()) {
@@ -855,14 +880,7 @@ internal partial class Program {
             }
 
             foreach (DataPoint dp in parser.DataPoints) {
-                // Assign taxonomy_concept_id by matching fact_name
-                string factNameKey = dp.FactName.Trim();
-                if (context.TaxonomyConceptIdsByFactName.TryGetValue(factNameKey, out long conceptId)) {
-                    DataPoint dpWithConcept = dp with { TaxonomyConceptId = conceptId };
-                    await ProcessDataPoint(dpWithConcept, context);
-                } else {
-                    unmatchedFactNames.Add((dp.FactName, dp.CompanyId, context.CurrentFileName));
-                }
+                await ProcessDataPoint(dp, context, unmatchedFactNames);
             }
         } catch (Exception ex) {
             _logger.LogError(ex, "ParseOneFileXBRL - Failed to process {FileName}", context.CurrentFileName);
@@ -884,7 +902,10 @@ internal partial class Program {
         }
     }
 
-    private static async Task ProcessDataPoint(DataPoint dp, ParseBulkXbrlArchiveContext context) {
+    private static async Task ProcessDataPoint(
+        DataPoint dp,
+        ParseBulkXbrlArchiveContext context,
+        List<(string FactName, ulong CompanyId, string FileName)> unmatchedFactNames) {
         if (!context.SubmissionsByCompanyId.TryGetValue(dp.CompanyId, out List<Submission>? submissions)) {
             _logger.LogWarning("ParseOneFileXBRL:ProcessDataPoint - Failed to find submissions for company: {CompanyId},{DataPoint}",
                 dp.CompanyId, dp);
@@ -898,7 +919,28 @@ internal partial class Program {
             return;
         }
 
-        string unitName = dp.Units.UnitNameNormalized;
+        // Resolve taxonomy concept ID using the submission's report year
+        Submission matchedSubmission = findSubmissionForDataPointResults.Value!;
+        int reportYear = matchedSubmission.ReportDate.Year;
+        string factNameKey = dp.FactName.Trim();
+
+        long conceptId = 0;
+        if (context.TaxonomyConceptIdsByYear.TryGetValue(reportYear, out Dictionary<string, long>? yearMap)) {
+            yearMap.TryGetValue(factNameKey, out conceptId);
+        }
+        // Fallback to latest taxonomy if the report year's taxonomy doesn't have this concept
+        if (conceptId == 0 && reportYear != context.LatestTaxonomyYear) {
+            if (context.TaxonomyConceptIdsByYear.TryGetValue(context.LatestTaxonomyYear, out Dictionary<string, long>? latestMap))
+                latestMap.TryGetValue(factNameKey, out conceptId);
+        }
+        if (conceptId == 0) {
+            unmatchedFactNames.Add((dp.FactName, dp.CompanyId, context.CurrentFileName));
+            return;
+        }
+
+        DataPoint dpWithConcept = dp with { TaxonomyConceptId = conceptId };
+
+        string unitName = dpWithConcept.Units.UnitNameNormalized;
         if (!context.UnitsByUnitName.TryGetValue(unitName, out DataPointUnit? dpu)) {
             ++context.NumDataPointUnits;
             ulong dpuId = await _dbm!.GetNextId64(CancellationToken.None);
@@ -908,7 +950,7 @@ internal partial class Program {
         }
 
         ulong dpId = await _dbm!.GetNextId64(CancellationToken.None);
-        DataPoint dataPointToInsert = dp with { DataPointId = dpId, Units = dpu, TaxonomyConceptId = dp.TaxonomyConceptId };
+        DataPoint dataPointToInsert = dpWithConcept with { DataPointId = dpId, Units = dpu };
         context.DataPointsBatch.Add(dataPointToInsert);
 
         if (context.DataPointsBatch.Count >= ParseBulkXbrlNumDataPointsBatchSize)

@@ -37,8 +37,8 @@ public class SubmissionEndpointsTests : IClassFixture<WebApplicationFactory<Prog
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         string body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("TenK", body);
-        Assert.Contains("TenQ", body);
+        Assert.Contains("10-K", body);
+        Assert.Contains("10-Q", body);
     }
 
     [Fact]

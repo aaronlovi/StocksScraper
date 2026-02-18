@@ -20,6 +20,7 @@ public class Program {
         if (builder.Configuration.GetConnectionString(DbmService.StocksDataConnectionStringName) is not null) {
             _ = builder.Services.AddSingleton<IDbmService, DbmService>();
             _ = builder.Services.AddSingleton<StatementDataService>();
+            _ = builder.Services.AddSingleton<ScoringService>();
             _ = builder.Services.AddSingleton<TypeaheadTrieService>();
             _ = builder.Services.AddHostedService(sp => sp.GetRequiredService<TypeaheadTrieService>());
         }
@@ -45,6 +46,7 @@ public class Program {
         app.MapDashboardEndpoints();
         app.MapStatementEndpoints();
         app.MapTypeaheadEndpoints();
+        app.MapScoringEndpoints();
 
         app.Run();
     }

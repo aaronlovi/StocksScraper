@@ -31,6 +31,9 @@ import {
             }
           </div>
         }
+        <div class="company-links">
+          <a [routerLink]="['/company', cik, 'scoring']" class="scoring-link">Value Score</a>
+        </div>
       </div>
 
       @if (submissions().length > 0) {
@@ -196,6 +199,18 @@ import {
     .loading-statements, .no-statements {
       color: #64748b;
       margin: 0;
+    }
+    .company-links {
+      margin-top: 10px;
+    }
+    .scoring-link {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    .scoring-link:hover {
+      text-decoration: underline;
     }
     .error {
       color: #dc2626;

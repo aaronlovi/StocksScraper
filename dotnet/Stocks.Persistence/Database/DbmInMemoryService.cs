@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Stocks.DataModels;
+using Stocks.DataModels.Scoring;
 using Stocks.Persistence.Database.DTO.Taxonomies;
 using Stocks.Shared;
 using Stocks.Shared.Models;
@@ -185,4 +186,9 @@ public sealed class DbmInMemoryService : IDbmService {
 
     public Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<DataPoint>>.Success(_data.GetDataPointsForSubmission(companyId, submissionId)));
+
+    public Task<Result<IReadOnlyCollection<ScoringConceptValue>>> GetScoringDataPoints(
+        ulong companyId, string[] conceptNames, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<ScoringConceptValue>>.Success(
+            _data.GetScoringDataPoints(companyId, conceptNames)));
 }

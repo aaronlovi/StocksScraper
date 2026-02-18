@@ -38,7 +38,7 @@ WHERE company_id = @company_id;
     protected override void ClearResults() => Company = Company.Empty;
 
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() =>
-        [new NpgsqlParameter<ulong>("company_id", _companyId)];
+        [new NpgsqlParameter<long>("company_id", (long)_companyId)];
 
     protected override bool ProcessCurrentRow(NpgsqlDataReader reader) {
         Company = new Company(

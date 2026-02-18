@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
+using Stocks.DataModels.Scoring;
 using Stocks.Persistence.Database.DTO.Taxonomies;
 using Stocks.Persistence.Database.Migrations;
 using Stocks.Persistence.Database.Statements;
@@ -361,6 +362,20 @@ public sealed class DbmService : IDisposable, IDbmService {
         } else {
             _logger.LogWarning("GetDataPointsForSubmission failed with error {Error}", res.ErrorMessage);
             return Result<IReadOnlyCollection<DataPoint>>.Failure(res);
+        }
+    }
+
+    public async Task<Result<IReadOnlyCollection<ScoringConceptValue>>> GetScoringDataPoints(
+        ulong companyId, string[] conceptNames, CancellationToken ct) {
+        var stmt = new GetScoringDataPointsStmt(companyId, conceptNames);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetScoringDataPoints success - CompanyId: {CompanyId}, Num results: {NumResults}",
+                companyId, stmt.Results.Count);
+            return Result<IReadOnlyCollection<ScoringConceptValue>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetScoringDataPoints failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<ScoringConceptValue>>.Failure(res);
         }
     }
     #endregion

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Stocks.DataModels;
 using Stocks.DataModels.Enums;
+using Stocks.DataModels.Scoring;
 using Stocks.Persistence.Database.DTO.Taxonomies;
 
 namespace Stocks.Persistence.Database;
@@ -404,6 +405,78 @@ public sealed class DbmInMemoryData {
                 results.Add(p);
             }
         }
+        return results;
+    }
+
+    // Scoring data points
+
+    public IReadOnlyCollection<ScoringConceptValue> GetScoringDataPoints(ulong companyId, string[] conceptNames) {
+        var conceptSet = new HashSet<string>(conceptNames, StringComparer.Ordinal);
+        var results = new List<ScoringConceptValue>();
+
+        lock (_mutex) {
+            // Build a lookup of submission_id → Submission for 10-K filings of this company
+            var tenKSubmissions = new Dictionary<ulong, Submission>();
+            foreach (Submission s in _submissions) {
+                if (s.CompanyId == companyId && s.FilingType == FilingType.TenK)
+                    tenKSubmissions[s.SubmissionId] = s;
+            }
+
+            // Find the 5 most recent distinct report dates
+            var reportDates = new SortedSet<DateOnly>();
+            foreach (Submission s in tenKSubmissions.Values)
+                reportDates.Add(s.ReportDate);
+
+            var topDates = new HashSet<DateOnly>();
+            int count = 0;
+            foreach (DateOnly date in reportDates.Reverse()) {
+                topDates.Add(date);
+                count++;
+                if (count >= 5)
+                    break;
+            }
+
+            // Build taxonomy concept id → name lookup
+            var conceptIdToName = new Dictionary<long, string>();
+            foreach (ConceptDetailsDTO c in _taxonomyConcepts) {
+                if (conceptSet.Contains(c.Name))
+                    conceptIdToName[c.ConceptId] = c.Name;
+            }
+
+            // Collect candidate data points, keyed by (submissionId, conceptName)
+            // Keep only the one with the max end_date per key (DISTINCT ON equivalent)
+            var bestByKey = new Dictionary<(ulong submissionId, string conceptName), (DateOnly endDate, decimal value, DateOnly reportDate)>();
+
+            foreach (DataPoint dp in _dataPoints) {
+                if (dp.CompanyId != companyId)
+                    continue;
+
+                if (!tenKSubmissions.TryGetValue(dp.SubmissionId, out Submission? submission))
+                    continue;
+
+                if (!topDates.Contains(submission.ReportDate))
+                    continue;
+
+                if (!conceptIdToName.TryGetValue(dp.TaxonomyConceptId, out string? conceptName))
+                    continue;
+
+                var key = (dp.SubmissionId, conceptName);
+                if (!bestByKey.TryGetValue(key, out var existing) || dp.DatePair.EndDate > existing.endDate)
+                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate);
+            }
+
+            foreach (var entry in bestByKey)
+                results.Add(new ScoringConceptValue(entry.Key.conceptName, entry.Value.value, entry.Value.reportDate));
+        }
+
+        // Sort by report_date DESC, then concept name
+        results.Sort((a, b) => {
+            int dateCompare = b.ReportDate.CompareTo(a.ReportDate);
+            if (dateCompare != 0)
+                return dateCompare;
+            return string.Compare(a.ConceptName, b.ConceptName, StringComparison.Ordinal);
+        });
+
         return results;
     }
 

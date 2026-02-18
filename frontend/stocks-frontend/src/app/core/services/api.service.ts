@@ -71,6 +71,41 @@ export interface TypeaheadResult {
   cik: string;
 }
 
+export interface ScoringCheckResponse {
+  checkNumber: number;
+  name: string;
+  computedValue: number | null;
+  threshold: string;
+  result: 'pass' | 'fail' | 'na';
+}
+
+export interface DerivedMetricsResponse {
+  bookValue: number | null;
+  marketCap: number | null;
+  debtToEquityRatio: number | null;
+  priceToBookRatio: number | null;
+  debtToBookRatio: number | null;
+  adjustedRetainedEarnings: number | null;
+  oldestRetainedEarnings: number | null;
+  averageNetCashFlow: number | null;
+  averageOwnerEarnings: number | null;
+  estimatedReturnCF: number | null;
+  estimatedReturnOE: number | null;
+  currentDividendsPaid: number | null;
+}
+
+export interface ScoringResponse {
+  rawDataByYear: Record<string, Record<string, number>>;
+  metrics: DerivedMetricsResponse;
+  scorecard: ScoringCheckResponse[];
+  overallScore: number;
+  computableChecks: number;
+  yearsOfData: number;
+  pricePerShare: number | null;
+  priceDate: string | null;
+  sharesOutstanding: number | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   constructor(private http: HttpClient) {}
@@ -110,5 +145,9 @@ export class ApiService {
 
   getTypeahead(query: string): Observable<TypeaheadResult[]> {
     return this.http.get<TypeaheadResult[]>(`/api/typeahead?q=${encodeURIComponent(query)}`);
+  }
+
+  getScoring(cik: string): Observable<ScoringResponse> {
+    return this.http.get<ScoringResponse>(`/api/companies/${cik}/scoring`);
   }
 }

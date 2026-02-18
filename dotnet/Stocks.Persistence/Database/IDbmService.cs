@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Stocks.DataModels;
+using Stocks.DataModels.Scoring;
 using Stocks.Persistence.Database.DTO.Taxonomies;
 using Stocks.Shared;
 
@@ -56,6 +57,10 @@ public interface IDbmService {
 
     // Data points for a company and submission
     Task<Result<IReadOnlyCollection<DataPoint>>> GetDataPointsForSubmission(ulong companyId, ulong submissionId, CancellationToken ct);
+
+    // Scoring data points (10-K filings, up to 5 most recent years)
+    Task<Result<IReadOnlyCollection<ScoringConceptValue>>> GetScoringDataPoints(
+        ulong companyId, string[] conceptNames, CancellationToken ct);
 
     // Dashboard
     Task<Result<DashboardStats>> GetDashboardStats(CancellationToken ct);

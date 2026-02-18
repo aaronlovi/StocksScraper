@@ -115,6 +115,17 @@ describe('CompanyComponent', () => {
     expect(stmtLinks[1].textContent).toContain('Income Statement');
   });
 
+  it('should render Value Score link', () => {
+    const fixture = TestBed.createComponent(CompanyComponent);
+    fixture.detectChanges();
+    flushInitialRequests();
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('.scoring-link');
+    expect(link).toBeTruthy();
+    expect(link.textContent).toContain('Value Score');
+  });
+
   it('should show error on company load failure', () => {
     const fixture = TestBed.createComponent(CompanyComponent);
     fixture.detectChanges();

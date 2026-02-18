@@ -18,6 +18,11 @@ export const routes: Routes = [
       import('./features/company/company.component').then(m => m.CompanyComponent)
   },
   {
+    path: 'company/:cik/scoring',
+    loadComponent: () =>
+      import('./features/scoring/scoring.component').then(m => m.ScoringComponent)
+  },
+  {
     path: 'company/:cik/report/:submissionId/:concept',
     loadComponent: () =>
       import('./features/report/report.component').then(m => m.ReportComponent)

@@ -109,7 +109,7 @@ describe('CompanyComponent', () => {
 
     fixture.detectChanges();
 
-    const stmtLinks = fixture.nativeElement.querySelectorAll('.statement-list a');
+    const stmtLinks = fixture.nativeElement.querySelectorAll('.statement-table a');
     expect(stmtLinks.length).toBe(2);
     expect(stmtLinks[0].textContent).toContain('Balance Sheet');
     expect(stmtLinks[1].textContent).toContain('Income Statement');

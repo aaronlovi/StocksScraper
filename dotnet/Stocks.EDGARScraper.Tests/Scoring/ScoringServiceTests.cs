@@ -268,6 +268,98 @@ public class ScoringServiceTests {
 
     #endregion
 
+    #region ResolveWorkingCapitalChange tests
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_UsesAggregateWhenPresent() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInOperatingCapital"] = -5_000_000m,
+            ["IncreaseDecreaseInAccountsReceivable"] = 3_000_000m,
+            ["IncreaseDecreaseInInventories"] = -1_000_000m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(-5_000_000m, result); // Aggregate preferred
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_SumsComponentsWhenAggregateMissing() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsReceivable"] = 6_682_000_000m,
+            ["IncreaseDecreaseInInventories"] = -1_400_000_000m,
+            ["IncreaseDecreaseInAccountsPayable"] = 902_000_000m,
+            ["IncreaseDecreaseInOtherOperatingAssets"] = 9_197_000_000m,
+            ["IncreaseDecreaseInOtherOperatingLiabilities"] = -11_076_000_000m,
+            ["IncreaseDecreaseInOtherReceivables"] = 347_000_000m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        // 6682 + (-1400) + 902 + 9197 + (-11076) + 347 = 4652
+        Assert.Equal(4_652_000_000m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_PrefersCombinedAPOverIndividual() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"] = 5_000_000m,
+            ["IncreaseDecreaseInAccountsPayable"] = 3_000_000m,     // should be ignored
+            ["IncreaseDecreaseInAccruedLiabilities"] = 2_000_000m,  // should be ignored
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(5_000_000m, result); // Combined preferred, not 3+2=5 (coincidence)
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_FallsBackToIndividualAPAndAL() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayable"] = 3_000_000m,
+            ["IncreaseDecreaseInAccruedLiabilities"] = 2_000_000m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(5_000_000m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_PrefersCombinedAROverIndividual() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsAndOtherReceivables"] = 7_000_000m,
+            ["IncreaseDecreaseInAccountsReceivable"] = 5_000_000m,  // should be ignored
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(7_000_000m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_PrefersDeferredRevenueOverContractLiability() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInDeferredRevenue"] = 1_000_000m,
+            ["IncreaseDecreaseInContractWithCustomerLiability"] = 500_000m, // should be ignored
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(1_000_000m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_ReturnsZeroWhenNothingAvailable() {
+        var data = new Dictionary<string, decimal>();
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(0m, result);
+    }
+
+    #endregion
+
     #region ComputeDerivedMetrics tests
 
     private static Dictionary<int, IReadOnlyDictionary<string, decimal>> MakeSingleYearData(

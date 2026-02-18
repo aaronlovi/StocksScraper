@@ -57,6 +57,19 @@ public class ScoringService {
         "PaymentsForRepurchaseOfPreferredStockAndPreferenceStock",
         "IncreaseDecreaseInOperatingCapital",
         "IncreaseDecreaseInOtherOperatingCapitalNet",
+        // Working capital components (fallback when aggregates above are missing)
+        "IncreaseDecreaseInAccountsReceivable",
+        "IncreaseDecreaseInOtherReceivables",
+        "IncreaseDecreaseInAccountsAndOtherReceivables",
+        "IncreaseDecreaseInInventories",
+        "IncreaseDecreaseInAccountsPayableAndAccruedLiabilities",
+        "IncreaseDecreaseInAccountsPayable",
+        "IncreaseDecreaseInAccruedLiabilities",
+        "IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets",
+        "IncreaseDecreaseInDeferredRevenue",
+        "IncreaseDecreaseInContractWithCustomerLiability",
+        "IncreaseDecreaseInOtherOperatingAssets",
+        "IncreaseDecreaseInOtherOperatingLiabilities",
         "DeferredIncomeTaxExpenseBenefit",
         "DeferredIncomeTaxesAndTaxCredits",
         "Depletion",
@@ -286,6 +299,77 @@ public class ScoringService {
         return 0m;
     }
 
+    /// <summary>
+    /// Resolve working capital change with component sum fallback.
+    /// 1. If IncreaseDecreaseInOperatingCapital or IncreaseDecreaseInOtherOperatingCapitalNet exists, use it.
+    /// 2. Otherwise, sum individual components with overlap-aware grouping:
+    ///    - Receivables: prefer combined AccountsAndOtherReceivables, else AR + OtherReceivables
+    ///    - Inventories
+    ///    - Payables: prefer combined AP+AccruedLiabilities, else AP + AccruedLiabilities
+    ///    - Prepaid/deferred assets
+    ///    - Revenue: prefer DeferredRevenue, else ContractWithCustomerLiability
+    ///    - Other operating assets/liabilities
+    /// All values are already signed for cash flow impact (sum directly).
+    /// </summary>
+    internal static decimal ResolveWorkingCapitalChange(IReadOnlyDictionary<string, decimal> yearData) {
+        decimal? aggregate = ResolveField(yearData, WorkingCapitalChangeChain, null);
+        if (aggregate.HasValue)
+            return aggregate.Value;
+
+        decimal sum = 0m;
+        bool foundAny = false;
+
+        // Receivables group: prefer combined, else individual AR + OtherReceivables
+        decimal? combinedAR = ResolveField(yearData, ["IncreaseDecreaseInAccountsAndOtherReceivables"], null);
+        if (combinedAR.HasValue) {
+            sum += combinedAR.Value;
+            foundAny = true;
+        } else {
+            decimal? ar = ResolveField(yearData, ["IncreaseDecreaseInAccountsReceivable"], null);
+            decimal? otherAR = ResolveField(yearData, ["IncreaseDecreaseInOtherReceivables"], null);
+            if (ar.HasValue) { sum += ar.Value; foundAny = true; }
+            if (otherAR.HasValue) { sum += otherAR.Value; foundAny = true; }
+        }
+
+        // Inventories
+        decimal? inv = ResolveField(yearData, ["IncreaseDecreaseInInventories"], null);
+        if (inv.HasValue) { sum += inv.Value; foundAny = true; }
+
+        // Payables + accrued: prefer combined, else individual
+        decimal? combinedAP = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"], null);
+        if (combinedAP.HasValue) {
+            sum += combinedAP.Value;
+            foundAny = true;
+        } else {
+            decimal? ap = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayable"], null);
+            decimal? al = ResolveField(yearData, ["IncreaseDecreaseInAccruedLiabilities"], null);
+            if (ap.HasValue) { sum += ap.Value; foundAny = true; }
+            if (al.HasValue) { sum += al.Value; foundAny = true; }
+        }
+
+        // Prepaid/deferred expenses and other assets
+        decimal? prepaid = ResolveField(yearData, ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"], null);
+        if (prepaid.HasValue) { sum += prepaid.Value; foundAny = true; }
+
+        // Deferred revenue / contract liabilities: prefer deferred revenue, else contract liability
+        decimal? deferredRev = ResolveField(yearData, ["IncreaseDecreaseInDeferredRevenue"], null);
+        if (deferredRev.HasValue) {
+            sum += deferredRev.Value;
+            foundAny = true;
+        } else {
+            decimal? contractLiab = ResolveField(yearData, ["IncreaseDecreaseInContractWithCustomerLiability"], null);
+            if (contractLiab.HasValue) { sum += contractLiab.Value; foundAny = true; }
+        }
+
+        // Other operating assets and liabilities
+        decimal? otherAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingAssets"], null);
+        if (otherAssets.HasValue) { sum += otherAssets.Value; foundAny = true; }
+        decimal? otherLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingLiabilities"], null);
+        if (otherLiab.HasValue) { sum += otherLiab.Value; foundAny = true; }
+
+        return foundAny ? sum : 0m;
+    }
+
     internal static DerivedMetrics ComputeDerivedMetrics(
         IReadOnlyDictionary<int, IReadOnlyDictionary<string, decimal>> rawDataByYear,
         decimal? pricePerShare,
@@ -382,7 +466,7 @@ public class ScoringService {
                 decimal deferredTax = ResolveDeferredTax(yearData);
                 decimal otherNonCash = ResolveField(yearData, OtherNonCashChain, 0m)!.Value;
                 decimal capEx = ResolveField(yearData, CapExChain, 0m)!.Value;
-                decimal workingCapitalChange = ResolveField(yearData, WorkingCapitalChangeChain, 0m)!.Value;
+                decimal workingCapitalChange = ResolveWorkingCapitalChange(yearData);
 
                 // Simplified OE formula (Depreciation cancels out)
                 decimal ownerEarnings = netIncome.Value

@@ -441,6 +441,124 @@ public class ScoringServiceTests {
         Assert.Equal(27182m, result);
     }
 
+    [Fact]
+    public void ResolveWorkingCapitalChange_PrefersARAndOtherAssetsOverSeparateConcepts() {
+        // AccountsReceivableAndOtherOperatingAssets subsumes AR + OtherOperatingAssets
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"] = 3249m,
+            ["IncreaseDecreaseInAccountsReceivable"] = 1000m,  // should be ignored
+            ["IncreaseDecreaseInOtherOperatingAssets"] = 500m,  // should be ignored
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(3249m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_ARAndOtherAssetsSkipsCurrentButKeepsNoncurrent() {
+        // ARAndOtherOperatingAssets covers current operating assets; noncurrent is separate
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"] = 3249m,
+            ["IncreaseDecreaseInOtherCurrentAssets"] = 200m,     // should be ignored (subsumed)
+            ["IncreaseDecreaseInOtherNoncurrentAssets"] = 300m,  // should NOT be ignored (separate line item)
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        // 3249 + 300 = 3549
+        Assert.Equal(3549m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_AccruedAndOtherLiabSkipsOtherLiabGroup() {
+        // AccruedLiabilitiesAndOtherOperatingLiabilities subsumes AccruedLiabilities + OtherOperatingLiabilities
+        // Should still pick up AP separately, but skip "other liabilities" group
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"] = -2904m,
+            ["IncreaseDecreaseInAccountsPayable"] = 2972m,
+            ["IncreaseDecreaseInOtherOperatingLiabilities"] = 500m,  // should be ignored
+            ["IncreaseDecreaseInOtherCurrentLiabilities"] = 200m,    // should be ignored
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        // -2904 + 2972 = 68
+        Assert.Equal(68m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_IncludesSelfInsuranceReserve() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayable"] = 100m,
+            ["IncreaseDecreaseInSelfInsuranceReserve"] = 1300m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(1400m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_AmznStyleFullComponentSum() {
+        // Simulates AMZN's reporting pattern: ARAndOtherOperatingAssets covers current,
+        // OtherNoncurrentAssets is a separate line item
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"] = 3249m,
+            ["IncreaseDecreaseInInventories"] = 1884m,
+            ["IncreaseDecreaseInAccountsPayable"] = 2972m,
+            ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"] = -2904m,
+            ["IncreaseDecreaseInContractWithCustomerLiability"] = 4007m,
+            ["IncreaseDecreaseInOtherNoncurrentAssets"] = 14483m,
+            ["IncreaseDecreaseInSelfInsuranceReserve"] = 1300m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        // 3249 + 1884 + 2972 - 2904 + 4007 + 14483 + 1300 = 24991
+        Assert.Equal(24991m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_FallsBackToAccountsPayableTrade() {
+        // META uses AccountsPayableTrade instead of AccountsPayable
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayableTrade"] = 373m,
+            ["IncreaseDecreaseInAccruedLiabilities"] = 323m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(696m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_PrefersAccountsPayableOverTrade() {
+        // When both exist, prefer the broader AccountsPayable
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayable"] = 1000m,
+            ["IncreaseDecreaseInAccountsPayableTrade"] = 373m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        Assert.Equal(1000m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_AccountsPayableTradeWithAccruedAndOtherLiab() {
+        // AccountsPayableTrade should still be picked up alongside AccruedLiabilitiesAndOtherOperatingLiabilities
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"] = -2904m,
+            ["IncreaseDecreaseInAccountsPayableTrade"] = 373m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+
+        // -2904 + 373 = -2531
+        Assert.Equal(-2531m, result);
+    }
+
     #endregion
 
     #region ComputeDerivedMetrics tests

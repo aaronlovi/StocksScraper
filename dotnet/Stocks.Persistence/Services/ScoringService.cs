@@ -76,6 +76,14 @@ public class ScoringService {
         "IncreaseDecreaseInOtherCurrentLiabilities",
         "IncreaseDecreaseInOtherNoncurrentLiabilities",
         "IncreaseDecreaseInAccruedIncomeTaxesPayable",
+        // Combined receivables + other assets (e.g. AMZN uses this instead of separate AR)
+        "IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets",
+        // Combined accrued liabilities + other operating liabilities (1,765 companies)
+        "IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities",
+        // Self-insurance reserve (niche, 75 companies)
+        "IncreaseDecreaseInSelfInsuranceReserve",
+        // Trade payables (more specific than AccountsPayable; 1,410 companies, 599 exclusive)
+        "IncreaseDecreaseInAccountsPayableTrade",
         "DeferredIncomeTaxExpenseBenefit",
         "DeferredIncomeTaxesAndTaxCredits",
         "Depletion",
@@ -325,32 +333,57 @@ public class ScoringService {
         decimal sum = 0m;
         bool foundAny = false;
 
-        // Receivables group: prefer combined, else individual AR + OtherReceivables
-        decimal? combinedAR = ResolveField(yearData, ["IncreaseDecreaseInAccountsAndOtherReceivables"], null);
-        if (combinedAR.HasValue) {
-            sum += combinedAR.Value;
+        // Track whether broad combined concepts are used, to avoid double-counting
+        bool usedARAndOtherAssets = false;
+        bool usedAccruedAndOtherLiab = false;
+
+        // Receivables group: prefer broadest combined concept, then narrower, then individual
+        // AccountsReceivableAndOtherOperatingAssets subsumes AR + OtherOperatingAssets (e.g. AMZN)
+        decimal? arAndOtherAssets = ResolveField(yearData, ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"], null);
+        if (arAndOtherAssets.HasValue) {
+            sum += arAndOtherAssets.Value;
             foundAny = true;
+            usedARAndOtherAssets = true;
         } else {
-            decimal? ar = ResolveField(yearData, ["IncreaseDecreaseInAccountsReceivable"], null);
-            decimal? otherAR = ResolveField(yearData, ["IncreaseDecreaseInOtherReceivables"], null);
-            if (ar.HasValue) { sum += ar.Value; foundAny = true; }
-            if (otherAR.HasValue) { sum += otherAR.Value; foundAny = true; }
+            decimal? combinedAR = ResolveField(yearData, ["IncreaseDecreaseInAccountsAndOtherReceivables"], null);
+            if (combinedAR.HasValue) {
+                sum += combinedAR.Value;
+                foundAny = true;
+            } else {
+                decimal? ar = ResolveField(yearData, ["IncreaseDecreaseInAccountsReceivable"], null);
+                decimal? otherAR = ResolveField(yearData, ["IncreaseDecreaseInOtherReceivables"], null);
+                if (ar.HasValue) { sum += ar.Value; foundAny = true; }
+                if (otherAR.HasValue) { sum += otherAR.Value; foundAny = true; }
+            }
         }
 
         // Inventories
         decimal? inv = ResolveField(yearData, ["IncreaseDecreaseInInventories"], null);
         if (inv.HasValue) { sum += inv.Value; foundAny = true; }
 
-        // Payables + accrued: prefer combined, else individual
-        decimal? combinedAP = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"], null);
-        if (combinedAP.HasValue) {
-            sum += combinedAP.Value;
+        // Payables + accrued + other liabilities: prefer broadest combined, then narrower
+        // AccruedLiabilitiesAndOtherOperatingLiabilities subsumes AccruedLiabilities + OtherOperatingLiabilities (e.g. AMZN)
+        decimal? accruedAndOtherLiab = ResolveField(yearData, ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"], null);
+        if (accruedAndOtherLiab.HasValue) {
+            sum += accruedAndOtherLiab.Value;
             foundAny = true;
-        } else {
-            decimal? ap = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayable"], null);
-            decimal? al = ResolveField(yearData, ["IncreaseDecreaseInAccruedLiabilities"], null);
+            usedAccruedAndOtherLiab = true;
+            // Still pick up AP separately since this combined concept doesn't include AP
+            // Prefer AccountsPayable, fall back to AccountsPayableTrade (subset)
+            decimal? ap = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], null);
             if (ap.HasValue) { sum += ap.Value; foundAny = true; }
-            if (al.HasValue) { sum += al.Value; foundAny = true; }
+        } else {
+            decimal? combinedAP = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"], null);
+            if (combinedAP.HasValue) {
+                sum += combinedAP.Value;
+                foundAny = true;
+            } else {
+                // Prefer AccountsPayable, fall back to AccountsPayableTrade (subset)
+                decimal? ap = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], null);
+                decimal? al = ResolveField(yearData, ["IncreaseDecreaseInAccruedLiabilities"], null);
+                if (ap.HasValue) { sum += ap.Value; foundAny = true; }
+                if (al.HasValue) { sum += al.Value; foundAny = true; }
+            }
         }
 
         // Prepaid/deferred expenses and other assets
@@ -368,32 +401,46 @@ public class ScoringService {
         }
 
         // Other operating assets: prefer general, else current + noncurrent
-        decimal? otherAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingAssets"], null);
-        if (otherAssets.HasValue) {
-            sum += otherAssets.Value;
-            foundAny = true;
+        // If ARAndOtherOperatingAssets was used, it covers current operating assets, so skip
+        // OtherOperatingAssets and OtherCurrentAssets but still pick up OtherNoncurrentAssets
+        if (!usedARAndOtherAssets) {
+            decimal? otherAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingAssets"], null);
+            if (otherAssets.HasValue) {
+                sum += otherAssets.Value;
+                foundAny = true;
+            } else {
+                decimal? otherCurAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherCurrentAssets"], null);
+                if (otherCurAssets.HasValue) { sum += otherCurAssets.Value; foundAny = true; }
+                decimal? otherNoncurAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherNoncurrentAssets"], null);
+                if (otherNoncurAssets.HasValue) { sum += otherNoncurAssets.Value; foundAny = true; }
+            }
         } else {
-            decimal? otherCurAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherCurrentAssets"], null);
+            // ARAndOtherOperatingAssets covers current operating assets; noncurrent is separate
             decimal? otherNoncurAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherNoncurrentAssets"], null);
-            if (otherCurAssets.HasValue) { sum += otherCurAssets.Value; foundAny = true; }
             if (otherNoncurAssets.HasValue) { sum += otherNoncurAssets.Value; foundAny = true; }
         }
 
-        // Other operating liabilities: prefer general, else current + noncurrent
-        decimal? otherLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingLiabilities"], null);
-        if (otherLiab.HasValue) {
-            sum += otherLiab.Value;
-            foundAny = true;
-        } else {
-            decimal? otherCurLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherCurrentLiabilities"], null);
-            decimal? otherNoncurLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherNoncurrentLiabilities"], null);
-            if (otherCurLiab.HasValue) { sum += otherCurLiab.Value; foundAny = true; }
-            if (otherNoncurLiab.HasValue) { sum += otherNoncurLiab.Value; foundAny = true; }
+        // Other operating liabilities: skip if AccruedLiabilitiesAndOtherOperatingLiabilities already included them
+        if (!usedAccruedAndOtherLiab) {
+            decimal? otherLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingLiabilities"], null);
+            if (otherLiab.HasValue) {
+                sum += otherLiab.Value;
+                foundAny = true;
+            } else {
+                decimal? otherCurLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherCurrentLiabilities"], null);
+                decimal? otherNoncurLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherNoncurrentLiabilities"], null);
+                if (otherCurLiab.HasValue) { sum += otherCurLiab.Value; foundAny = true; }
+                if (otherNoncurLiab.HasValue) { sum += otherNoncurLiab.Value; foundAny = true; }
+            }
         }
 
         // Accrued income taxes payable (standalone, not subsumed by other groups)
         decimal? accruedTax = ResolveField(yearData, ["IncreaseDecreaseInAccruedIncomeTaxesPayable"], null);
         if (accruedTax.HasValue) { sum += accruedTax.Value; foundAny = true; }
+
+        // Self-insurance reserve (standalone, niche)
+        decimal? selfInsurance = ResolveField(yearData, ["IncreaseDecreaseInSelfInsuranceReserve"], null);
+        if (selfInsurance.HasValue) { sum += selfInsurance.Value; foundAny = true; }
 
         return foundAny ? sum : 0m;
     }

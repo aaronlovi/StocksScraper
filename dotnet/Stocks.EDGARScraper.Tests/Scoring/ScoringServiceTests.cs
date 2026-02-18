@@ -61,6 +61,213 @@ public class ScoringServiceTests {
 
     #endregion
 
+    #region ResolveEquity tests
+
+    [Fact]
+    public void ResolveEquity_PrefersLiabilitiesAndEquityMinusLiabilities() {
+        var data = new Dictionary<string, decimal> {
+            ["LiabilitiesAndStockholdersEquity"] = 1000m,
+            ["Liabilities"] = 400m,
+            ["Assets"] = 1000m,
+            ["StockholdersEquity"] = 500m, // stale value — should be ignored
+        };
+
+        decimal? result = ScoringService.ResolveEquity(data);
+
+        Assert.Equal(600m, result); // 1000 - 400
+    }
+
+    [Fact]
+    public void ResolveEquity_FallsBackToAssetsMinusLiabilities() {
+        var data = new Dictionary<string, decimal> {
+            ["Assets"] = 800m,
+            ["Liabilities"] = 300m,
+            ["StockholdersEquity"] = 400m,
+        };
+
+        decimal? result = ScoringService.ResolveEquity(data);
+
+        Assert.Equal(500m, result); // 800 - 300
+    }
+
+    [Fact]
+    public void ResolveEquity_FallsBackToDirectEquityConcepts() {
+        var data = new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 700m,
+        };
+
+        decimal? result = ScoringService.ResolveEquity(data);
+
+        Assert.Equal(700m, result);
+    }
+
+    [Fact]
+    public void ResolveEquity_FallsBackToMembersEquity() {
+        var data = new Dictionary<string, decimal> {
+            ["MembersEquity"] = 250m,
+        };
+
+        decimal? result = ScoringService.ResolveEquity(data);
+
+        Assert.Equal(250m, result);
+    }
+
+    [Fact]
+    public void ResolveEquity_ReturnsNullWhenNothingAvailable() {
+        var data = new Dictionary<string, decimal>();
+
+        decimal? result = ScoringService.ResolveEquity(data);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ResolveEquity_SubtractsNciFromDerivedEquity() {
+        var data = new Dictionary<string, decimal> {
+            ["LiabilitiesAndStockholdersEquity"] = 400_000m,
+            ["Liabilities"] = 120_000m,
+            ["MinorityInterest"] = 3_000m,
+        };
+
+        decimal? result = ScoringService.ResolveEquity(data);
+
+        Assert.Equal(277_000m, result); // 400K - 120K - 3K
+    }
+
+    [Fact]
+    public void ResolveEquity_SubtractsRedeemableNciFromDerivedEquity() {
+        var data = new Dictionary<string, decimal> {
+            ["Assets"] = 500_000m,
+            ["Liabilities"] = 200_000m,
+            ["MinorityInterest"] = 5_000m,
+            ["RedeemableNoncontrollingInterestEquityCarryingAmount"] = 10_000m,
+        };
+
+        decimal? result = ScoringService.ResolveEquity(data);
+
+        Assert.Equal(285_000m, result); // 500K - 200K - 5K - 10K
+    }
+
+    [Fact]
+    public void ResolveEquity_UsesVieNciWhenMinorityInterestMissing() {
+        var data = new Dictionary<string, decimal> {
+            ["LiabilitiesAndStockholdersEquity"] = 402_000m,
+            ["Liabilities"] = 119_000m,
+            ["NoncontrollingInterestInVariableInterestEntity"] = 3_400m,
+        };
+
+        decimal? result = ScoringService.ResolveEquity(data);
+
+        Assert.Equal(279_600m, result); // 402K - 119K - 3.4K
+    }
+
+    #endregion
+
+    #region ResolveDepletionAndAmortization tests
+
+    [Fact]
+    public void ResolveDepletionAndAmortization_UsesDirectConceptsWhenPresent() {
+        var data = new Dictionary<string, decimal> {
+            ["Depletion"] = 1_000_000m,
+            ["AmortizationOfIntangibleAssets"] = 2_000_000m,
+            ["DepreciationDepletionAndAmortization"] = 11_000_000m,
+            ["Depreciation"] = 8_000_000m,
+        };
+
+        decimal result = ScoringService.ResolveDepletionAndAmortization(data);
+
+        Assert.Equal(3_000_000m, result); // 1M + 2M, NOT DDA-Depreciation
+    }
+
+    [Fact]
+    public void ResolveDepletionAndAmortization_FallsBackToDdaMinusDepreciation() {
+        var data = new Dictionary<string, decimal> {
+            ["DepreciationDepletionAndAmortization"] = 11_700_000_000m,
+            ["Depreciation"] = 8_000_000_000m,
+        };
+
+        decimal result = ScoringService.ResolveDepletionAndAmortization(data);
+
+        Assert.Equal(3_700_000_000m, result); // 11.7B - 8B
+    }
+
+    [Fact]
+    public void ResolveDepletionAndAmortization_UsesPartialDirectConcepts() {
+        // Only amortization is tagged, no depletion
+        var data = new Dictionary<string, decimal> {
+            ["AmortizationOfIntangibleAssets"] = 2_000_000m,
+            ["DepreciationDepletionAndAmortization"] = 11_000_000m,
+            ["Depreciation"] = 8_000_000m,
+        };
+
+        decimal result = ScoringService.ResolveDepletionAndAmortization(data);
+
+        Assert.Equal(2_000_000m, result); // Only amortization, depletion defaults to 0
+    }
+
+    [Fact]
+    public void ResolveDepletionAndAmortization_ReturnsZeroWhenNothingAvailable() {
+        var data = new Dictionary<string, decimal>();
+
+        decimal result = ScoringService.ResolveDepletionAndAmortization(data);
+
+        Assert.Equal(0m, result);
+    }
+
+    #endregion
+
+    #region ResolveDeferredTax tests
+
+    [Fact]
+    public void ResolveDeferredTax_UsesAggregateWhenPresent() {
+        var data = new Dictionary<string, decimal> {
+            ["DeferredIncomeTaxExpenseBenefit"] = 5_000_000m,
+            ["DeferredFederalIncomeTaxExpenseBenefit"] = 3_000_000m,
+            ["DeferredForeignIncomeTaxExpenseBenefit"] = 1_500_000m,
+            ["DeferredStateAndLocalIncomeTaxExpenseBenefit"] = 500_000m,
+        };
+
+        decimal result = ScoringService.ResolveDeferredTax(data);
+
+        Assert.Equal(5_000_000m, result); // Aggregate preferred
+    }
+
+    [Fact]
+    public void ResolveDeferredTax_SumsComponentsWhenAggregateIsMissing() {
+        var data = new Dictionary<string, decimal> {
+            ["DeferredFederalIncomeTaxExpenseBenefit"] = -1_804_000_000m,
+            ["DeferredForeignIncomeTaxExpenseBenefit"] = 604_000_000m,
+            ["DeferredStateAndLocalIncomeTaxExpenseBenefit"] = -139_000_000m,
+        };
+
+        decimal result = ScoringService.ResolveDeferredTax(data);
+
+        Assert.Equal(-1_339_000_000m, result); // Sum of components
+    }
+
+    [Fact]
+    public void ResolveDeferredTax_SumsPartialComponents() {
+        // Only federal is tagged
+        var data = new Dictionary<string, decimal> {
+            ["DeferredFederalIncomeTaxExpenseBenefit"] = -2_000_000m,
+        };
+
+        decimal result = ScoringService.ResolveDeferredTax(data);
+
+        Assert.Equal(-2_000_000m, result);
+    }
+
+    [Fact]
+    public void ResolveDeferredTax_ReturnsZeroWhenNothingAvailable() {
+        var data = new Dictionary<string, decimal>();
+
+        decimal result = ScoringService.ResolveDeferredTax(data);
+
+        Assert.Equal(0m, result);
+    }
+
+    #endregion
+
     #region ComputeDerivedMetrics tests
 
     private static Dictionary<int, IReadOnlyDictionary<string, decimal>> MakeSingleYearData(

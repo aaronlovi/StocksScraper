@@ -17,11 +17,22 @@ public class ScoringService {
         _dbmService = dbmService;
     }
 
-    // All 33 US-GAAP concept names needed for scoring (research.md section 6.1)
+    // US-GAAP concept names needed for scoring
     internal static readonly string[] AllConceptNames = [
-        // Balance sheet (instant)
+        // Balance sheet (instant) — totals for derived equity computation
+        "Assets",
+        "Liabilities",
+        "LiabilitiesAndStockholdersEquity",
+        // Balance sheet (instant) — equity concepts
         "StockholdersEquity",
         "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+        "MembersEquity",
+        "PartnersCapital",
+        // Balance sheet (instant) — noncontrolling interest (for equity derivation)
+        "MinorityInterest",
+        "NoncontrollingInterestInVariableInterestEntity",
+        "RedeemableNoncontrollingInterestEquityCarryingAmount",
+        // Balance sheet (instant) — other
         "Goodwill",
         "IntangibleAssetsNetExcludingGoodwill",
         "LongTermDebtAndCapitalLeaseObligations",
@@ -50,7 +61,12 @@ public class ScoringService {
         "DeferredIncomeTaxesAndTaxCredits",
         "Depletion",
         "AmortizationOfIntangibleAssets",
+        "DepreciationDepletionAndAmortization",
+        "Depreciation",
         "OtherNoncashIncomeExpense",
+        "DeferredFederalIncomeTaxExpenseBenefit",
+        "DeferredForeignIncomeTaxExpenseBenefit",
+        "DeferredStateAndLocalIncomeTaxExpenseBenefit",
         "PaymentsToAcquirePropertyPlantAndEquipment",
         // Income statement (duration)
         "NetIncomeLoss",
@@ -58,8 +74,13 @@ public class ScoringService {
         "ProfitLoss",
     ];
 
-    // Fallback chains (research.md section 6.1)
-    internal static readonly string[] EquityChain = ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"];
+    // Fallback chains
+    internal static readonly string[] EquityChain = ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest", "MembersEquity", "PartnersCapital"];
+    internal static readonly string[] AssetsChain = ["Assets"];
+    internal static readonly string[] LiabilitiesChain = ["Liabilities"];
+    internal static readonly string[] LiabilitiesAndEquityChain = ["LiabilitiesAndStockholdersEquity"];
+    internal static readonly string[] NciChain = ["MinorityInterest", "NoncontrollingInterestInVariableInterestEntity"];
+    internal static readonly string[] RedeemableNciChain = ["RedeemableNoncontrollingInterestEquityCarryingAmount"];
     internal static readonly string[] DebtChain = ["LongTermDebtAndCapitalLeaseObligations", "LongTermDebt", "LongTermDebtNoncurrent"];
     internal static readonly string[] RetainedEarningsChain = ["RetainedEarningsAccumulatedDeficit"];
     internal static readonly string[] GoodwillChain = ["Goodwill"];
@@ -74,6 +95,11 @@ public class ScoringService {
     internal static readonly string[] DeferredTaxChain = ["DeferredIncomeTaxExpenseBenefit", "DeferredIncomeTaxesAndTaxCredits"];
     internal static readonly string[] DepletionChain = ["Depletion"];
     internal static readonly string[] AmortizationChain = ["AmortizationOfIntangibleAssets"];
+    internal static readonly string[] DDAChain = ["DepreciationDepletionAndAmortization"];
+    internal static readonly string[] DepreciationChain = ["Depreciation"];
+    internal static readonly string[] DeferredTaxFederalChain = ["DeferredFederalIncomeTaxExpenseBenefit"];
+    internal static readonly string[] DeferredTaxForeignChain = ["DeferredForeignIncomeTaxExpenseBenefit"];
+    internal static readonly string[] DeferredTaxStateChain = ["DeferredStateAndLocalIncomeTaxExpenseBenefit"];
     internal static readonly string[] OtherNonCashChain = ["OtherNoncashIncomeExpense"];
     internal static readonly string[] WorkingCapitalChangeChain = ["IncreaseDecreaseInOperatingCapital", "IncreaseDecreaseInOtherOperatingCapitalNet"];
     internal static readonly string[] SharesChain = ["CommonStockSharesOutstanding", "WeightedAverageNumberOfSharesOutstandingBasic"];
@@ -186,6 +212,80 @@ public class ScoringService {
         return defaultValue;
     }
 
+    /// <summary>
+    /// Resolve equity with derived fallbacks. Some companies (e.g. NVDA, MSFT) only tag
+    /// StockholdersEquity in the Statement of Changes in Equity (with stale end_dates),
+    /// not on the balance sheet. We prefer equity derived from balance sheet totals:
+    ///   1. LiabilitiesAndStockholdersEquity - Liabilities - NCI - RedeemableNCI
+    ///   2. Assets - Liabilities - NCI - RedeemableNCI
+    ///   3. Direct StockholdersEquity / fallback concepts
+    /// NCI (noncontrolling interest) and RedeemableNCI (mezzanine equity) are subtracted
+    /// because L&SE includes all equity holders, not just stockholders.
+    /// </summary>
+    internal static decimal? ResolveEquity(IReadOnlyDictionary<string, decimal> yearData) {
+        decimal? liabilitiesAndEquity = ResolveField(yearData, LiabilitiesAndEquityChain, null);
+        decimal? liabilities = ResolveField(yearData, LiabilitiesChain, null);
+        decimal? assets = ResolveField(yearData, AssetsChain, null);
+
+        decimal? totalEquity = null;
+        if (liabilitiesAndEquity.HasValue && liabilities.HasValue)
+            totalEquity = liabilitiesAndEquity.Value - liabilities.Value;
+        else if (assets.HasValue && liabilities.HasValue)
+            totalEquity = assets.Value - liabilities.Value;
+
+        if (totalEquity.HasValue) {
+            decimal nci = ResolveField(yearData, NciChain, 0m)!.Value;
+            decimal redeemableNci = ResolveField(yearData, RedeemableNciChain, 0m)!.Value;
+            return totalEquity.Value - nci - redeemableNci;
+        }
+
+        // Direct equity concepts (including MembersEquity, PartnersCapital)
+        return ResolveField(yearData, EquityChain, null);
+    }
+
+    /// <summary>
+    /// Fix F: Resolve depletion + amortization with computed fallback.
+    /// 1. If Depletion or AmortizationOfIntangibleAssets is found, use them (0 for missing).
+    /// 2. Otherwise, compute DepreciationDepletionAndAmortization - Depreciation.
+    /// 3. If that's not possible, return 0.
+    /// </summary>
+    internal static decimal ResolveDepletionAndAmortization(IReadOnlyDictionary<string, decimal> yearData) {
+        decimal? depletion = ResolveField(yearData, DepletionChain, null);
+        decimal? amortization = ResolveField(yearData, AmortizationChain, null);
+
+        if (depletion.HasValue || amortization.HasValue)
+            return (depletion ?? 0m) + (amortization ?? 0m);
+
+        // Fallback: DDA - Depreciation = depletion + amortization
+        decimal? dda = ResolveField(yearData, DDAChain, null);
+        decimal? depreciation = ResolveField(yearData, DepreciationChain, null);
+        if (dda.HasValue && depreciation.HasValue)
+            return dda.Value - depreciation.Value;
+
+        return 0m;
+    }
+
+    /// <summary>
+    /// Fix G: Resolve deferred tax with component sum fallback.
+    /// 1. If DeferredIncomeTaxExpenseBenefit or DeferredIncomeTaxesAndTaxCredits is found, use it.
+    /// 2. Otherwise, sum Federal + Foreign + State components (0 for missing, but at least one must exist).
+    /// 3. If nothing is found, return 0.
+    /// </summary>
+    internal static decimal ResolveDeferredTax(IReadOnlyDictionary<string, decimal> yearData) {
+        decimal? aggregate = ResolveField(yearData, DeferredTaxChain, null);
+        if (aggregate.HasValue)
+            return aggregate.Value;
+
+        decimal? federal = ResolveField(yearData, DeferredTaxFederalChain, null);
+        decimal? foreign = ResolveField(yearData, DeferredTaxForeignChain, null);
+        decimal? state = ResolveField(yearData, DeferredTaxStateChain, null);
+
+        if (federal.HasValue || foreign.HasValue || state.HasValue)
+            return (federal ?? 0m) + (foreign ?? 0m) + (state ?? 0m);
+
+        return 0m;
+    }
+
     internal static DerivedMetrics ComputeDerivedMetrics(
         IReadOnlyDictionary<int, IReadOnlyDictionary<string, decimal>> rawDataByYear,
         decimal? pricePerShare,
@@ -203,7 +303,7 @@ public class ScoringService {
         IReadOnlyDictionary<string, decimal> mostRecentData = rawDataByYear[mostRecentYear];
 
         // Balance sheet values from most recent year
-        decimal? equity = ResolveField(mostRecentData, EquityChain, null);
+        decimal? equity = ResolveEquity(mostRecentData);
         decimal? goodwill = ResolveField(mostRecentData, GoodwillChain, 0m);
         decimal? intangibles = ResolveField(mostRecentData, IntangiblesChain, 0m);
         decimal? debt = ResolveField(mostRecentData, DebtChain, 0m);
@@ -278,16 +378,15 @@ public class ScoringService {
             decimal? netIncome = ResolveField(yearData, NetIncomeChain, null);
             if (netIncome.HasValue) {
                 hasAnyOwnerEarnings = true;
-                decimal depletion = ResolveField(yearData, DepletionChain, 0m)!.Value;
-                decimal amortization = ResolveField(yearData, AmortizationChain, 0m)!.Value;
-                decimal deferredTax = ResolveField(yearData, DeferredTaxChain, 0m)!.Value;
+                decimal depletionAndAmortization = ResolveDepletionAndAmortization(yearData);
+                decimal deferredTax = ResolveDeferredTax(yearData);
                 decimal otherNonCash = ResolveField(yearData, OtherNonCashChain, 0m)!.Value;
                 decimal capEx = ResolveField(yearData, CapExChain, 0m)!.Value;
                 decimal workingCapitalChange = ResolveField(yearData, WorkingCapitalChangeChain, 0m)!.Value;
 
                 // Simplified OE formula (Depreciation cancels out)
                 decimal ownerEarnings = netIncome.Value
-                    + depletion + amortization + deferredTax + otherNonCash
+                    + depletionAndAmortization + deferredTax + otherNonCash
                     - capEx + workingCapitalChange;
                 totalOwnerEarnings += ownerEarnings;
                 yearsWithOE++;

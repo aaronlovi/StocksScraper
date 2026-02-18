@@ -18,7 +18,7 @@ internal class XBRLFileParser {
     private readonly string _content;
     private readonly Dictionary<ulong, ulong> _companyIdsByCiks;
     private readonly Dictionary<ulong, List<Submission>> _submissionsByCompanyId;
-    private readonly Dictionary<string, Dictionary<string, Dictionary<DatePair, DataPoint>>> _dataPoints;
+    private readonly Dictionary<string, Dictionary<string, Dictionary<(DatePair, string), DataPoint>>> _dataPoints;
     private readonly Dictionary<string, Submission> _submissionsByFilingReference;
     private readonly HashSet<string> _filingReferencesWithNoSubmissions;
     private readonly ILogger<XBRLFileParser> _logger;
@@ -83,7 +83,7 @@ internal class XBRLFileParser {
     }
 
     private void ProcessFact(string factName, Fact fact) {
-        Dictionary<string, Dictionary<DatePair, DataPoint>> unitsDataPoints =
+        Dictionary<string, Dictionary<(DatePair, string), DataPoint>> unitsDataPoints =
             _dataPoints.GetOrCreateEntry(factName);
 
         foreach ((string unitName, List<Unit> units) in fact.Units)
@@ -92,10 +92,10 @@ internal class XBRLFileParser {
 
     private void ProcessUnitsForFact(
         string factName,
-        Dictionary<string, Dictionary<DatePair, DataPoint>> unitsDataPoints,
+        Dictionary<string, Dictionary<(DatePair, string), DataPoint>> unitsDataPoints,
         string unitName,
         List<Unit> units) {
-        Dictionary<DatePair, DataPoint> dataPointsByDatePair =
+        Dictionary<(DatePair, string), DataPoint> dataPointsByDatePair =
             unitsDataPoints.GetOrCreateEntry(unitName);
 
         foreach (Unit unitData in units) {
@@ -128,10 +128,11 @@ internal class XBRLFileParser {
     }
 
     private void ProcessUnitItemForFact(
-        string factName, string unit, Dictionary<DatePair, DataPoint> dataPointsByDatePair, Unit unitData) {
+        string factName, string unit, Dictionary<(DatePair, string), DataPoint> dataPointsByDatePair, Unit unitData) {
         DatePair datePair = unitData.DatePair;
+        var key = (datePair, unitData.FilingReference);
 
-        if (dataPointsByDatePair.TryGetValue(datePair, out DataPoint? existingDataPoint)
+        if (dataPointsByDatePair.TryGetValue(key, out DataPoint? existingDataPoint)
             && unitData.FiledDate <= existingDataPoint.FiledDate) {
             return;
         }
@@ -142,7 +143,7 @@ internal class XBRLFileParser {
             return;
         }
 
-        dataPointsByDatePair[datePair] = new DataPoint(
+        dataPointsByDatePair[key] = new DataPoint(
             0, // Data point ID is not known at this point
             _companyId,
             factName.ToLowerInvariant(),

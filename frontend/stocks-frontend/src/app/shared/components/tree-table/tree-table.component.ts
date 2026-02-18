@@ -1,4 +1,4 @@
-import { Component, input, signal } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { StatementTreeNode } from '../../../core/services/api.service';
 
 @Component({
@@ -14,13 +14,13 @@ import { StatementTreeNode } from '../../../core/services/api.service';
       </thead>
       <tbody>
         @for (row of flatRows(); track row.node.conceptName + row.depth) {
-          <tr class="tree-row" [class.has-children]="row.hasChildren" (click)="toggle(row.node.conceptName)">
+          <tr class="tree-row" [class.section-header]="row.hasChildren && !row.node.value">
             <td>
-              <span class="indent" [style.padding-left.px]="row.depth * 20">
-                @if (row.hasChildren) {
-                  <span class="toggle">{{ isExpanded(row.node.conceptName) ? '▾' : '▸' }}</span>
-                }
+              <span class="indent" [style.padding-left.px]="row.depth * 16">
                 {{ row.node.label }}
+                @if (row.node.documentation) {
+                  <span class="info-icon" [title]="row.node.documentation">&#9432;</span>
+                }
               </span>
             </td>
             <td class="value-col">
@@ -37,48 +37,56 @@ import { StatementTreeNode } from '../../../core/services/api.service';
     table {
       width: 100%;
       border-collapse: collapse;
+      font-size: 13px;
     }
     th, td {
-      padding: 4px 12px;
+      padding: 3px 12px;
       border-bottom: 1px solid #e2e8f0;
       text-align: left;
     }
     th {
-      background: #f1f5f9;
+      background: #e2e8f0;
       font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #475569;
+      border-bottom: 3px double #94a3b8;
     }
     .value-col {
       text-align: right;
       width: 200px;
     }
-    .tree-row.has-children {
-      cursor: pointer;
+    .tree-row:nth-child(even) td {
+      background: #f1f5f9;
     }
-    .tree-row.has-children:hover {
-      background: #f8fafc;
+    .section-header td {
+      font-weight: 600;
     }
     .indent {
       display: inline-block;
     }
-    .toggle {
-      color: #94a3b8;
-      margin-right: 4px;
+    .info-icon {
+      margin-left: 4px;
+      color: #64748b;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .info-icon:hover {
+      color: #3b82f6;
     }
   `]
 })
 export class TreeTableComponent {
   nodes = input<StatementTreeNode[]>([]);
-  expandedNodes = signal<Set<string>>(new Set());
 
   flatRows(): { node: StatementTreeNode; depth: number; hasChildren: boolean }[] {
     const rows: { node: StatementTreeNode; depth: number; hasChildren: boolean }[] = [];
-    const expanded = this.expandedNodes();
 
     const walk = (nodeList: StatementTreeNode[], depth: number) => {
       for (const node of nodeList) {
         const hasChildren = !!node.children && node.children.length > 0;
         rows.push({ node, depth, hasChildren });
-        if (hasChildren && expanded.has(node.conceptName)) {
+        if (hasChildren) {
           walk(node.children!, depth + 1);
         }
       }
@@ -86,20 +94,6 @@ export class TreeTableComponent {
 
     walk(this.nodes(), 0);
     return rows;
-  }
-
-  isExpanded(conceptName: string): boolean {
-    return this.expandedNodes().has(conceptName);
-  }
-
-  toggle(conceptName: string): void {
-    const current = new Set(this.expandedNodes());
-    if (current.has(conceptName)) {
-      current.delete(conceptName);
-    } else {
-      current.add(conceptName);
-    }
-    this.expandedNodes.set(current);
   }
 
   formatValue(value: string): string {

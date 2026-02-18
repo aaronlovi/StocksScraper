@@ -6,6 +6,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="Stocks.EDGARScraper.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
         <None Remove="Database\Migrations\*.sql" />
         <EmbeddedResource Include="Database\Migrations\*.sql" />
     </ItemGroup>

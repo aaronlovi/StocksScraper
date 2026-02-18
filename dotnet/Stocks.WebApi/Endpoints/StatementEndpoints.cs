@@ -12,10 +12,6 @@ using Stocks.WebApi.Middleware;
 namespace Stocks.WebApi.Endpoints;
 
 public static class StatementEndpoints {
-    // Data points are imported against a single taxonomy year. Default to that
-    // year so concept IDs in data points match the loaded taxonomy hierarchy.
-    private const int DefaultTaxonomyYear = 2025;
-
     public static void MapStatementEndpoints(this IEndpointRouteBuilder app) {
         _ = app.MapGet("/api/companies/{cik}/submissions/{submissionId}/statements",
             async (string cik, ulong submissionId, IDbmService dbm, StatementDataService sds, CancellationToken ct) => {
@@ -23,10 +19,26 @@ public static class StatementEndpoints {
                 if (companyResult.IsFailure)
                     return companyResult.ToHttpResult();
 
+                Result<IReadOnlyCollection<Submission>> subsResult =
+                    await dbm.GetSubmissionsByCompanyId(companyResult.Value!.CompanyId, ct);
+                if (subsResult.IsFailure)
+                    return subsResult.ToHttpResult();
+
+                Submission? matchedSub = null;
+                foreach (Submission s in subsResult.Value!) {
+                    if (s.SubmissionId == submissionId) {
+                        matchedSub = s;
+                        break;
+                    }
+                }
+                if (matchedSub is null)
+                    return Results.NotFound(new { error = $"Submission {submissionId} not found for company." });
+
+                int taxonomyYear = matchedSub.ReportDate.Year;
                 Result<TaxonomyTypeInfo> taxResult =
-                    await dbm.GetTaxonomyTypeByNameVersion("us-gaap", DefaultTaxonomyYear, ct);
+                    await dbm.GetTaxonomyTypeByNameVersion("us-gaap", taxonomyYear, ct);
                 if (taxResult.IsFailure)
-                    return Results.NotFound(new { error = "No taxonomy found." });
+                    return Results.NotFound(new { error = $"No taxonomy found for year {taxonomyYear}." });
 
                 Result<IReadOnlyCollection<StatementListItem>> listResult =
                     await sds.ListStatementsForSubmission(
@@ -48,7 +60,23 @@ public static class StatementEndpoints {
 
                 Company company = companyResult.Value!;
 
-                int resolvedTaxYear = taxonomyYear ?? DefaultTaxonomyYear;
+                // Find the submission to get report date for taxonomy year
+                Result<IReadOnlyCollection<Submission>> subsResult =
+                    await dbm.GetSubmissionsByCompanyId(company.CompanyId, ct);
+                if (subsResult.IsFailure)
+                    return subsResult.ToHttpResult();
+
+                Submission? matchedSub = null;
+                foreach (Submission s in subsResult.Value!) {
+                    if (s.SubmissionId == submissionId) {
+                        matchedSub = s;
+                        break;
+                    }
+                }
+                if (matchedSub is null)
+                    return Results.NotFound(new { error = $"Submission {submissionId} not found for company." });
+
+                int resolvedTaxYear = taxonomyYear ?? matchedSub.ReportDate.Year;
                 Result<TaxonomyTypeInfo> taxResult =
                     await dbm.GetTaxonomyTypeByNameVersion("us-gaap", resolvedTaxYear, ct);
                 if (taxResult.IsFailure)
@@ -104,6 +132,7 @@ public static class StatementEndpoints {
             var obj = new Dictionary<string, object?> {
                 ["conceptName"] = node.Name,
                 ["label"] = node.Label,
+                ["documentation"] = string.IsNullOrEmpty(node.Documentation) ? null : node.Documentation,
                 ["value"] = dataPointMap.TryGetValue(node.ConceptId, out DataPoint? dp) ? dp.Value : null
             };
             object? nodeChildren = BuildJsonTree(childrenMap, rootNodes, includedConceptIds, dataPointMap, node.ConceptId);

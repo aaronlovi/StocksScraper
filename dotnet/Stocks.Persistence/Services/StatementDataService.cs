@@ -329,6 +329,7 @@ public class StatementDataService {
             ConceptId = concept.ConceptId,
             Name = concept.Name ?? string.Empty,
             Label = concept.Label ?? string.Empty,
+            Documentation = concept.Documentation ?? string.Empty,
             Depth = ctx.Depth,
             ParentConceptId = ctx.ParentConceptId,
         });
@@ -371,9 +372,16 @@ public class StatementDataService {
         List<HierarchyNode> nodes,
         Dictionary<long, List<HierarchyNode>> childrenMap,
         List<HierarchyNode> rootNodes) {
+        var seenChildrenByParent = new Dictionary<long, HashSet<long>>();
         foreach (HierarchyNode node in nodes) {
             if (node.ParentConceptId.HasValue) {
                 long parentId = node.ParentConceptId.Value;
+                if (!seenChildrenByParent.TryGetValue(parentId, out HashSet<long>? seen)) {
+                    seen = new HashSet<long>();
+                    seenChildrenByParent[parentId] = seen;
+                }
+                if (!seen.Add(node.ConceptId))
+                    continue;
                 if (!childrenMap.TryGetValue(parentId, out List<HierarchyNode>? children)) {
                     children = new List<HierarchyNode>();
                     childrenMap[parentId] = children;

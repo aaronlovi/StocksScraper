@@ -37,14 +37,16 @@ describe('TreeTableComponent', () => {
     }).compileComponents();
   });
 
-  it('should render root nodes as top-level rows', () => {
+  it('should render all rows including nested children immediately', () => {
     const fixture = TestBed.createComponent(TestHostComponent);
     fixture.detectChanges();
 
     const rows = fixture.nativeElement.querySelectorAll('.tree-row');
-    expect(rows.length).toBe(2);
+    expect(rows.length).toBe(4);
     expect(rows[0].textContent).toContain('Total Assets');
-    expect(rows[1].textContent).toContain('Total Liabilities');
+    expect(rows[1].textContent).toContain('Current Assets');
+    expect(rows[2].textContent).toContain('Non-Current Assets');
+    expect(rows[3].textContent).toContain('Total Liabilities');
   });
 
   it('should format numeric values with commas', () => {
@@ -55,39 +57,25 @@ describe('TreeTableComponent', () => {
     expect(valueCells[0].textContent.trim()).toBe('123,456,789');
   });
 
-  it('should expand parent row to show children', () => {
+  it('should apply section-header class to parent rows without values', () => {
+    const nodesWithSectionHeader: StatementTreeNode[] = [
+      {
+        conceptName: 'Section',
+        label: 'Section Header',
+        value: null as unknown as string,
+        children: [
+          { conceptName: 'Child', label: 'Child Item', value: '100', children: [] }
+        ]
+      }
+    ];
+
     const fixture = TestBed.createComponent(TestHostComponent);
+    fixture.componentInstance.nodes = nodesWithSectionHeader;
     fixture.detectChanges();
 
-    // Initially 2 rows (collapsed)
-    let rows = fixture.nativeElement.querySelectorAll('.tree-row');
+    const rows = fixture.nativeElement.querySelectorAll('.tree-row');
     expect(rows.length).toBe(2);
-
-    // Click "Total Assets" to expand
-    const treeTable = fixture.debugElement.children[0].componentInstance as TreeTableComponent;
-    treeTable.toggle('Assets');
-    fixture.detectChanges();
-
-    // Now should show 4 rows (Assets + 2 children + Liabilities)
-    rows = fixture.nativeElement.querySelectorAll('.tree-row');
-    expect(rows.length).toBe(4);
-    expect(rows[1].textContent).toContain('Current Assets');
-    expect(rows[2].textContent).toContain('Non-Current Assets');
-  });
-
-  it('should collapse expanded parent row', () => {
-    const fixture = TestBed.createComponent(TestHostComponent);
-    fixture.detectChanges();
-
-    const treeTable = fixture.debugElement.children[0].componentInstance as TreeTableComponent;
-
-    // Expand then collapse
-    treeTable.toggle('Assets');
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelectorAll('.tree-row').length).toBe(4);
-
-    treeTable.toggle('Assets');
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelectorAll('.tree-row').length).toBe(2);
+    expect(rows[0].classList.contains('section-header')).toBe(true);
+    expect(rows[1].classList.contains('section-header')).toBe(false);
   });
 });

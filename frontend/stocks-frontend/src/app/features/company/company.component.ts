@@ -57,15 +57,27 @@ import {
                     @if (statementsLoading()) {
                       <p class="loading-statements">Loading statements...</p>
                     } @else if (statements().length > 0) {
-                      <ul class="statement-list">
-                        @for (st of statements(); track st.rootConceptName) {
-                          <li>
-                            <a [routerLink]="['/company', cik, 'report', sub.submissionId, st.rootConceptName]">
-                              {{ st.rootLabel }}
-                            </a>
-                          </li>
-                        }
-                      </ul>
+                      <table class="statement-table">
+                        <thead>
+                          <tr>
+                            <th>Statement</th>
+                            <th>Variant</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (st of statements(); track st.roleName) {
+                            <tr>
+                              <td>
+                                <a [routerLink]="['/company', cik, 'report', sub.submissionId, st.rootConceptName]"
+                                   [queryParams]="{ roleName: st.roleName }">
+                                  {{ st.rootLabel }}
+                                </a>
+                              </td>
+                              <td class="role-detail">{{ formatRoleName(st.roleName) }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
                     } @else {
                       <p class="no-statements">No statements available.</p>
                     }
@@ -151,22 +163,35 @@ import {
     }
     .detail-row td {
       background: #f8fafc;
-      padding: 12px 24px;
+      padding: 6px 24px;
     }
-    .statement-list {
-      list-style: none;
-      padding: 0;
+    .statement-table {
+      width: 100%;
+      border-collapse: collapse;
       margin: 0;
     }
-    .statement-list li {
-      padding: 4px 0;
+    .statement-table th {
+      background: #e2e8f0;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #475569;
     }
-    .statement-list a {
+    .statement-table th, .statement-table td {
+      padding: 2px 12px;
+    }
+    .statement-table td {
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .statement-table a {
       color: #3b82f6;
       text-decoration: none;
     }
-    .statement-list a:hover {
+    .statement-table a:hover {
       text-decoration: underline;
+    }
+    .role-detail {
+      font-size: 13px;
+      color: #64748b;
     }
     .loading-statements, .no-statements {
       color: #64748b;
@@ -209,6 +234,11 @@ export class CompanyComponent implements OnInit {
     });
   }
 
+  formatRoleName(roleName: string): string {
+    const match = roleName.match(/^\d+\s*-\s*Statement\s*-\s*(.+)$/);
+    return match ? match[1] : roleName;
+  }
+
   toggleRow(submissionId: number): void {
     if (this.expandedRow() === submissionId) {
       this.expandedRow.set(null);
@@ -222,7 +252,12 @@ export class CompanyComponent implements OnInit {
 
     this.api.listStatements(this.cik, submissionId).subscribe({
       next: data => {
-        this.statements.set(data);
+        const sorted = [...data].sort((a, b) => {
+          const labelCmp = a.rootLabel.localeCompare(b.rootLabel);
+          if (labelCmp !== 0) return labelCmp;
+          return this.formatRoleName(a.roleName).localeCompare(this.formatRoleName(b.roleName));
+        });
+        this.statements.set(sorted);
         this.statementsLoading.set(false);
       },
       error: () => {

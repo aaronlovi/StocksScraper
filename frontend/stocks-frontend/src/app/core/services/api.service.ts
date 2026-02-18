@@ -60,6 +60,7 @@ export interface StatementListItem {
 export interface StatementTreeNode {
   conceptName: string;
   label: string;
+  documentation?: string | null;
   value: string | null;
   children?: StatementTreeNode[];
 }

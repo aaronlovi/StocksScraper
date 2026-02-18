@@ -23,6 +23,14 @@ const mockActivatedRoute = {
   }
 };
 
+const mockCompanyResponse = {
+  cik: '320193',
+  companyName: 'Apple Inc.',
+  latestPrice: 185.50,
+  latestPriceDate: '2025-01-15',
+  tickers: [{ ticker: 'AAPL', exchange: 'NASDAQ' }]
+};
+
 const mockStatementResponse = {
   conceptName: 'BalanceSheetAbstract',
   label: 'Balance Sheet',
@@ -44,6 +52,18 @@ const mockStatementResponse = {
     }
   ]
 };
+
+function flushCompanyRequest(httpMock: HttpTestingController): void {
+  const companyReq = httpMock.expectOne(r => r.url.includes('/api/companies/320193') && !r.url.includes('submissions'));
+  companyReq.flush(mockCompanyResponse);
+}
+
+function flushInitialRequests(httpMock: HttpTestingController): void {
+  flushCompanyRequest(httpMock);
+
+  const statementReq = httpMock.expectOne(r => r.url.includes('/statements/BalanceSheetAbstract'));
+  statementReq.flush(mockStatementResponse);
+}
 
 describe('ReportComponent', () => {
   let httpMock: HttpTestingController;
@@ -69,8 +89,7 @@ describe('ReportComponent', () => {
     const fixture = TestBed.createComponent(ReportComponent);
     fixture.detectChanges();
 
-    const req = httpMock.expectOne(r => r.url.includes('/api/companies/320193/submissions/100/statements/BalanceSheetAbstract'));
-    req.flush(mockStatementResponse);
+    flushInitialRequests(httpMock);
     fixture.detectChanges();
 
     const breadcrumb = fixture.nativeElement.querySelector('.breadcrumb');
@@ -78,23 +97,38 @@ describe('ReportComponent', () => {
     expect(breadcrumb.textContent).toContain('BalanceSheetAbstract');
   });
 
+  it('should render company header with name and price', () => {
+    const fixture = TestBed.createComponent(ReportComponent);
+    fixture.detectChanges();
+
+    flushInitialRequests(httpMock);
+    fixture.detectChanges();
+
+    const header = fixture.nativeElement.querySelector('.company-header');
+    expect(header).toBeTruthy();
+    expect(header.textContent).toContain('Apple Inc.');
+    expect(header.textContent).toContain('185.50');
+  });
+
   it('should render tree table from statement data', () => {
     const fixture = TestBed.createComponent(ReportComponent);
     fixture.detectChanges();
 
-    const req = httpMock.expectOne(r => r.url.includes('/statements/BalanceSheetAbstract'));
-    req.flush(mockStatementResponse);
+    flushInitialRequests(httpMock);
     fixture.detectChanges();
 
     const rows = fixture.nativeElement.querySelectorAll('.tree-row');
-    expect(rows.length).toBe(2);
+    expect(rows.length).toBe(3);
     expect(rows[0].textContent).toContain('Total Assets');
-    expect(rows[1].textContent).toContain('Total Liabilities');
+    expect(rows[1].textContent).toContain('Current Assets');
+    expect(rows[2].textContent).toContain('Total Liabilities');
   });
 
   it('should show error on failure', () => {
     const fixture = TestBed.createComponent(ReportComponent);
     fixture.detectChanges();
+
+    flushCompanyRequest(httpMock);
 
     const req = httpMock.expectOne(r => r.url.includes('/statements/BalanceSheetAbstract'));
     req.error(new ProgressEvent('error'));
@@ -107,6 +141,8 @@ describe('ReportComponent', () => {
   it('should show role picker when multiple roles returned', () => {
     const fixture = TestBed.createComponent(ReportComponent);
     fixture.detectChanges();
+
+    flushCompanyRequest(httpMock);
 
     const req = httpMock.expectOne(r => r.url.includes('/statements/BalanceSheetAbstract'));
     req.flush(
@@ -131,12 +167,14 @@ describe('ReportComponent', () => {
     fixture.detectChanges();
 
     const rows = fixture.nativeElement.querySelectorAll('.tree-row');
-    expect(rows.length).toBe(2);
+    expect(rows.length).toBe(3);
   });
 
   it('should show no-data message when response has no children and no value', () => {
     const fixture = TestBed.createComponent(ReportComponent);
     fixture.detectChanges();
+
+    flushCompanyRequest(httpMock);
 
     const req = httpMock.expectOne(r => r.url.includes('/statements/BalanceSheetAbstract'));
     req.flush({ conceptName: 'BalanceSheetAbstract', label: 'Balance Sheet', value: null });
@@ -150,8 +188,7 @@ describe('ReportComponent', () => {
     const fixture = TestBed.createComponent(ReportComponent);
     fixture.detectChanges();
 
-    const req1 = httpMock.expectOne(r => r.url.includes('/statements/BalanceSheetAbstract') && !r.url.includes('taxonomyYear'));
-    req1.flush(mockStatementResponse);
+    flushInitialRequests(httpMock);
     fixture.detectChanges();
 
     // Change taxonomy year
@@ -164,6 +201,6 @@ describe('ReportComponent', () => {
     fixture.detectChanges();
 
     const rows = fixture.nativeElement.querySelectorAll('.tree-row');
-    expect(rows.length).toBe(2);
+    expect(rows.length).toBe(3);
   });
 });

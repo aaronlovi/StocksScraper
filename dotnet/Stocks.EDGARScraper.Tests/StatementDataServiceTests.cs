@@ -93,6 +93,26 @@ public class StatementDataServiceTests {
     }
 
     [Fact]
+    public void BuildChildrenMap_DeduplicatesChildrenUnderSameParent() {
+        // Simulates a DAG where concept 2 appears under concept 1 twice
+        // (because concept 1 was traversed from two different parents)
+        var nodes = new List<HierarchyNode> {
+            new() { ConceptId = 1, Name = "Parent", Label = "Parent", Depth = 0, ParentConceptId = null },
+            new() { ConceptId = 2, Name = "Child", Label = "Child", Depth = 1, ParentConceptId = 1 },
+            new() { ConceptId = 2, Name = "Child", Label = "Child", Depth = 1, ParentConceptId = 1 }
+        };
+        var childrenMap = new Dictionary<long, List<HierarchyNode>>();
+        var rootNodes = new List<HierarchyNode>();
+
+        StatementDataService.BuildChildrenMap(nodes, childrenMap, rootNodes);
+
+        Assert.Single(rootNodes);
+        Assert.True(childrenMap.ContainsKey(1));
+        Assert.Single(childrenMap[1]);
+        Assert.Equal(2, childrenMap[1][0].ConceptId);
+    }
+
+    [Fact]
     public async Task ListStatements_ReturnsAvailableRoles() {
         var mock = new Mock<IDbmService>();
         var concepts = new List<ConceptDetailsDTO> {

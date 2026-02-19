@@ -5,4 +5,5 @@ namespace Stocks.DataModels.EdgarFileModels;
 
 public record Facts {
     [JsonPropertyName("us-gaap")] public Dictionary<string, Fact> UsGaap { get; init; } = [];
+    [JsonPropertyName("dei")] public Dictionary<string, Fact> Dei { get; init; } = [];
 }

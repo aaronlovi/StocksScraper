@@ -801,29 +801,35 @@ internal partial class Program {
             reportYears.Add(s.ReportDate.Year);
         }
 
-        // Load taxonomy concepts for each report year
+        // Load taxonomy concepts for each report year (us-gaap + dei merged into same map)
         int latestYear = 0;
+        string[] taxonomyPrefixes = ["us-gaap", "dei"];
         foreach (int year in reportYears) {
-            Result<TaxonomyTypeInfo> taxTypeResult =
-                await _dbm!.GetTaxonomyTypeByNameVersion("us-gaap", year, CancellationToken.None);
-            if (taxTypeResult.IsFailure || taxTypeResult.Value is null)
-                continue;
-
-            Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult =
-                await _dbm!.GetTaxonomyConceptsByTaxonomyType(taxTypeResult.Value.TaxonomyTypeId, CancellationToken.None);
-            if (conceptsResult.IsFailure || conceptsResult.Value is null)
-                continue;
-
             var yearMap = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-            foreach (ConceptDetailsDTO concept in conceptsResult.Value) {
-                if (concept.PeriodTypeId == (int)TaxonomyPeriodTypes.None)
+
+            foreach (string prefix in taxonomyPrefixes) {
+                Result<TaxonomyTypeInfo> taxTypeResult =
+                    await _dbm!.GetTaxonomyTypeByNameVersion(prefix, year, CancellationToken.None);
+                if (taxTypeResult.IsFailure || taxTypeResult.Value is null)
                     continue;
-                yearMap[concept.Name.Trim()] = concept.ConceptId;
+
+                Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult =
+                    await _dbm!.GetTaxonomyConceptsByTaxonomyType(taxTypeResult.Value.TaxonomyTypeId, CancellationToken.None);
+                if (conceptsResult.IsFailure || conceptsResult.Value is null)
+                    continue;
+
+                foreach (ConceptDetailsDTO concept in conceptsResult.Value) {
+                    if (concept.PeriodTypeId == (int)TaxonomyPeriodTypes.None)
+                        continue;
+                    yearMap[concept.Name.Trim()] = concept.ConceptId;
+                }
             }
 
-            context.TaxonomyConceptIdsByYear[year] = yearMap;
-            if (year > latestYear)
-                latestYear = year;
+            if (yearMap.Count > 0) {
+                context.TaxonomyConceptIdsByYear[year] = yearMap;
+                if (year > latestYear)
+                    latestYear = year;
+            }
 
             _logger.LogInformation("ParseBulkXbrlArchive - Loaded {Count} concepts for taxonomy year {Year}",
                 yearMap.Count, year);

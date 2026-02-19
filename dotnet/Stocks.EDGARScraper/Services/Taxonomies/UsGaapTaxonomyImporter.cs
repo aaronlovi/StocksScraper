@@ -17,8 +17,11 @@ namespace Stocks.EDGARScraper.Services.Taxonomies;
 
 public sealed class UsGaapTaxonomyImporter {
     private const string UsGaapPrefix = "us-gaap";
-    private const string ConceptsSuffix = "_GAAP_Taxonomy.worksheets.concepts.csv";
-    private const string PresentationSuffix = "_GAAP_Taxonomy.worksheets.presentation.csv";
+    private const string GaapConceptsSuffix = "_GAAP_Taxonomy.worksheets.concepts.csv";
+    private const string GaapPresentationSuffix = "_GAAP_Taxonomy.worksheets.presentation.csv";
+
+    private const string DeiPrefix = "dei";
+    private const string DeiConceptsSuffix = "_DEI_Taxonomy.worksheets.concepts.csv";
 
     private readonly IDbmService _dbm;
     private readonly ILogger<UsGaapTaxonomyImporter> _logger;
@@ -29,19 +32,36 @@ public sealed class UsGaapTaxonomyImporter {
     }
 
     public async Task<Result> ImportYearAsync(int year, string rootDir, CancellationToken ct) {
+        Result gaapResult = await ImportYearAsync(year, rootDir, UsGaapPrefix, GaapConceptsSuffix, GaapPresentationSuffix, ct);
+        if (gaapResult.IsFailure)
+            return gaapResult;
+
+        return await ImportDeiYearAsync(year, rootDir, ct);
+    }
+
+    public async Task<Result> ImportDeiYearAsync(int year, string rootDir, CancellationToken ct) {
+        return await ImportYearAsync(year, rootDir, DeiPrefix, DeiConceptsSuffix, null, ct);
+    }
+
+    private async Task<Result> ImportYearAsync(int year, string rootDir, string prefix,
+        string conceptsSuffix, string? presentationSuffix, CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(rootDir))
             return Result.Failure(ErrorCodes.ValidationError, "Taxonomy root directory is required.");
 
-        string conceptsPath = Path.Combine(rootDir, $"{year}{ConceptsSuffix}");
-        string presentationPath = Path.Combine(rootDir, $"{year}{PresentationSuffix}");
+        string conceptsPath = Path.Combine(rootDir, $"{year}{conceptsSuffix}");
 
         if (!File.Exists(conceptsPath))
             return Result.Failure(ErrorCodes.NotFound, $"Missing concepts CSV: {conceptsPath}");
-        if (!File.Exists(presentationPath))
-            return Result.Failure(ErrorCodes.NotFound, $"Missing presentation CSV: {presentationPath}");
+
+        string? presentationPath = null;
+        if (presentationSuffix is not null) {
+            presentationPath = Path.Combine(rootDir, $"{year}{presentationSuffix}");
+            if (!File.Exists(presentationPath))
+                return Result.Failure(ErrorCodes.NotFound, $"Missing presentation CSV: {presentationPath}");
+        }
 
         Result<TaxonomyTypeInfo> taxonomyTypeResult =
-            await _dbm.EnsureTaxonomyType(UsGaapPrefix, year, ct);
+            await _dbm.EnsureTaxonomyType(prefix, year, ct);
         if (taxonomyTypeResult.IsFailure)
             return Result.Failure(taxonomyTypeResult);
 
@@ -55,37 +75,49 @@ public sealed class UsGaapTaxonomyImporter {
         if (presentationCount.IsFailure)
             return Result.Failure(presentationCount);
 
-        if (conceptCount.Value > 0 && presentationCount.Value > 0) {
-            _logger.LogInformation("ImportYearAsync - Year {Year} already imported ({Concepts} concepts, {Presentations} presentations), skipping",
-                year, conceptCount.Value, presentationCount.Value);
+        bool hasPresentations = presentationPath is not null;
+        bool conceptsDone = conceptCount.Value > 0;
+        bool presentationsDone = !hasPresentations || presentationCount.Value > 0;
+
+        if (conceptsDone && presentationsDone) {
+            _logger.LogInformation("ImportYearAsync - {Prefix} year {Year} already imported ({Concepts} concepts, {Presentations} presentations), skipping",
+                prefix, year, conceptCount.Value, presentationCount.Value);
             return Result.Success;
         }
 
-        if (conceptCount.Value == 0) {
-            Result conceptsResult = await ImportConceptsAsync(conceptsPath, taxonomyTypeId, ct);
+        if (!conceptsDone) {
+            Result conceptsResult = await ImportConceptsAsync(conceptsPath, prefix, taxonomyTypeId, ct);
             if (conceptsResult.IsFailure)
                 return conceptsResult;
         } else {
-            _logger.LogInformation("ImportYearAsync - Year {Year} concepts already loaded ({Count}), skipping", year, conceptCount.Value);
+            _logger.LogInformation("ImportYearAsync - {Prefix} year {Year} concepts already loaded ({Count}), skipping", prefix, year, conceptCount.Value);
         }
 
-        if (presentationCount.Value == 0) {
-            Result presentationsResult = await ImportPresentationsAsync(presentationPath, taxonomyTypeId, ct);
+        if (hasPresentations && !presentationsDone) {
+            Result presentationsResult = await ImportPresentationsAsync(presentationPath!, prefix, taxonomyTypeId, ct);
             if (presentationsResult.IsFailure)
                 return presentationsResult;
-        } else {
-            _logger.LogInformation("ImportYearAsync - Year {Year} presentations already loaded ({Count}), skipping", year, presentationCount.Value);
+        } else if (hasPresentations) {
+            _logger.LogInformation("ImportYearAsync - {Prefix} year {Year} presentations already loaded ({Count}), skipping", prefix, year, presentationCount.Value);
         }
 
         return Result.Success;
     }
 
     public IReadOnlyList<int> DiscoverYears(string rootDir) {
+        return DiscoverYearsForSuffix(rootDir, GaapConceptsSuffix);
+    }
+
+    public IReadOnlyList<int> DiscoverDeiYears(string rootDir) {
+        return DiscoverYearsForSuffix(rootDir, DeiConceptsSuffix);
+    }
+
+    private static IReadOnlyList<int> DiscoverYearsForSuffix(string rootDir, string conceptsSuffix) {
         var years = new List<int>();
         if (string.IsNullOrWhiteSpace(rootDir) || !Directory.Exists(rootDir))
             return years;
 
-        foreach (string filePath in Directory.EnumerateFiles(rootDir, $"*{ConceptsSuffix}", SearchOption.TopDirectoryOnly)) {
+        foreach (string filePath in Directory.EnumerateFiles(rootDir, $"*{conceptsSuffix}", SearchOption.TopDirectoryOnly)) {
             string fileName = Path.GetFileName(filePath);
             int year = TryParseLeadingYear(fileName);
             if (year == 0)
@@ -98,14 +130,14 @@ public sealed class UsGaapTaxonomyImporter {
         return years;
     }
 
-    private async Task<Result> ImportConceptsAsync(string csvPath, int taxonomyTypeId, CancellationToken ct) {
+    private async Task<Result> ImportConceptsAsync(string csvPath, string prefix, int taxonomyTypeId, CancellationToken ct) {
         var concepts = new List<ConceptDetailsDTO>();
 
         try {
             using var reader = new StreamReader(csvPath);
             using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
             await foreach (dynamic r in csv.GetRecordsAsync<dynamic>(ct)) {
-                if (!string.Equals((string)r.prefix, UsGaapPrefix, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals((string)r.prefix, prefix, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 Result<TaxonomyPeriodTypes> periodResult = ParsePeriodType((string)r.periodType);
@@ -138,7 +170,7 @@ public sealed class UsGaapTaxonomyImporter {
         return await _dbm.BulkInsertTaxonomyConcepts(concepts, ct);
     }
 
-    private async Task<Result> ImportPresentationsAsync(string csvPath, int taxonomyTypeId, CancellationToken ct) {
+    private async Task<Result> ImportPresentationsAsync(string csvPath, string prefix, int taxonomyTypeId, CancellationToken ct) {
         Result<IReadOnlyCollection<ConceptDetailsDTO>> conceptsResult =
             await _dbm.GetTaxonomyConceptsByTaxonomyType(taxonomyTypeId, ct);
         if (conceptsResult.IsFailure)
@@ -157,7 +189,7 @@ public sealed class UsGaapTaxonomyImporter {
             using var reader = new StreamReader(csvPath);
             using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
             await foreach (dynamic r in csv.GetRecordsAsync<dynamic>(ct)) {
-                if (!string.Equals((string)r.prefix, UsGaapPrefix, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals((string)r.prefix, prefix, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 string conceptName = ((string)r.name).Trim();
@@ -179,7 +211,7 @@ public sealed class UsGaapTaxonomyImporter {
                 long parentConceptId = 0;
                 long parentPresentationId = 0;
                 bool parentIsExternal = !string.IsNullOrEmpty(parentPrefix)
-                    && !string.Equals(parentPrefix, UsGaapPrefix, StringComparison.OrdinalIgnoreCase);
+                    && !string.Equals(parentPrefix, prefix, StringComparison.OrdinalIgnoreCase);
                 if (!string.IsNullOrWhiteSpace(parentName) && !parentIsExternal) {
                     if (!conceptIdsByName.TryGetValue(parentName, out parentConceptId))
                         return Result.Failure(ErrorCodes.ValidationError, $"Parent concept '{parentName}' not found for '{conceptName}'.");

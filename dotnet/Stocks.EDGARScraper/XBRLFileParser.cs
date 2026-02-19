@@ -68,6 +68,9 @@ internal class XBRLFileParser {
             foreach ((string factName, Fact fact) in _xbrlJson.Facts.UsGaap)
                 ProcessFact(factName, fact);
 
+            foreach ((string factName, Fact fact) in _xbrlJson.Facts.Dei)
+                ProcessFact(factName, fact);
+
             return XBRLParserResult.Success;
         } catch (Exception ex) {
             _logger.LogError(ex, "Parse - Exception occurred");

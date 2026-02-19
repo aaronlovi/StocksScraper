@@ -59,6 +59,31 @@ public class ScoringServiceTests {
         Assert.Null(result);
     }
 
+    [Fact]
+    public void ResolveField_SharesChain_FallsBackToEntityCommonStockSharesOutstanding() {
+        var data = new Dictionary<string, decimal> {
+            ["EntityCommonStockSharesOutstanding"] = 1_600_000_000m,
+        };
+
+        decimal? result = ScoringService.ResolveField(data,
+            ScoringService.SharesChain, null);
+
+        Assert.Equal(1_600_000_000m, result);
+    }
+
+    [Fact]
+    public void ResolveField_SharesChain_PrefersCommonStockSharesOverDei() {
+        var data = new Dictionary<string, decimal> {
+            ["CommonStockSharesOutstanding"] = 500_000_000m,
+            ["EntityCommonStockSharesOutstanding"] = 1_600_000_000m,
+        };
+
+        decimal? result = ScoringService.ResolveField(data,
+            ScoringService.SharesChain, null);
+
+        Assert.Equal(500_000_000m, result);
+    }
+
     #endregion
 
     #region ResolveEquity tests

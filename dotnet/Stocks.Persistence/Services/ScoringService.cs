@@ -44,6 +44,8 @@ public class ScoringService {
         "LiabilitiesCurrent",
         "CommonStockSharesOutstanding",
         "WeightedAverageNumberOfSharesOutstandingBasic",
+        // DEI cover page concept — aggregate shares for multi-class structures (e.g. Visa)
+        "EntityCommonStockSharesOutstanding",
         // Cash flow (duration) — cash change
         "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
         "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect",
@@ -186,7 +188,7 @@ public class ScoringService {
     internal static readonly string[] OtherNonCashExpenseChain = ["OtherNoncashExpense"];
     internal static readonly string[] OtherNonCashIncomeChain = ["OtherNoncashIncome"];
     internal static readonly string[] WorkingCapitalChangeChain = ["IncreaseDecreaseInOperatingCapital", "IncreaseDecreaseInOtherOperatingCapitalNet"];
-    internal static readonly string[] SharesChain = ["CommonStockSharesOutstanding", "WeightedAverageNumberOfSharesOutstandingBasic"];
+    internal static readonly string[] SharesChain = ["CommonStockSharesOutstanding", "WeightedAverageNumberOfSharesOutstandingBasic", "EntityCommonStockSharesOutstanding"];
 
     private static readonly Dictionary<string, TaxonomyBalanceTypes> EmptyBalanceTypes = new(StringComparer.Ordinal);
 

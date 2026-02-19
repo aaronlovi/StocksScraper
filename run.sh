@@ -9,22 +9,38 @@ DATE="2025-03-29"
 FORMAT="html"
 ROLE="104000 - Statement - Statement of Financial Position, Classified"
 
+# Kill a process listening on a given port
+kill_port() {
+    local port=$1
+    local pids
+    pids=$(lsof -t -i:"$port" 2>/dev/null)
+    if [ -n "$pids" ]; then
+        kill $pids 2>/dev/null && echo "Killed process(es) on port $port." && return 0
+    fi
+    fuser -k "$port/tcp" 2>/dev/null && echo "Killed process on port $port." && return 0
+    echo "Nothing found on port $port."
+    return 1
+}
+
 # Function to display the menu
 display_menu() {
-    echo "Select an option:"
-    echo "t) Run .NET tests"
-    echo "u) Run Angular tests"
-    echo "s) Start Web API + Angular dev server"
-    echo "w) Start .NET Web API"
-    echo "a) Start Angular dev server"
-    echo "1) Build the solution"
-    echo "2) Run the application with specific parameters"
-    echo "3) Download SEC ticker mappings"
-    echo "4) Download Stooq prices (batch CSV)"
-    echo "5) Import price CSVs into the database"
-    echo "6) Import bulk Stooq files into the database"
-    echo "7) Import SEC ticker mappings"
-    echo "q) Exit"
+    local col1_w=42
+    echo "========================================================================"
+    printf "  %-${col1_w}s  %s\n" "--- Dev Servers ---"           "--- Testing ---"
+    printf "  %-${col1_w}s  %s\n" "s) Start Web API + Angular"    "t) Run .NET tests"
+    printf "  %-${col1_w}s  %s\n" "w) Start .NET Web API"         "u) Run Angular tests"
+    printf "  %-${col1_w}s  %s\n" "a) Start Angular dev server"   ""
+    printf "  %-${col1_w}s  %s\n" "kw) Kill .NET Web API (:5000)" "--- Build ---"
+    printf "  %-${col1_w}s  %s\n" "ka) Kill Angular (:4201)"      "1) Build the solution"
+    echo ""
+    printf "  %-${col1_w}s  %s\n" "--- Data Import ---"           "--- Data Download ---"
+    printf "  %-${col1_w}s  %s\n" "5) Import price CSVs"          "3) Download SEC ticker mappings"
+    printf "  %-${col1_w}s  %s\n" "6) Import bulk Stooq files"    "4) Download Stooq prices (batch CSV)"
+    printf "  %-${col1_w}s  %s\n" "7) Import SEC ticker mappings" ""
+    echo ""
+    printf "  %-${col1_w}s  %s\n" "--- Other ---"                 ""
+    printf "  %-${col1_w}s  %s\n" "2) Print financial statement"  "q) Exit"
+    echo "========================================================================"
 }
 
 # Function to build the solution
@@ -88,6 +104,12 @@ while true; do
             pushd frontend/stocks-frontend > /dev/null
             npx ng serve
             popd > /dev/null
+            ;;
+        kw)
+            kill_port 5000
+            ;;
+        ka)
+            kill_port 4201
             ;;
         1)
             build_solution

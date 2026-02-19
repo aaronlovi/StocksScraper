@@ -48,8 +48,10 @@ public class ScoringService {
         "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
         "CashAndCashEquivalentsPeriodIncreaseDecrease",
         "ProceedsFromIssuanceOfLongTermDebt",
+        "ProceedsFromIssuanceOfDebt",
         "RepaymentsOfLongTermDebt",
         "RepaymentsOfDebt",
+        "RepaymentsOfConvertibleDebt",
         "PaymentsOfDividends",
         "PaymentsOfDividendsCommonStock",
         "Dividends",
@@ -518,9 +520,9 @@ public class ScoringService {
             if (grossCashFlow.HasValue) {
                 hasAnyCashFlow = true;
                 decimal debtProceeds = ResolveField(yearData,
-                    ["ProceedsFromIssuanceOfLongTermDebt"], 0m)!.Value;
+                    ["ProceedsFromIssuanceOfLongTermDebt", "ProceedsFromIssuanceOfDebt"], 0m)!.Value;
                 decimal debtRepayments = ResolveField(yearData,
-                    ["RepaymentsOfLongTermDebt", "RepaymentsOfDebt"], 0m)!.Value;
+                    ["RepaymentsOfLongTermDebt", "RepaymentsOfDebt", "RepaymentsOfConvertibleDebt"], 0m)!.Value;
                 decimal netDebtIssuance = debtProceeds - debtRepayments;
 
                 decimal stockProceeds = ResolveField(yearData,

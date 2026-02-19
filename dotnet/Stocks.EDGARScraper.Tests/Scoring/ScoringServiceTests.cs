@@ -706,6 +706,22 @@ public class ScoringServiceTests {
     }
 
     [Fact]
+    public void ComputeDerivedMetrics_NetCashFlow_FallsBackToRepaymentsOfConvertibleDebt() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50_000_000m,
+            ["ProceedsFromIssuanceOfDebt"] = 6_000_000m, // fallback (no LT variant)
+            ["RepaymentsOfConvertibleDebt"] = 2_500_000m, // fallback (no LT or generic)
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // NCF = 50M - ((6-2.5) + 0 + 0) = 50 - 3.5 = 46.5M
+        Assert.NotNull(metrics.AverageNetCashFlow);
+        Assert.Equal(46_500_000m, metrics.AverageNetCashFlow!.Value);
+    }
+
+    [Fact]
     public void ComputeDerivedMetrics_NetCashFlow_PrefersRepaymentsOfLongTermDebtOverGeneric() {
         var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
             ["StockholdersEquity"] = 500_000_000m,
@@ -713,11 +729,13 @@ public class ScoringServiceTests {
             ["ProceedsFromIssuanceOfLongTermDebt"] = 10_000_000m,
             ["RepaymentsOfLongTermDebt"] = 5_000_000m,
             ["RepaymentsOfDebt"] = 8_000_000m, // should be ignored since LT variant exists
+            ["RepaymentsOfConvertibleDebt"] = 3_000_000m, // should be ignored
+            ["ProceedsFromIssuanceOfDebt"] = 12_000_000m, // should be ignored since LT variant exists
         });
 
         DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
-        // NCF = 50M - ((10-5) + 0 + 0) = 50 - 5 = 45M  (uses 5M, not 8M)
+        // NCF = 50M - ((10-5) + 0 + 0) = 50 - 5 = 45M  (uses LT variants, not broader ones)
         Assert.NotNull(metrics.AverageNetCashFlow);
         Assert.Equal(45_000_000m, metrics.AverageNetCashFlow!.Value);
     }

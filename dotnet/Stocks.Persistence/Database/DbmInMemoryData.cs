@@ -422,30 +422,38 @@ public sealed class DbmInMemoryData {
                     tenKSubmissions[s.SubmissionId] = s;
             }
 
-            // Find the 5 most recent distinct report dates
-            var reportDates = new SortedSet<DateOnly>();
-            foreach (Submission s in tenKSubmissions.Values)
-                reportDates.Add(s.ReportDate);
+            // Build taxonomy concept id → (name, balanceTypeId) lookup
+            var conceptIdToInfo = new Dictionary<long, (string Name, int BalanceTypeId)>();
+            foreach (ConceptDetailsDTO c in _taxonomyConcepts) {
+                if (conceptSet.Contains(c.Name))
+                    conceptIdToInfo[c.ConceptId] = (c.Name, c.BalanceTypeId);
+            }
 
+            // Find the 5 most recent distinct report dates that have matching data points
+            var datesWithData = new HashSet<DateOnly>();
+            foreach (DataPoint dp in _dataPoints) {
+                if (dp.CompanyId != companyId)
+                    continue;
+                if (!tenKSubmissions.TryGetValue(dp.SubmissionId, out Submission? sub))
+                    continue;
+                if (!conceptIdToInfo.ContainsKey(dp.TaxonomyConceptId))
+                    continue;
+                datesWithData.Add(sub.ReportDate);
+            }
+
+            var sortedDates = new SortedSet<DateOnly>(datesWithData);
             var topDates = new HashSet<DateOnly>();
             int count = 0;
-            foreach (DateOnly date in reportDates.Reverse()) {
+            foreach (DateOnly date in sortedDates.Reverse()) {
                 topDates.Add(date);
                 count++;
                 if (count >= 5)
                     break;
             }
 
-            // Build taxonomy concept id → name lookup
-            var conceptIdToName = new Dictionary<long, string>();
-            foreach (ConceptDetailsDTO c in _taxonomyConcepts) {
-                if (conceptSet.Contains(c.Name))
-                    conceptIdToName[c.ConceptId] = c.Name;
-            }
-
             // Collect candidate data points, keyed by (submissionId, conceptName)
             // Keep only the one with the max end_date per key (DISTINCT ON equivalent)
-            var bestByKey = new Dictionary<(ulong submissionId, string conceptName), (DateOnly endDate, decimal value, DateOnly reportDate)>();
+            var bestByKey = new Dictionary<(ulong submissionId, string conceptName), (DateOnly endDate, decimal value, DateOnly reportDate, int balanceTypeId)>();
 
             foreach (DataPoint dp in _dataPoints) {
                 if (dp.CompanyId != companyId)
@@ -457,16 +465,16 @@ public sealed class DbmInMemoryData {
                 if (!topDates.Contains(submission.ReportDate))
                     continue;
 
-                if (!conceptIdToName.TryGetValue(dp.TaxonomyConceptId, out string? conceptName))
+                if (!conceptIdToInfo.TryGetValue(dp.TaxonomyConceptId, out var conceptInfo))
                     continue;
 
-                var key = (dp.SubmissionId, conceptName);
+                var key = (dp.SubmissionId, conceptInfo.Name);
                 if (!bestByKey.TryGetValue(key, out var existing) || dp.DatePair.EndDate > existing.endDate)
-                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate);
+                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate, conceptInfo.BalanceTypeId);
             }
 
             foreach (var entry in bestByKey)
-                results.Add(new ScoringConceptValue(entry.Key.conceptName, entry.Value.value, entry.Value.reportDate));
+                results.Add(new ScoringConceptValue(entry.Key.conceptName, entry.Value.value, entry.Value.reportDate, entry.Value.balanceTypeId));
         }
 
         // Sort by report_date DESC, then concept name

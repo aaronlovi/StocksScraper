@@ -8,10 +8,11 @@ namespace Stocks.Persistence.Database.Statements;
 
 internal class GetScoringDataPointsStmt : QueryDbStmtBase {
     private const string Sql = @"
-SELECT concept_name, value, report_date
+SELECT concept_name, value, report_date, balance_type_id
 FROM (
     SELECT DISTINCT ON (s.submission_id, tc.name)
-        tc.name AS concept_name, dp.value, s.report_date
+        tc.name AS concept_name, dp.value, s.report_date,
+        tc.taxonomy_balance_type_id AS balance_type_id
     FROM data_points dp
     JOIN taxonomy_concepts tc ON dp.taxonomy_concept_id = tc.taxonomy_concept_id
     JOIN submissions s ON dp.submission_id = s.submission_id AND dp.company_id = s.company_id
@@ -22,6 +23,12 @@ FROM (
         SELECT DISTINCT s2.report_date
         FROM submissions s2
         WHERE s2.company_id = @company_id AND s2.filing_type = 1
+          AND EXISTS (
+            SELECT 1 FROM data_points dp2
+            JOIN taxonomy_concepts tc2 ON dp2.taxonomy_concept_id = tc2.taxonomy_concept_id
+            WHERE dp2.submission_id = s2.submission_id AND dp2.company_id = s2.company_id
+              AND tc2.name = ANY(@concept_names)
+          )
         ORDER BY s2.report_date DESC
         LIMIT 5
       )
@@ -36,6 +43,7 @@ ORDER BY report_date DESC, concept_name";
     private static int _conceptNameIndex = -1;
     private static int _valueIndex = -1;
     private static int _reportDateIndex = -1;
+    private static int _balanceTypeIdIndex = -1;
 
     public GetScoringDataPointsStmt(ulong companyId, string[] conceptNames)
         : base(Sql, nameof(GetScoringDataPointsStmt)) {
@@ -52,6 +60,7 @@ ORDER BY report_date DESC, concept_name";
         _conceptNameIndex = reader.GetOrdinal("concept_name");
         _valueIndex = reader.GetOrdinal("value");
         _reportDateIndex = reader.GetOrdinal("report_date");
+        _balanceTypeIdIndex = reader.GetOrdinal("balance_type_id");
     }
 
     protected override void ClearResults() => _results.Clear();
@@ -66,7 +75,8 @@ ORDER BY report_date DESC, concept_name";
         var value = new ScoringConceptValue(
             reader.GetString(_conceptNameIndex),
             reader.GetDecimal(_valueIndex),
-            DateOnly.FromDateTime(reader.GetDateTime(_reportDateIndex))
+            DateOnly.FromDateTime(reader.GetDateTime(_reportDateIndex)),
+            reader.GetInt32(_balanceTypeIdIndex)
         );
         _results.Add(value);
         return true;

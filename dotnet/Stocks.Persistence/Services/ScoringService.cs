@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Stocks.DataModels;
+using Stocks.DataModels.Enums;
 using Stocks.DataModels.Scoring;
 using Stocks.Persistence.Database;
 using Stocks.Shared;
@@ -48,6 +49,7 @@ public class ScoringService {
         "CashAndCashEquivalentsPeriodIncreaseDecrease",
         "ProceedsFromIssuanceOfLongTermDebt",
         "RepaymentsOfLongTermDebt",
+        "RepaymentsOfDebt",
         "PaymentsOfDividends",
         "PaymentsOfDividendsCommonStock",
         "Dividends",
@@ -131,6 +133,8 @@ public class ScoringService {
     internal static readonly string[] WorkingCapitalChangeChain = ["IncreaseDecreaseInOperatingCapital", "IncreaseDecreaseInOtherOperatingCapitalNet"];
     internal static readonly string[] SharesChain = ["CommonStockSharesOutstanding", "WeightedAverageNumberOfSharesOutstandingBasic"];
 
+    private static readonly Dictionary<string, TaxonomyBalanceTypes> EmptyBalanceTypes = new(StringComparer.Ordinal);
+
     public async Task<Result<ScoringResult>> ComputeScore(ulong companyId, CancellationToken ct) {
         // 1. Get raw scoring data points
         Result<IReadOnlyCollection<ScoringConceptValue>> dataResult =
@@ -174,7 +178,8 @@ public class ScoringService {
         }
 
         // 5. Group raw data by report year
-        Dictionary<int, Dictionary<string, decimal>> rawByYear = GroupByYear(dataResult.Value);
+        Dictionary<int, Dictionary<string, decimal>> rawByYear = GroupByYear(
+            dataResult.Value, out Dictionary<string, TaxonomyBalanceTypes> balanceTypes);
 
         // Build the IReadOnlyDictionary version
         var rawDataByYear = new Dictionary<int, IReadOnlyDictionary<string, decimal>>();
@@ -198,7 +203,7 @@ public class ScoringService {
         }
 
         // 7. Compute derived metrics
-        DerivedMetrics metrics = ComputeDerivedMetrics(rawDataByYear, pricePerShare, sharesOutstanding);
+        DerivedMetrics metrics = ComputeDerivedMetrics(rawDataByYear, pricePerShare, sharesOutstanding, balanceTypes);
 
         // 8. Evaluate the 13 checks
         IReadOnlyList<ScoringCheck> scorecard = EvaluateChecks(metrics, yearsOfData);
@@ -323,9 +328,16 @@ public class ScoringService {
     ///    - Prepaid/deferred assets
     ///    - Revenue: prefer DeferredRevenue, else ContractWithCustomerLiability
     ///    - Other operating assets/liabilities
-    /// All values are already signed for cash flow impact (sum directly).
+    ///
+    /// XBRL sign convention: IncreaseDecrease values represent the direction of change
+    /// (positive = asset/liability increased). Credit-balance concepts (assets) must be
+    /// negated to convert to cash flow impact: an increase in assets uses cash.
+    /// Debit-balance concepts (liabilities) already have the correct sign: an increase
+    /// in liabilities provides cash.
     /// </summary>
-    internal static decimal ResolveWorkingCapitalChange(IReadOnlyDictionary<string, decimal> yearData) {
+    internal static decimal ResolveWorkingCapitalChange(
+        IReadOnlyDictionary<string, decimal> yearData,
+        IReadOnlyDictionary<string, TaxonomyBalanceTypes> balanceTypes) {
         decimal? aggregate = ResolveField(yearData, WorkingCapitalChangeChain, null);
         if (aggregate.HasValue)
             return aggregate.Value;
@@ -339,116 +351,112 @@ public class ScoringService {
 
         // Receivables group: prefer broadest combined concept, then narrower, then individual
         // AccountsReceivableAndOtherOperatingAssets subsumes AR + OtherOperatingAssets (e.g. AMZN)
-        decimal? arAndOtherAssets = ResolveField(yearData, ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"], null);
-        if (arAndOtherAssets.HasValue) {
-            sum += arAndOtherAssets.Value;
+        if (AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"], ref sum)) {
             foundAny = true;
             usedARAndOtherAssets = true;
         } else {
-            decimal? combinedAR = ResolveField(yearData, ["IncreaseDecreaseInAccountsAndOtherReceivables"], null);
-            if (combinedAR.HasValue) {
-                sum += combinedAR.Value;
-                foundAny = true;
-            } else {
-                decimal? ar = ResolveField(yearData, ["IncreaseDecreaseInAccountsReceivable"], null);
-                decimal? otherAR = ResolveField(yearData, ["IncreaseDecreaseInOtherReceivables"], null);
-                if (ar.HasValue) { sum += ar.Value; foundAny = true; }
-                if (otherAR.HasValue) { sum += otherAR.Value; foundAny = true; }
+            if (!AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsAndOtherReceivables"], ref sum, ref foundAny)) {
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsReceivable"], ref sum, ref foundAny);
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherReceivables"], ref sum, ref foundAny);
             }
         }
 
         // Inventories
-        decimal? inv = ResolveField(yearData, ["IncreaseDecreaseInInventories"], null);
-        if (inv.HasValue) { sum += inv.Value; foundAny = true; }
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInInventories"], ref sum, ref foundAny);
 
         // Payables + accrued + other liabilities: prefer broadest combined, then narrower
         // AccruedLiabilitiesAndOtherOperatingLiabilities subsumes AccruedLiabilities + OtherOperatingLiabilities (e.g. AMZN)
-        decimal? accruedAndOtherLiab = ResolveField(yearData, ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"], null);
-        if (accruedAndOtherLiab.HasValue) {
-            sum += accruedAndOtherLiab.Value;
+        if (AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"], ref sum)) {
             foundAny = true;
             usedAccruedAndOtherLiab = true;
             // Still pick up AP separately since this combined concept doesn't include AP
-            // Prefer AccountsPayable, fall back to AccountsPayableTrade (subset)
-            decimal? ap = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], null);
-            if (ap.HasValue) { sum += ap.Value; foundAny = true; }
+            AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], ref sum, ref foundAny);
         } else {
-            decimal? combinedAP = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"], null);
-            if (combinedAP.HasValue) {
-                sum += combinedAP.Value;
-                foundAny = true;
-            } else {
-                // Prefer AccountsPayable, fall back to AccountsPayableTrade (subset)
-                decimal? ap = ResolveField(yearData, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], null);
-                decimal? al = ResolveField(yearData, ["IncreaseDecreaseInAccruedLiabilities"], null);
-                if (ap.HasValue) { sum += ap.Value; foundAny = true; }
-                if (al.HasValue) { sum += al.Value; foundAny = true; }
+            if (!AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"], ref sum, ref foundAny)) {
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], ref sum, ref foundAny);
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccruedLiabilities"], ref sum, ref foundAny);
             }
         }
 
         // Prepaid/deferred expenses and other assets
-        decimal? prepaid = ResolveField(yearData, ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"], null);
-        if (prepaid.HasValue) { sum += prepaid.Value; foundAny = true; }
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"], ref sum, ref foundAny);
 
         // Deferred revenue / contract liabilities: prefer deferred revenue, else contract liability
-        decimal? deferredRev = ResolveField(yearData, ["IncreaseDecreaseInDeferredRevenue"], null);
-        if (deferredRev.HasValue) {
-            sum += deferredRev.Value;
-            foundAny = true;
-        } else {
-            decimal? contractLiab = ResolveField(yearData, ["IncreaseDecreaseInContractWithCustomerLiability"], null);
-            if (contractLiab.HasValue) { sum += contractLiab.Value; foundAny = true; }
-        }
+        if (!AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInDeferredRevenue"], ref sum, ref foundAny))
+            AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInContractWithCustomerLiability"], ref sum, ref foundAny);
 
         // Other operating assets: prefer general, else current + noncurrent
-        // If ARAndOtherOperatingAssets was used, it covers current operating assets, so skip
-        // OtherOperatingAssets and OtherCurrentAssets but still pick up OtherNoncurrentAssets
         if (!usedARAndOtherAssets) {
-            decimal? otherAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingAssets"], null);
-            if (otherAssets.HasValue) {
-                sum += otherAssets.Value;
-                foundAny = true;
-            } else {
-                decimal? otherCurAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherCurrentAssets"], null);
-                if (otherCurAssets.HasValue) { sum += otherCurAssets.Value; foundAny = true; }
-                decimal? otherNoncurAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherNoncurrentAssets"], null);
-                if (otherNoncurAssets.HasValue) { sum += otherNoncurAssets.Value; foundAny = true; }
+            if (!AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherOperatingAssets"], ref sum, ref foundAny)) {
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherCurrentAssets"], ref sum, ref foundAny);
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherNoncurrentAssets"], ref sum, ref foundAny);
             }
         } else {
             // ARAndOtherOperatingAssets covers current operating assets; noncurrent is separate
-            decimal? otherNoncurAssets = ResolveField(yearData, ["IncreaseDecreaseInOtherNoncurrentAssets"], null);
-            if (otherNoncurAssets.HasValue) { sum += otherNoncurAssets.Value; foundAny = true; }
+            AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherNoncurrentAssets"], ref sum, ref foundAny);
         }
 
         // Other operating liabilities: skip if AccruedLiabilitiesAndOtherOperatingLiabilities already included them
         if (!usedAccruedAndOtherLiab) {
-            decimal? otherLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherOperatingLiabilities"], null);
-            if (otherLiab.HasValue) {
-                sum += otherLiab.Value;
-                foundAny = true;
-            } else {
-                decimal? otherCurLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherCurrentLiabilities"], null);
-                decimal? otherNoncurLiab = ResolveField(yearData, ["IncreaseDecreaseInOtherNoncurrentLiabilities"], null);
-                if (otherCurLiab.HasValue) { sum += otherCurLiab.Value; foundAny = true; }
-                if (otherNoncurLiab.HasValue) { sum += otherNoncurLiab.Value; foundAny = true; }
+            if (!AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherOperatingLiabilities"], ref sum, ref foundAny)) {
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherCurrentLiabilities"], ref sum, ref foundAny);
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherNoncurrentLiabilities"], ref sum, ref foundAny);
             }
         }
 
         // Accrued income taxes payable (standalone, not subsumed by other groups)
-        decimal? accruedTax = ResolveField(yearData, ["IncreaseDecreaseInAccruedIncomeTaxesPayable"], null);
-        if (accruedTax.HasValue) { sum += accruedTax.Value; foundAny = true; }
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccruedIncomeTaxesPayable"], ref sum, ref foundAny);
 
         // Self-insurance reserve (standalone, niche)
-        decimal? selfInsurance = ResolveField(yearData, ["IncreaseDecreaseInSelfInsuranceReserve"], null);
-        if (selfInsurance.HasValue) { sum += selfInsurance.Value; foundAny = true; }
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInSelfInsuranceReserve"], ref sum, ref foundAny);
 
         return foundAny ? sum : 0m;
+    }
+
+    /// <summary>
+    /// Resolve a WC field from the fallback chain and accumulate into sum with sign correction.
+    /// Credit-balance concepts (asset changes) are negated; debit-balance (liability changes) are kept.
+    /// Returns true if a value was found.
+    /// </summary>
+    private static bool AccumulateWcField(
+        IReadOnlyDictionary<string, decimal> yearData,
+        IReadOnlyDictionary<string, TaxonomyBalanceTypes> balanceTypes,
+        string[] chain,
+        ref decimal sum,
+        ref bool foundAny) {
+        if (AccumulateWcField(yearData, balanceTypes, chain, ref sum)) {
+            foundAny = true;
+            return true;
+        }
+        return false;
+    }
+
+    private static bool AccumulateWcField(
+        IReadOnlyDictionary<string, decimal> yearData,
+        IReadOnlyDictionary<string, TaxonomyBalanceTypes> balanceTypes,
+        string[] chain,
+        ref decimal sum) {
+        foreach (string conceptName in chain) {
+            if (yearData.TryGetValue(conceptName, out decimal value)) {
+                // Credit-balance = asset concept: negate (positive increase = cash outflow)
+                // Debit-balance = liability concept: keep as-is (positive increase = cash inflow)
+                if (balanceTypes.TryGetValue(conceptName, out TaxonomyBalanceTypes bt)
+                    && bt == TaxonomyBalanceTypes.Credit) {
+                    sum -= value;
+                } else {
+                    sum += value;
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     internal static DerivedMetrics ComputeDerivedMetrics(
         IReadOnlyDictionary<int, IReadOnlyDictionary<string, decimal>> rawDataByYear,
         decimal? pricePerShare,
-        long? sharesOutstanding) {
+        long? sharesOutstanding,
+        IReadOnlyDictionary<string, TaxonomyBalanceTypes>? balanceTypes = null) {
 
         if (rawDataByYear.Count == 0)
             return new DerivedMetrics(null, null, null, null, null, null, null, null, null, null, null, null);
@@ -512,7 +520,7 @@ public class ScoringService {
                 decimal debtProceeds = ResolveField(yearData,
                     ["ProceedsFromIssuanceOfLongTermDebt"], 0m)!.Value;
                 decimal debtRepayments = ResolveField(yearData,
-                    ["RepaymentsOfLongTermDebt"], 0m)!.Value;
+                    ["RepaymentsOfLongTermDebt", "RepaymentsOfDebt"], 0m)!.Value;
                 decimal netDebtIssuance = debtProceeds - debtRepayments;
 
                 decimal stockProceeds = ResolveField(yearData,
@@ -541,7 +549,8 @@ public class ScoringService {
                 decimal deferredTax = ResolveDeferredTax(yearData);
                 decimal otherNonCash = ResolveField(yearData, OtherNonCashChain, 0m)!.Value;
                 decimal capEx = ResolveField(yearData, CapExChain, 0m)!.Value;
-                decimal workingCapitalChange = ResolveWorkingCapitalChange(yearData);
+                decimal workingCapitalChange = ResolveWorkingCapitalChange(yearData,
+                    balanceTypes ?? EmptyBalanceTypes);
 
                 // Simplified OE formula (Depreciation cancels out)
                 decimal ownerEarnings = netIncome.Value
@@ -709,9 +718,11 @@ public class ScoringService {
         return new ScoringCheck(number, name, value, threshold, result);
     }
 
-    private static Dictionary<int, Dictionary<string, decimal>> GroupByYear(
-        IReadOnlyCollection<ScoringConceptValue> values) {
+    internal static Dictionary<int, Dictionary<string, decimal>> GroupByYear(
+        IReadOnlyCollection<ScoringConceptValue> values,
+        out Dictionary<string, TaxonomyBalanceTypes> balanceTypes) {
         var result = new Dictionary<int, Dictionary<string, decimal>>();
+        balanceTypes = new Dictionary<string, TaxonomyBalanceTypes>(StringComparer.Ordinal);
         foreach (ScoringConceptValue v in values) {
             int year = v.ReportDate.Year;
             if (!result.ContainsKey(year))
@@ -720,6 +731,10 @@ public class ScoringService {
             // Take the first value for each concept per year (skip duplicates)
             if (!result[year].ContainsKey(v.ConceptName))
                 result[year][v.ConceptName] = v.Value;
+
+            // Record balance type per concept (consistent across years)
+            if (!balanceTypes.ContainsKey(v.ConceptName))
+                balanceTypes[v.ConceptName] = (TaxonomyBalanceTypes)v.BalanceTypeId;
         }
         return result;
     }

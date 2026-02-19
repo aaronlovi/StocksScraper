@@ -270,6 +270,33 @@ public class ScoringServiceTests {
 
     #region ResolveWorkingCapitalChange tests
 
+    // Balance type lookup matching the real US-GAAP taxonomy:
+    // Credit = asset concepts (positive XBRL value = asset increased = cash outflow → negate)
+    // Debit = liability concepts (positive XBRL value = liability increased = cash inflow → keep)
+    private static readonly Dictionary<string, TaxonomyBalanceTypes> WcBalanceTypes = new(StringComparer.Ordinal) {
+        ["IncreaseDecreaseInAccountsReceivable"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInOtherReceivables"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInAccountsAndOtherReceivables"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInInventories"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInOtherOperatingAssets"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInOtherCurrentAssets"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInOtherNoncurrentAssets"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInAccountsPayable"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInAccountsPayableTrade"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInAccruedLiabilities"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInDeferredRevenue"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInContractWithCustomerLiability"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInOtherOperatingLiabilities"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInOtherCurrentLiabilities"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInOtherNoncurrentLiabilities"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInSelfInsuranceReserve"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInAccruedIncomeTaxesPayable"] = TaxonomyBalanceTypes.Debit,
+    };
+
     [Fact]
     public void ResolveWorkingCapitalChange_UsesAggregateWhenPresent() {
         var data = new Dictionary<string, decimal> {
@@ -278,13 +305,15 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInInventories"] = -1_000_000m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
         Assert.Equal(-5_000_000m, result); // Aggregate preferred
     }
 
     [Fact]
-    public void ResolveWorkingCapitalChange_SumsComponentsWhenAggregateMissing() {
+    public void ResolveWorkingCapitalChange_NegatesCreditBalanceAssetConcepts() {
+        // Credit-balance concepts (assets) should be negated:
+        // positive XBRL value = asset increased = cash outflow
         var data = new Dictionary<string, decimal> {
             ["IncreaseDecreaseInAccountsReceivable"] = 6_682_000_000m,
             ["IncreaseDecreaseInInventories"] = -1_400_000_000m,
@@ -294,10 +323,12 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInOtherReceivables"] = 347_000_000m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        // 6682 + (-1400) + 902 + 9197 + (-11076) + 347 = 4652
-        Assert.Equal(4_652_000_000m, result);
+        // Asset items negated: -6682 + 1400 - 9197 - 347 = -14826
+        // Liability items kept: 902 - 11076 = -10174
+        // Total: -14826 + -10174 = -25000
+        Assert.Equal(-25_000_000_000m, result);
     }
 
     [Fact]
@@ -308,9 +339,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInAccruedLiabilities"] = 2_000_000m,  // should be ignored
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(5_000_000m, result); // Combined preferred, not 3+2=5 (coincidence)
+        Assert.Equal(5_000_000m, result); // Combined preferred (debit, kept as-is)
     }
 
     [Fact]
@@ -320,9 +351,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInAccruedLiabilities"] = 2_000_000m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(5_000_000m, result);
+        Assert.Equal(5_000_000m, result); // Both debit, kept as-is
     }
 
     [Fact]
@@ -332,9 +363,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInAccountsReceivable"] = 5_000_000m,  // should be ignored
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(7_000_000m, result);
+        Assert.Equal(-7_000_000m, result); // Credit → negated
     }
 
     [Fact]
@@ -344,16 +375,16 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInContractWithCustomerLiability"] = 500_000m, // should be ignored
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(1_000_000m, result);
+        Assert.Equal(1_000_000m, result); // Debit, kept as-is
     }
 
     [Fact]
     public void ResolveWorkingCapitalChange_ReturnsZeroWhenNothingAvailable() {
         var data = new Dictionary<string, decimal>();
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
         Assert.Equal(0m, result);
     }
@@ -366,9 +397,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInOtherNoncurrentAssets"] = 300m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(500m, result);
+        Assert.Equal(-500m, result); // Credit → negated
     }
 
     [Fact]
@@ -378,9 +409,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInOtherNoncurrentAssets"] = 300m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(500m, result);
+        Assert.Equal(-500m, result); // Both credit → negated: -(200) + -(300)
     }
 
     [Fact]
@@ -391,9 +422,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInOtherNoncurrentLiabilities"] = 250m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(400m, result);
+        Assert.Equal(400m, result); // Debit, kept as-is
     }
 
     [Fact]
@@ -403,9 +434,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInOtherNoncurrentLiabilities"] = 250m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(400m, result);
+        Assert.Equal(400m, result); // Both debit, kept as-is
     }
 
     [Fact]
@@ -415,30 +446,33 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInAccruedIncomeTaxesPayable"] = -38m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(62m, result);
+        // AR: credit → negated: -100. AccruedTax: debit → kept: -38. Total: -138
+        Assert.Equal(-138m, result);
     }
 
     [Fact]
     public void ResolveWorkingCapitalChange_MsftStyleFullComponentSum() {
         // Simulates MSFT's reporting pattern: no aggregate, uses current/noncurrent split
         var data = new Dictionary<string, decimal> {
-            ["IncreaseDecreaseInAccountsReceivable"] = 10581m,
-            ["IncreaseDecreaseInInventories"] = -309m,
-            ["IncreaseDecreaseInAccountsPayable"] = 569m,
-            ["IncreaseDecreaseInContractWithCustomerLiability"] = 5438m,
-            ["IncreaseDecreaseInOtherCurrentAssets"] = 3044m,
-            ["IncreaseDecreaseInOtherCurrentLiabilities"] = 5922m,
-            ["IncreaseDecreaseInOtherNoncurrentAssets"] = 2950m,
-            ["IncreaseDecreaseInOtherNoncurrentLiabilities"] = -975m,
-            ["IncreaseDecreaseInAccruedIncomeTaxesPayable"] = -38m,
+            ["IncreaseDecreaseInAccountsReceivable"] = 10581m,   // credit → negate
+            ["IncreaseDecreaseInInventories"] = -309m,           // credit → negate
+            ["IncreaseDecreaseInAccountsPayable"] = 569m,        // debit → keep
+            ["IncreaseDecreaseInContractWithCustomerLiability"] = 5438m, // debit → keep
+            ["IncreaseDecreaseInOtherCurrentAssets"] = 3044m,    // credit → negate
+            ["IncreaseDecreaseInOtherCurrentLiabilities"] = 5922m, // debit → keep
+            ["IncreaseDecreaseInOtherNoncurrentAssets"] = 2950m, // credit → negate
+            ["IncreaseDecreaseInOtherNoncurrentLiabilities"] = -975m, // debit → keep
+            ["IncreaseDecreaseInAccruedIncomeTaxesPayable"] = -38m,   // debit → keep
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        // 10581 - 309 + 569 + 5438 + 3044 + 5922 + 2950 - 975 - 38 = 27182
-        Assert.Equal(27182m, result);
+        // Assets negated: -10581 + 309 - 3044 - 2950 = -16266
+        // Liabilities kept: 569 + 5438 + 5922 - 975 - 38 = 10916
+        // Total: -16266 + 10916 = -5350
+        Assert.Equal(-5350m, result);
     }
 
     [Fact]
@@ -450,9 +484,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInOtherOperatingAssets"] = 500m,  // should be ignored
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(3249m, result);
+        Assert.Equal(-3249m, result); // Credit → negated
     }
 
     [Fact]
@@ -464,10 +498,10 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInOtherNoncurrentAssets"] = 300m,  // should NOT be ignored (separate line item)
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        // 3249 + 300 = 3549
-        Assert.Equal(3549m, result);
+        // Both credit → negated: -3249 + -300 = -3549
+        Assert.Equal(-3549m, result);
     }
 
     [Fact]
@@ -481,9 +515,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInOtherCurrentLiabilities"] = 200m,    // should be ignored
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        // -2904 + 2972 = 68
+        // Both debit → kept: -2904 + 2972 = 68
         Assert.Equal(68m, result);
     }
 
@@ -494,9 +528,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInSelfInsuranceReserve"] = 1300m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(1400m, result);
+        Assert.Equal(1400m, result); // Both debit, kept as-is
     }
 
     [Fact]
@@ -504,19 +538,21 @@ public class ScoringServiceTests {
         // Simulates AMZN's reporting pattern: ARAndOtherOperatingAssets covers current,
         // OtherNoncurrentAssets is a separate line item
         var data = new Dictionary<string, decimal> {
-            ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"] = 3249m,
-            ["IncreaseDecreaseInInventories"] = 1884m,
-            ["IncreaseDecreaseInAccountsPayable"] = 2972m,
-            ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"] = -2904m,
-            ["IncreaseDecreaseInContractWithCustomerLiability"] = 4007m,
-            ["IncreaseDecreaseInOtherNoncurrentAssets"] = 14483m,
-            ["IncreaseDecreaseInSelfInsuranceReserve"] = 1300m,
+            ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"] = 3249m, // credit → negate
+            ["IncreaseDecreaseInInventories"] = 1884m,            // credit → negate
+            ["IncreaseDecreaseInAccountsPayable"] = 2972m,        // debit → keep
+            ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"] = -2904m, // debit → keep
+            ["IncreaseDecreaseInContractWithCustomerLiability"] = 4007m, // debit → keep
+            ["IncreaseDecreaseInOtherNoncurrentAssets"] = 14483m, // credit → negate
+            ["IncreaseDecreaseInSelfInsuranceReserve"] = 1300m,   // debit → keep
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        // 3249 + 1884 + 2972 - 2904 + 4007 + 14483 + 1300 = 24991
-        Assert.Equal(24991m, result);
+        // Assets negated: -3249 - 1884 - 14483 = -19616
+        // Liabilities kept: 2972 - 2904 + 4007 + 1300 = 5375
+        // Total: -19616 + 5375 = -14241
+        Assert.Equal(-14241m, result);
     }
 
     [Fact]
@@ -527,9 +563,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInAccruedLiabilities"] = 323m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(696m, result);
+        Assert.Equal(696m, result); // Both debit, kept as-is
     }
 
     [Fact]
@@ -540,9 +576,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInAccountsPayableTrade"] = 373m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(1000m, result);
+        Assert.Equal(1000m, result); // Debit, kept as-is
     }
 
     [Fact]
@@ -553,9 +589,9 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInAccountsPayableTrade"] = 373m,
         };
 
-        decimal result = ScoringService.ResolveWorkingCapitalChange(data);
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        // -2904 + 373 = -2531
+        // Both debit → kept: -2904 + 373 = -2531
         Assert.Equal(-2531m, result);
     }
 
@@ -649,6 +685,41 @@ public class ScoringServiceTests {
         // NCF = 50M - ((10-5) + (3-1) + 0) = 50 - (5 + 2 + 0) = 50 - 7 = 43M
         Assert.NotNull(metrics.AverageNetCashFlow);
         Assert.Equal(43_000_000m, metrics.AverageNetCashFlow!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_NetCashFlow_FallsBackToRepaymentsOfDebt() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50_000_000m,
+            ["ProceedsFromIssuanceOfLongTermDebt"] = 40_000_000m,
+            ["RepaymentsOfDebt"] = 20_000_000m, // fallback (no RepaymentsOfLongTermDebt)
+            ["ProceedsFromIssuanceOfCommonStock"] = 3_000_000m,
+            ["PaymentsForRepurchaseOfCommonStock"] = 1_000_000m,
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // NCF = 50M - ((40-20) + (3-1) + 0) = 50 - (20 + 2) = 50 - 22 = 28M
+        Assert.NotNull(metrics.AverageNetCashFlow);
+        Assert.Equal(28_000_000m, metrics.AverageNetCashFlow!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_NetCashFlow_PrefersRepaymentsOfLongTermDebtOverGeneric() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50_000_000m,
+            ["ProceedsFromIssuanceOfLongTermDebt"] = 10_000_000m,
+            ["RepaymentsOfLongTermDebt"] = 5_000_000m,
+            ["RepaymentsOfDebt"] = 8_000_000m, // should be ignored since LT variant exists
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // NCF = 50M - ((10-5) + 0 + 0) = 50 - 5 = 45M  (uses 5M, not 8M)
+        Assert.NotNull(metrics.AverageNetCashFlow);
+        Assert.Equal(45_000_000m, metrics.AverageNetCashFlow!.Value);
     }
 
     [Fact]

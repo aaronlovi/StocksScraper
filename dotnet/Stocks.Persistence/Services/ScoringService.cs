@@ -44,60 +44,92 @@ public class ScoringService {
         "LiabilitiesCurrent",
         "CommonStockSharesOutstanding",
         "WeightedAverageNumberOfSharesOutstandingBasic",
-        // Cash flow (duration)
+        // Cash flow (duration) — cash change
         "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+        "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect",
         "CashAndCashEquivalentsPeriodIncreaseDecrease",
+        // Cash flow — debt proceeds (540 exclusive for Senior, 96 for Convertible)
         "ProceedsFromIssuanceOfLongTermDebt",
+        "ProceedsFromIssuanceOfSeniorLongTermDebt",
         "ProceedsFromIssuanceOfDebt",
+        "ProceedsFromConvertibleDebt",
+        // Cash flow — debt repayments (90 exclusive for Notes, 53 for Senior)
         "RepaymentsOfLongTermDebt",
         "RepaymentsOfDebt",
         "RepaymentsOfConvertibleDebt",
+        "RepaymentsOfNotesPayable",
+        "RepaymentsOfSeniorDebt",
+        // Cash flow — dividends (24 exclusive for CommonStockCash)
         "PaymentsOfDividends",
         "PaymentsOfDividendsCommonStock",
         "Dividends",
+        "DividendsCommonStockCash",
+        // Cash flow — stock issuance/repurchase (540 exclusive for Options, 41 for Equity)
         "ProceedsFromIssuanceOfCommonStock",
+        "ProceedsFromStockOptionsExercised",
         "PaymentsForRepurchaseOfCommonStock",
+        "PaymentsForRepurchaseOfEquity",
+        // Cash flow — preferred stock
         "ProceedsFromIssuanceOfPreferredStockAndPreferenceStock",
         "PaymentsForRepurchaseOfPreferredStockAndPreferenceStock",
+        // Working capital — aggregate concepts
         "IncreaseDecreaseInOperatingCapital",
         "IncreaseDecreaseInOtherOperatingCapitalNet",
-        // Working capital components (fallback when aggregates above are missing)
+        // Working capital — receivables group (broadest to narrowest)
+        "IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets",
+        "IncreaseDecreaseInReceivables",
+        "IncreaseDecreaseInAccountsAndOtherReceivables",
+        "IncreaseDecreaseInAccountsAndNotesReceivable",
         "IncreaseDecreaseInAccountsReceivable",
         "IncreaseDecreaseInOtherReceivables",
-        "IncreaseDecreaseInAccountsAndOtherReceivables",
+        // Working capital — inventories
         "IncreaseDecreaseInInventories",
+        // Working capital — payables and accrued liabilities group
+        "IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities",
         "IncreaseDecreaseInAccountsPayableAndAccruedLiabilities",
+        "IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities",
         "IncreaseDecreaseInAccountsPayable",
+        "IncreaseDecreaseInAccountsPayableTrade",
         "IncreaseDecreaseInAccruedLiabilities",
+        "IncreaseDecreaseInOtherAccruedLiabilities",
+        // Working capital — prepaid/deferred expenses
         "IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets",
+        "IncreaseDecreaseInPrepaidExpense",
+        // Working capital — deferred revenue / contract liabilities and assets
         "IncreaseDecreaseInDeferredRevenue",
         "IncreaseDecreaseInContractWithCustomerLiability",
+        "IncreaseDecreaseInContractWithCustomerAsset",
+        // Working capital — other operating assets/liabilities
         "IncreaseDecreaseInOtherOperatingAssets",
         "IncreaseDecreaseInOtherOperatingLiabilities",
-        // More granular current/noncurrent variants (fallback when general Other concepts are missing)
         "IncreaseDecreaseInOtherCurrentAssets",
         "IncreaseDecreaseInOtherNoncurrentAssets",
         "IncreaseDecreaseInOtherCurrentLiabilities",
         "IncreaseDecreaseInOtherNoncurrentLiabilities",
+        // Working capital — standalone categories (not subsumed by existing groups)
         "IncreaseDecreaseInAccruedIncomeTaxesPayable",
-        // Combined receivables + other assets (e.g. AMZN uses this instead of separate AR)
-        "IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets",
-        // Combined accrued liabilities + other operating liabilities (1,765 companies)
-        "IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities",
-        // Self-insurance reserve (niche, 75 companies)
         "IncreaseDecreaseInSelfInsuranceReserve",
-        // Trade payables (more specific than AccountsPayable; 1,410 companies, 599 exclusive)
-        "IncreaseDecreaseInAccountsPayableTrade",
+        "IncreaseDecreaseInOperatingLeaseLiability",
+        "IncreaseDecreaseInEmployeeRelatedLiabilities",
+        "IncreaseDecreaseInInterestPayableNet",
+        "IncreaseDecreaseInIncomeTaxesReceivable",
+        // Cash flow — deferred tax
         "DeferredIncomeTaxExpenseBenefit",
         "DeferredIncomeTaxesAndTaxCredits",
-        "Depletion",
-        "AmortizationOfIntangibleAssets",
-        "DepreciationDepletionAndAmortization",
-        "Depreciation",
-        "OtherNoncashIncomeExpense",
         "DeferredFederalIncomeTaxExpenseBenefit",
         "DeferredForeignIncomeTaxExpenseBenefit",
         "DeferredStateAndLocalIncomeTaxExpenseBenefit",
+        // Cash flow — depreciation/amortization
+        "Depletion",
+        "AmortizationOfIntangibleAssets",
+        "DepreciationDepletionAndAmortization",
+        "DepreciationAndAmortization",
+        "Depreciation",
+        // Cash flow — other non-cash
+        "OtherNoncashIncomeExpense",
+        "OtherNoncashExpense",
+        "OtherNoncashIncome",
+        // Cash flow — capex
         "PaymentsToAcquirePropertyPlantAndEquipment",
         // Income statement (duration)
         "NetIncomeLoss",
@@ -119,19 +151,40 @@ public class ScoringService {
     internal static readonly string[] NetIncomeChain = ["NetIncomeLoss", "IncomeLossFromContinuingOperations", "ProfitLoss"];
     internal static readonly string[] CashChangeChain = [
         "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+        "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect",
         "CashAndCashEquivalentsPeriodIncreaseDecrease"
     ];
+    internal static readonly string[] DebtProceedsChain = [
+        "ProceedsFromIssuanceOfLongTermDebt", "ProceedsFromIssuanceOfSeniorLongTermDebt",
+        "ProceedsFromIssuanceOfDebt", "ProceedsFromConvertibleDebt"
+    ];
+    internal static readonly string[] DebtRepaymentsChain = [
+        "RepaymentsOfLongTermDebt", "RepaymentsOfDebt", "RepaymentsOfConvertibleDebt",
+        "RepaymentsOfNotesPayable", "RepaymentsOfSeniorDebt"
+    ];
+    internal static readonly string[] DividendsChain = [
+        "PaymentsOfDividends", "PaymentsOfDividendsCommonStock", "Dividends", "DividendsCommonStockCash"
+    ];
+    internal static readonly string[] StockProceedsChain = [
+        "ProceedsFromIssuanceOfCommonStock", "ProceedsFromStockOptionsExercised"
+    ];
+    internal static readonly string[] StockRepurchaseChain = [
+        "PaymentsForRepurchaseOfCommonStock", "PaymentsForRepurchaseOfEquity"
+    ];
+    internal static readonly string[] PreferredProceedsChain = ["ProceedsFromIssuanceOfPreferredStockAndPreferenceStock"];
+    internal static readonly string[] PreferredRepurchaseChain = ["PaymentsForRepurchaseOfPreferredStockAndPreferenceStock"];
     internal static readonly string[] CapExChain = ["PaymentsToAcquirePropertyPlantAndEquipment"];
-    internal static readonly string[] DividendsChain = ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock", "Dividends"];
     internal static readonly string[] DeferredTaxChain = ["DeferredIncomeTaxExpenseBenefit", "DeferredIncomeTaxesAndTaxCredits"];
     internal static readonly string[] DepletionChain = ["Depletion"];
     internal static readonly string[] AmortizationChain = ["AmortizationOfIntangibleAssets"];
-    internal static readonly string[] DDAChain = ["DepreciationDepletionAndAmortization"];
+    internal static readonly string[] DDAChain = ["DepreciationDepletionAndAmortization", "DepreciationAndAmortization"];
     internal static readonly string[] DepreciationChain = ["Depreciation"];
     internal static readonly string[] DeferredTaxFederalChain = ["DeferredFederalIncomeTaxExpenseBenefit"];
     internal static readonly string[] DeferredTaxForeignChain = ["DeferredForeignIncomeTaxExpenseBenefit"];
     internal static readonly string[] DeferredTaxStateChain = ["DeferredStateAndLocalIncomeTaxExpenseBenefit"];
     internal static readonly string[] OtherNonCashChain = ["OtherNoncashIncomeExpense"];
+    internal static readonly string[] OtherNonCashExpenseChain = ["OtherNoncashExpense"];
+    internal static readonly string[] OtherNonCashIncomeChain = ["OtherNoncashIncome"];
     internal static readonly string[] WorkingCapitalChangeChain = ["IncreaseDecreaseInOperatingCapital", "IncreaseDecreaseInOtherOperatingCapitalNet"];
     internal static readonly string[] SharesChain = ["CommonStockSharesOutstanding", "WeightedAverageNumberOfSharesOutstandingBasic"];
 
@@ -321,6 +374,26 @@ public class ScoringService {
     }
 
     /// <summary>
+    /// Resolve other non-cash items with component sum fallback.
+    /// 1. If OtherNoncashIncomeExpense is found, use it.
+    /// 2. Otherwise, sum OtherNoncashExpense - OtherNoncashIncome (0 for missing, but at least one must exist).
+    /// 3. If nothing is found, return 0.
+    /// </summary>
+    internal static decimal ResolveOtherNonCash(IReadOnlyDictionary<string, decimal> yearData) {
+        decimal? aggregate = ResolveField(yearData, OtherNonCashChain, null);
+        if (aggregate.HasValue)
+            return aggregate.Value;
+
+        decimal? expense = ResolveField(yearData, OtherNonCashExpenseChain, null);
+        decimal? income = ResolveField(yearData, OtherNonCashIncomeChain, null);
+
+        if (expense.HasValue || income.HasValue)
+            return (expense ?? 0m) - (income ?? 0m);
+
+        return 0m;
+    }
+
+    /// <summary>
     /// Resolve working capital change with component sum fallback.
     /// 1. If IncreaseDecreaseInOperatingCapital or IncreaseDecreaseInOtherOperatingCapitalNet exists, use it.
     /// 2. Otherwise, sum individual components with overlap-aware grouping:
@@ -357,7 +430,11 @@ public class ScoringService {
             foundAny = true;
             usedARAndOtherAssets = true;
         } else {
-            if (!AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsAndOtherReceivables"], ref sum, ref foundAny)) {
+            // Receivables (broadest pure-receivables, 273 exclusive) > AccountsAndOtherReceivables > AccountsAndNotesReceivable > AR + OtherReceivables
+            if (!AccumulateWcField(yearData, balanceTypes, [
+                    "IncreaseDecreaseInReceivables",
+                    "IncreaseDecreaseInAccountsAndOtherReceivables",
+                    "IncreaseDecreaseInAccountsAndNotesReceivable"], ref sum, ref foundAny)) {
                 AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsReceivable"], ref sum, ref foundAny);
                 AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherReceivables"], ref sum, ref foundAny);
             }
@@ -374,18 +451,24 @@ public class ScoringService {
             // Still pick up AP separately since this combined concept doesn't include AP
             AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], ref sum, ref foundAny);
         } else {
-            if (!AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"], ref sum, ref foundAny)) {
+            if (!AccumulateWcField(yearData, balanceTypes, [
+                    "IncreaseDecreaseInAccountsPayableAndAccruedLiabilities",
+                    "IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities"], ref sum, ref foundAny)) {
                 AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], ref sum, ref foundAny);
-                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccruedLiabilities"], ref sum, ref foundAny);
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccruedLiabilities", "IncreaseDecreaseInOtherAccruedLiabilities"], ref sum, ref foundAny);
             }
         }
 
-        // Prepaid/deferred expenses and other assets
-        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"], ref sum, ref foundAny);
+        // Prepaid/deferred expenses and other assets: prefer broader, fall back to narrower
+        if (!AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"], ref sum, ref foundAny))
+            AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInPrepaidExpense"], ref sum, ref foundAny);
 
         // Deferred revenue / contract liabilities: prefer deferred revenue, else contract liability
         if (!AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInDeferredRevenue"], ref sum, ref foundAny))
             AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInContractWithCustomerLiability"], ref sum, ref foundAny);
+
+        // Contract with customer asset (52 companies, credit/asset — separate from contract liability)
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInContractWithCustomerAsset"], ref sum, ref foundAny);
 
         // Other operating assets: prefer general, else current + noncurrent
         if (!usedARAndOtherAssets) {
@@ -411,6 +494,18 @@ public class ScoringService {
 
         // Self-insurance reserve (standalone, niche)
         AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInSelfInsuranceReserve"], ref sum, ref foundAny);
+
+        // Operating lease liability (175 exclusive, debit/liability)
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOperatingLeaseLiability"], ref sum, ref foundAny);
+
+        // Employee-related liabilities (146 exclusive, debit/liability)
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInEmployeeRelatedLiabilities"], ref sum, ref foundAny);
+
+        // Interest payable (118 exclusive, debit/liability)
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInInterestPayableNet"], ref sum, ref foundAny);
+
+        // Income taxes receivable (105 exclusive, credit/asset)
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInIncomeTaxesReceivable"], ref sum, ref foundAny);
 
         return foundAny ? sum : 0m;
     }
@@ -519,22 +614,16 @@ public class ScoringService {
             decimal? grossCashFlow = ResolveField(yearData, CashChangeChain, null);
             if (grossCashFlow.HasValue) {
                 hasAnyCashFlow = true;
-                decimal debtProceeds = ResolveField(yearData,
-                    ["ProceedsFromIssuanceOfLongTermDebt", "ProceedsFromIssuanceOfDebt"], 0m)!.Value;
-                decimal debtRepayments = ResolveField(yearData,
-                    ["RepaymentsOfLongTermDebt", "RepaymentsOfDebt", "RepaymentsOfConvertibleDebt"], 0m)!.Value;
+                decimal debtProceeds = ResolveField(yearData, DebtProceedsChain, 0m)!.Value;
+                decimal debtRepayments = ResolveField(yearData, DebtRepaymentsChain, 0m)!.Value;
                 decimal netDebtIssuance = debtProceeds - debtRepayments;
 
-                decimal stockProceeds = ResolveField(yearData,
-                    ["ProceedsFromIssuanceOfCommonStock"], 0m)!.Value;
-                decimal stockRepurchase = ResolveField(yearData,
-                    ["PaymentsForRepurchaseOfCommonStock"], 0m)!.Value;
+                decimal stockProceeds = ResolveField(yearData, StockProceedsChain, 0m)!.Value;
+                decimal stockRepurchase = ResolveField(yearData, StockRepurchaseChain, 0m)!.Value;
                 decimal netStockIssuance = stockProceeds - stockRepurchase;
 
-                decimal preferredProceeds = ResolveField(yearData,
-                    ["ProceedsFromIssuanceOfPreferredStockAndPreferenceStock"], 0m)!.Value;
-                decimal preferredRepurchase = ResolveField(yearData,
-                    ["PaymentsForRepurchaseOfPreferredStockAndPreferenceStock"], 0m)!.Value;
+                decimal preferredProceeds = ResolveField(yearData, PreferredProceedsChain, 0m)!.Value;
+                decimal preferredRepurchase = ResolveField(yearData, PreferredRepurchaseChain, 0m)!.Value;
                 decimal netPreferredIssuance = preferredProceeds - preferredRepurchase;
 
                 decimal netCashFlow = grossCashFlow.Value
@@ -549,7 +638,7 @@ public class ScoringService {
                 hasAnyOwnerEarnings = true;
                 decimal depletionAndAmortization = ResolveDepletionAndAmortization(yearData);
                 decimal deferredTax = ResolveDeferredTax(yearData);
-                decimal otherNonCash = ResolveField(yearData, OtherNonCashChain, 0m)!.Value;
+                decimal otherNonCash = ResolveOtherNonCash(yearData);
                 decimal capEx = ResolveField(yearData, CapExChain, 0m)!.Value;
                 decimal workingCapitalChange = ResolveWorkingCapitalChange(yearData,
                     balanceTypes ?? EmptyBalanceTypes);
@@ -566,16 +655,12 @@ public class ScoringService {
             decimal dividends = ResolveField(yearData, DividendsChain, 0m)!.Value;
             totalDividends += dividends;
 
-            decimal stockProc = ResolveField(yearData,
-                ["ProceedsFromIssuanceOfCommonStock"], 0m)!.Value;
-            decimal stockRepurch = ResolveField(yearData,
-                ["PaymentsForRepurchaseOfCommonStock"], 0m)!.Value;
+            decimal stockProc = ResolveField(yearData, StockProceedsChain, 0m)!.Value;
+            decimal stockRepurch = ResolveField(yearData, StockRepurchaseChain, 0m)!.Value;
             totalStockIssuance += (stockProc - stockRepurch);
 
-            decimal prefProc = ResolveField(yearData,
-                ["ProceedsFromIssuanceOfPreferredStockAndPreferenceStock"], 0m)!.Value;
-            decimal prefRepurch = ResolveField(yearData,
-                ["PaymentsForRepurchaseOfPreferredStockAndPreferenceStock"], 0m)!.Value;
+            decimal prefProc = ResolveField(yearData, PreferredProceedsChain, 0m)!.Value;
+            decimal prefRepurch = ResolveField(yearData, PreferredRepurchaseChain, 0m)!.Value;
             totalPreferredIssuance += (prefProc - prefRepurch);
         }
 

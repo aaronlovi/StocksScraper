@@ -278,15 +278,22 @@ public class ScoringServiceTests {
         ["IncreaseDecreaseInOtherReceivables"] = TaxonomyBalanceTypes.Credit,
         ["IncreaseDecreaseInAccountsAndOtherReceivables"] = TaxonomyBalanceTypes.Credit,
         ["IncreaseDecreaseInAccountsReceivableAndOtherOperatingAssets"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInReceivables"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInAccountsAndNotesReceivable"] = TaxonomyBalanceTypes.Credit,
         ["IncreaseDecreaseInInventories"] = TaxonomyBalanceTypes.Credit,
         ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInPrepaidExpense"] = TaxonomyBalanceTypes.Credit,
         ["IncreaseDecreaseInOtherOperatingAssets"] = TaxonomyBalanceTypes.Credit,
         ["IncreaseDecreaseInOtherCurrentAssets"] = TaxonomyBalanceTypes.Credit,
         ["IncreaseDecreaseInOtherNoncurrentAssets"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInIncomeTaxesReceivable"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInContractWithCustomerAsset"] = TaxonomyBalanceTypes.Credit,
         ["IncreaseDecreaseInAccountsPayable"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInAccountsPayableTrade"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInAccruedLiabilities"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInOtherAccruedLiabilities"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInAccruedLiabilitiesAndOtherOperatingLiabilities"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInDeferredRevenue"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInContractWithCustomerLiability"] = TaxonomyBalanceTypes.Debit,
@@ -295,6 +302,9 @@ public class ScoringServiceTests {
         ["IncreaseDecreaseInOtherNoncurrentLiabilities"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInSelfInsuranceReserve"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInAccruedIncomeTaxesPayable"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInOperatingLeaseLiability"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInEmployeeRelatedLiabilities"] = TaxonomyBalanceTypes.Debit,
+        ["IncreaseDecreaseInInterestPayableNet"] = TaxonomyBalanceTypes.Debit,
     };
 
     [Fact]
@@ -595,6 +605,215 @@ public class ScoringServiceTests {
         Assert.Equal(-2531m, result);
     }
 
+    [Fact]
+    public void ResolveWorkingCapitalChange_FallsBackToReceivables() {
+        // IncreaseDecreaseInReceivables is broader than AccountsReceivable (273 exclusive companies)
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInReceivables"] = 5000m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        Assert.Equal(-5000m, result); // Credit → negated
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_PrefersReceivablesOverIndividualAR() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInReceivables"] = 5000m,
+            ["IncreaseDecreaseInAccountsReceivable"] = 3000m,  // should be ignored
+            ["IncreaseDecreaseInOtherReceivables"] = 2000m,     // should be ignored
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        Assert.Equal(-5000m, result); // Credit → negated (only Receivables used)
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_FallsBackToAccountsAndNotesReceivable() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsAndNotesReceivable"] = 4000m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        Assert.Equal(-4000m, result); // Credit → negated
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_FallsBackToPrepaidExpense() {
+        // PrepaidExpense is a fallback when PrepaidDeferredExpenseAndOtherAssets is missing (205 exclusive)
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInPrepaidExpense"] = 800m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        Assert.Equal(-800m, result); // Credit → negated
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_PrefersPrepaidDeferredOverPrepaidExpense() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"] = 1200m,
+            ["IncreaseDecreaseInPrepaidExpense"] = 800m, // should be ignored
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        Assert.Equal(-1200m, result); // Credit → negated (broader concept preferred)
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_FallsBackToOtherAccountsPayableAndAccruedLiabilities() {
+        // OtherAccountsPayableAndAccruedLiabilities as fallback for AP+AL (62 exclusive)
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities"] = 3000m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        Assert.Equal(3000m, result); // Debit, kept as-is
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_FallsBackToOtherAccruedLiabilities() {
+        // OtherAccruedLiabilities as fallback for AccruedLiabilities (81 exclusive)
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayable"] = 1000m,
+            ["IncreaseDecreaseInOtherAccruedLiabilities"] = 500m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        Assert.Equal(1500m, result); // Both debit, kept as-is
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_IncludesContractWithCustomerAsset() {
+        // ContractWithCustomerAsset is a separate asset concept (52 exclusive)
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInContractWithCustomerLiability"] = 2000m,
+            ["IncreaseDecreaseInContractWithCustomerAsset"] = 500m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        // Liability kept: 2000. Asset negated: -500. Total: 1500
+        Assert.Equal(1500m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_IncludesOperatingLeaseLiability() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayable"] = 1000m,
+            ["IncreaseDecreaseInOperatingLeaseLiability"] = -500m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        Assert.Equal(500m, result); // Both debit, kept as-is
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_IncludesEmployeeRelatedLiabilities() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayable"] = 1000m,
+            ["IncreaseDecreaseInEmployeeRelatedLiabilities"] = 300m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        Assert.Equal(1300m, result); // Both debit, kept as-is
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_IncludesInterestPayableNet() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsReceivable"] = 200m,
+            ["IncreaseDecreaseInInterestPayableNet"] = 150m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        // AR: credit → negated: -200. InterestPayable: debit → kept: 150. Total: -50
+        Assert.Equal(-50m, result);
+    }
+
+    [Fact]
+    public void ResolveWorkingCapitalChange_IncludesIncomeTaxesReceivable() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayable"] = 500m,
+            ["IncreaseDecreaseInIncomeTaxesReceivable"] = 200m,
+        };
+
+        decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
+
+        // AP: debit → kept: 500. TaxReceivable: credit → negated: -200. Total: 300
+        Assert.Equal(300m, result);
+    }
+
+    #endregion
+
+    #region ResolveOtherNonCash tests
+
+    [Fact]
+    public void ResolveOtherNonCash_UsesAggregateWhenPresent() {
+        var data = new Dictionary<string, decimal> {
+            ["OtherNoncashIncomeExpense"] = 500_000m,
+            ["OtherNoncashExpense"] = 300_000m,
+            ["OtherNoncashIncome"] = 100_000m,
+        };
+
+        decimal result = ScoringService.ResolveOtherNonCash(data);
+
+        Assert.Equal(500_000m, result); // Aggregate preferred
+    }
+
+    [Fact]
+    public void ResolveOtherNonCash_SumsComponentsWhenAggregateIsMissing() {
+        var data = new Dictionary<string, decimal> {
+            ["OtherNoncashExpense"] = 300_000m,
+            ["OtherNoncashIncome"] = 100_000m,
+        };
+
+        decimal result = ScoringService.ResolveOtherNonCash(data);
+
+        Assert.Equal(200_000m, result); // 300K - 100K
+    }
+
+    [Fact]
+    public void ResolveOtherNonCash_UsesExpenseOnlyWhenIncomeIsMissing() {
+        var data = new Dictionary<string, decimal> {
+            ["OtherNoncashExpense"] = 300_000m,
+        };
+
+        decimal result = ScoringService.ResolveOtherNonCash(data);
+
+        Assert.Equal(300_000m, result);
+    }
+
+    [Fact]
+    public void ResolveOtherNonCash_NegatesIncomeOnlyWhenExpenseIsMissing() {
+        var data = new Dictionary<string, decimal> {
+            ["OtherNoncashIncome"] = 200_000m,
+        };
+
+        decimal result = ScoringService.ResolveOtherNonCash(data);
+
+        Assert.Equal(-200_000m, result); // 0 - 200K
+    }
+
+    [Fact]
+    public void ResolveOtherNonCash_ReturnsZeroWhenNothingAvailable() {
+        var data = new Dictionary<string, decimal>();
+
+        decimal result = ScoringService.ResolveOtherNonCash(data);
+
+        Assert.Equal(0m, result);
+    }
+
     #endregion
 
     #region ComputeDerivedMetrics tests
@@ -738,6 +957,133 @@ public class ScoringServiceTests {
         // NCF = 50M - ((10-5) + 0 + 0) = 50 - 5 = 45M  (uses LT variants, not broader ones)
         Assert.NotNull(metrics.AverageNetCashFlow);
         Assert.Equal(45_000_000m, metrics.AverageNetCashFlow!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_NetCashFlow_FallsBackToStockOptionsExercised() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50_000_000m,
+            ["ProceedsFromStockOptionsExercised"] = 4_000_000m, // fallback (no IssuanceOfCommonStock)
+            ["PaymentsForRepurchaseOfCommonStock"] = 1_000_000m,
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // NCF = 50M - (0 + (4-1) + 0) = 50 - 3 = 47M
+        Assert.NotNull(metrics.AverageNetCashFlow);
+        Assert.Equal(47_000_000m, metrics.AverageNetCashFlow!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_NetCashFlow_FallsBackToRepurchaseOfEquity() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50_000_000m,
+            ["ProceedsFromIssuanceOfCommonStock"] = 3_000_000m,
+            ["PaymentsForRepurchaseOfEquity"] = 2_000_000m, // fallback (no RepurchaseOfCommonStock)
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // NCF = 50M - (0 + (3-2) + 0) = 50 - 1 = 49M
+        Assert.NotNull(metrics.AverageNetCashFlow);
+        Assert.Equal(49_000_000m, metrics.AverageNetCashFlow!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_NetCashFlow_FallsBackToSeniorDebtConcepts() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50_000_000m,
+            ["ProceedsFromIssuanceOfSeniorLongTermDebt"] = 15_000_000m,
+            ["RepaymentsOfSeniorDebt"] = 5_000_000m,
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // NCF = 50M - ((15-5) + 0 + 0) = 50 - 10 = 40M
+        Assert.NotNull(metrics.AverageNetCashFlow);
+        Assert.Equal(40_000_000m, metrics.AverageNetCashFlow!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_NetCashFlow_FallsBackToRepaymentsOfNotesPayable() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50_000_000m,
+            ["ProceedsFromIssuanceOfDebt"] = 8_000_000m,
+            ["RepaymentsOfNotesPayable"] = 3_000_000m, // fallback (no LT/generic/convertible)
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // NCF = 50M - ((8-3) + 0 + 0) = 50 - 5 = 45M
+        Assert.NotNull(metrics.AverageNetCashFlow);
+        Assert.Equal(45_000_000m, metrics.AverageNetCashFlow!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_NetCashFlow_FallsBackToDividendsCommonStockCash() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50_000_000m,
+            ["NetIncomeLoss"] = 40_000_000m,
+            ["DividendsCommonStockCash"] = 5_000_000m, // fallback (no PaymentsOfDividends/Common/Dividends)
+        });
+
+        // Price = 100, Shares = 10M → MarketCap = 1B
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 100m, 10_000_000);
+
+        // Dividends should be picked up from fallback
+        Assert.NotNull(metrics.CurrentDividendsPaid);
+        Assert.Equal(5_000_000m, metrics.CurrentDividendsPaid!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_NetCashFlow_FallsBackToCashChangeExcludingFx() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect"] = 50_000_000m,
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // NCF = 50M (no financing items)
+        Assert.NotNull(metrics.AverageNetCashFlow);
+        Assert.Equal(50_000_000m, metrics.AverageNetCashFlow!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_OwnerEarnings_FallsBackToDepreciationAndAmortization() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["NetIncomeLoss"] = 30_000_000m,
+            ["DepreciationAndAmortization"] = 8_000_000m, // fallback (no DepreciationDepletionAndAmortization)
+            ["Depreciation"] = 5_000_000m,
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // OE = 30 + (8-5) + 0 + 0 - 0 + 0 = 33M  (DDA fallback: D&A - Depreciation)
+        Assert.NotNull(metrics.AverageOwnerEarnings);
+        Assert.Equal(33_000_000m, metrics.AverageOwnerEarnings!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_OwnerEarnings_UsesOtherNonCashComponents() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 500_000_000m,
+            ["NetIncomeLoss"] = 30_000_000m,
+            ["OtherNoncashExpense"] = 3_000_000m,
+            ["OtherNoncashIncome"] = 1_000_000m,
+        });
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // OE = 30 + 0 + 0 + (3-1) - 0 + 0 = 32M
+        Assert.NotNull(metrics.AverageOwnerEarnings);
+        Assert.Equal(32_000_000m, metrics.AverageOwnerEarnings!.Value);
     }
 
     [Fact]

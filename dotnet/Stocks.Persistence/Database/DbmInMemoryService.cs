@@ -19,6 +19,8 @@ public sealed class DbmInMemoryService : IDbmService {
         _nextId = 1;
     }
 
+    public DbmInMemoryData GetInMemoryData() => _data;
+
     public Task<Result> DropAllTables(CancellationToken ct) => Task.FromResult(Result.Success);
 
     public ValueTask<ulong> GetNextId64(CancellationToken ct) {
@@ -210,4 +212,14 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<LatestPrice>>.Success(
             _data.GetAllLatestPrices()));
+
+    public Task<Result> TruncateCompanyScores(CancellationToken ct) {
+        _data.TruncateCompanyScores();
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result> BulkInsertCompanyScores(List<CompanyScoreSummary> scores, CancellationToken ct) {
+        _data.AddCompanyScores(scores);
+        return Task.FromResult(Result.Success);
+    }
 }

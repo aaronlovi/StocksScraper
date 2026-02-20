@@ -74,6 +74,10 @@ public interface IDbmService {
         string[] conceptNames, CancellationToken ct);
     Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct);
 
+    // Company scores persistence
+    Task<Result> TruncateCompanyScores(CancellationToken ct);
+    Task<Result> BulkInsertCompanyScores(List<CompanyScoreSummary> scores, CancellationToken ct);
+
     // Dashboard
     Task<Result<DashboardStats>> GetDashboardStats(CancellationToken ct);
 

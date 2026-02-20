@@ -606,6 +606,25 @@ public sealed class DbmInMemoryData {
         return results;
     }
 
+    // Company scores
+
+    private readonly List<CompanyScoreSummary> _companyScores = [];
+
+    public void TruncateCompanyScores() {
+        lock (_mutex)
+            _companyScores.Clear();
+    }
+
+    public void AddCompanyScores(IReadOnlyCollection<CompanyScoreSummary> scores) {
+        lock (_mutex)
+            _companyScores.AddRange(scores);
+    }
+
+    public IReadOnlyCollection<CompanyScoreSummary> GetCompanyScores() {
+        lock (_mutex)
+            return [.. _companyScores];
+    }
+
     // Helpers
 
     private static string BuildImportKey(ulong cik, string ticker, string? exchange) {

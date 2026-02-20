@@ -101,20 +101,23 @@ public class BatchScoringDataFetchTests {
     // --- GetAllScoringDataPoints tests ---
 
     [Fact]
-    public async Task GetAllScoringDataPoints_ReturnsOnlyTenKData() {
+    public async Task GetAllScoringDataPoints_IncludesTenQAsLatestDate() {
         await SeedAll();
 
         Result<IReadOnlyCollection<BatchScoringConceptValue>> result =
             await _dbm.GetAllScoringDataPoints(TestConceptNames, _ct);
         Assert.True(result.IsSuccess);
 
-        // Company 3 has only 10-Q, should have no results
+        // Company 3 has only 10-Q data; it IS returned from the query
+        // (the service layer skips companies with no annual data when scoring)
         bool hasCompany3 = false;
         foreach (BatchScoringConceptValue v in result.Value!) {
-            if (v.CompanyId == 3)
+            if (v.CompanyId == 3) {
                 hasCompany3 = true;
+                Assert.Equal(2, v.FilingTypeId); // FilingType.TenQ
+            }
         }
-        Assert.False(hasCompany3, "Company 3 (only 10-Q) should have no scoring data");
+        Assert.True(hasCompany3, "Company 3 (only 10-Q) should have 10-Q data returned");
     }
 
     [Fact]

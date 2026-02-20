@@ -71,7 +71,34 @@ public class GetScoringDataPointsTests {
     }
 
     [Fact]
-    public async Task GetScoringDataPoints_ExcludesTenQFilings() {
+    public async Task GetScoringDataPoints_IncludesTenQWhenMoreRecent() {
+        await SeedCompanyAndTaxonomy();
+
+        var tenKDate = new DateOnly(2024, 9, 28);
+        var tenQDate = new DateOnly(2025, 3, 29);
+        await _dbm.BulkInsertSubmissions([
+            new Submission(10, CompanyId, "ref-1", FilingType.TenK, FilingCategory.Annual, tenKDate, null),
+            new Submission(11, CompanyId, "ref-2", FilingType.TenQ, FilingCategory.Quarterly, tenQDate, null),
+        ], _ct);
+
+        await _dbm.BulkInsertDataPoints([
+            MakeDataPoint(1000, 10, 100, 500_000_000m, tenKDate, tenKDate),
+            MakeDataPoint(1001, 11, 100, 480_000_000m, tenQDate, tenQDate),
+        ], _ct);
+
+        Result<IReadOnlyCollection<ScoringConceptValue>> result = await _dbm.GetScoringDataPoints(
+            CompanyId, ["StockholdersEquity"], _ct);
+
+        Assert.True(result.IsSuccess);
+        var list = new List<ScoringConceptValue>(result.Value!);
+        // Both the 10-K and 10-Q data should be included
+        Assert.Equal(2, list.Count);
+        Assert.Contains(list, v => v.ReportDate == tenQDate && v.Value == 480_000_000m && v.FilingTypeId == (int)FilingType.TenQ);
+        Assert.Contains(list, v => v.ReportDate == tenKDate && v.Value == 500_000_000m && v.FilingTypeId == (int)FilingType.TenK);
+    }
+
+    [Fact]
+    public async Task GetScoringDataPoints_TenQOlderThanTenKNotIncluded() {
         await SeedCompanyAndTaxonomy();
 
         var tenKDate = new DateOnly(2024, 9, 28);
@@ -91,6 +118,8 @@ public class GetScoringDataPointsTests {
 
         Assert.True(result.IsSuccess);
         var list = new List<ScoringConceptValue>(result.Value!);
+        // The 10-Q is older than the 10-K, so it doesn't qualify as the latest date
+        // Only the 10-K date is eligible (5 most recent 10-K dates UNION 1 most recent any-type date = 10-K date)
         Assert.Single(list);
         Assert.Equal(500_000_000m, list[0].Value);
         Assert.Equal(tenKDate, list[0].ReportDate);

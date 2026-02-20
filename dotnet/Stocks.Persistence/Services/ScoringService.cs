@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Stocks.DataModels;
 using Stocks.DataModels.Enums;
 using Stocks.DataModels.Scoring;
@@ -13,9 +14,11 @@ namespace Stocks.Persistence.Services;
 
 public class ScoringService {
     private readonly IDbmService _dbmService;
+    private readonly ILogger? _logger;
 
-    public ScoringService(IDbmService dbmService) {
+    public ScoringService(IDbmService dbmService, ILogger? logger = null) {
         _dbmService = dbmService;
+        _logger = logger;
     }
 
     // US-GAAP concept names needed for scoring
@@ -194,39 +197,49 @@ public class ScoringService {
 
     public async Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScores(CancellationToken ct) {
         // 1. Fetch all scoring data points in one query
+        _logger?.LogInformation("Fetching scoring data points...");
         Result<IReadOnlyCollection<BatchScoringConceptValue>> dataResult =
             await _dbmService.GetAllScoringDataPoints(AllConceptNames, ct);
         if (dataResult.IsFailure || dataResult.Value is null)
             return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch batch scoring data points.");
+        _logger?.LogInformation("Fetched {Count} scoring data points", dataResult.Value.Count);
 
         // 2. Fetch latest prices for all tickers
+        _logger?.LogInformation("Fetching latest prices...");
         Result<IReadOnlyCollection<LatestPrice>> pricesResult =
             await _dbmService.GetAllLatestPrices(ct);
         if (pricesResult.IsFailure || pricesResult.Value is null)
             return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch latest prices.");
+        _logger?.LogInformation("Fetched {Count} latest prices", pricesResult.Value.Count);
 
         // 3. Fetch company tickers (company_id → ticker)
+        _logger?.LogInformation("Fetching company tickers...");
         Result<IReadOnlyCollection<CompanyTicker>> tickersResult =
             await _dbmService.GetAllCompanyTickers(ct);
         if (tickersResult.IsFailure || tickersResult.Value is null)
             return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch company tickers.");
+        _logger?.LogInformation("Fetched {Count} company tickers", tickersResult.Value.Count);
 
         // 4. Fetch company names (company_id → name)
+        _logger?.LogInformation("Fetching company names...");
         Result<IReadOnlyCollection<CompanyName>> namesResult =
             await _dbmService.GetAllCompanyNames(ct);
         if (namesResult.IsFailure || namesResult.Value is null)
             return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch company names.");
+        _logger?.LogInformation("Fetched {Count} company names", namesResult.Value.Count);
 
         // 5. Fetch all companies for CIK lookup
+        _logger?.LogInformation("Fetching companies...");
         Result<IReadOnlyCollection<Company>> companiesResult =
-            await _dbmService.GetAllCompaniesByDataSource("sec-edgar", ct);
+            await _dbmService.GetAllCompaniesByDataSource("EDGAR", ct);
         if (companiesResult.IsFailure || companiesResult.Value is null)
             return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch companies.");
+        _logger?.LogInformation("Fetched {Count} companies", companiesResult.Value.Count);
 
         // Build lookups
         var companyLookup = new Dictionary<ulong, Company>();
@@ -258,39 +271,38 @@ public class ScoringService {
                 list = new List<ScoringConceptValue>();
                 dataByCompany[bv.CompanyId] = list;
             }
-            list.Add(new ScoringConceptValue(bv.ConceptName, bv.Value, bv.ReportDate, bv.BalanceTypeId));
+            list.Add(new ScoringConceptValue(bv.ConceptName, bv.Value, bv.ReportDate, bv.BalanceTypeId, bv.FilingTypeId));
         }
 
         // 7. Compute scores for each company
+        _logger?.LogInformation("Scoring {Count} companies...", dataByCompany.Count);
         DateTime now = DateTime.UtcNow;
         var results = new List<CompanyScoreSummary>(dataByCompany.Count);
+        int scored = 0;
+        int logInterval = Math.Max(dataByCompany.Count / 10, 1);
 
         foreach (var entry in dataByCompany) {
             ulong companyId = entry.Key;
             List<ScoringConceptValue> values = entry.Value;
 
-            // Group by year
-            Dictionary<int, Dictionary<string, decimal>> rawByYear = GroupByYear(
-                values, out Dictionary<string, TaxonomyBalanceTypes> balanceTypes);
+            // Group and partition data (annual vs most recent snapshot)
+            GroupedScoringData grouped = GroupAndPartitionData(values);
 
             var rawDataByYear = new Dictionary<int, IReadOnlyDictionary<string, decimal>>();
-            foreach (var yearEntry in rawByYear)
+            foreach (var yearEntry in grouped.AnnualByYear)
                 rawDataByYear[yearEntry.Key] = yearEntry.Value;
 
-            int yearsOfData = rawDataByYear.Count;
+            int yearsOfData = grouped.AnnualByYear.Count;
 
-            // Extract shares outstanding from most recent year
+            // Skip companies with no annual (10-K) data — can't produce meaningful scores
+            if (yearsOfData == 0)
+                continue;
+
+            // Extract shares outstanding from most recent snapshot
             long? sharesOutstanding = null;
-            if (yearsOfData > 0) {
-                int mostRecentYear = int.MinValue;
-                foreach (int year in rawDataByYear.Keys) {
-                    if (year > mostRecentYear)
-                        mostRecentYear = year;
-                }
-                decimal? sharesValue = ResolveField(rawDataByYear[mostRecentYear], SharesChain, null);
-                if (sharesValue.HasValue)
-                    sharesOutstanding = (long)sharesValue.Value;
-            }
+            decimal? sharesValue = ResolveField(grouped.MostRecentSnapshot, SharesChain, null);
+            if (sharesValue.HasValue)
+                sharesOutstanding = (long)sharesValue.Value;
 
             // Look up ticker and price
             decimal? pricePerShare = null;
@@ -307,7 +319,9 @@ public class ScoringService {
             }
 
             // Compute derived metrics
-            DerivedMetrics metrics = ComputeDerivedMetrics(rawDataByYear, pricePerShare, sharesOutstanding, balanceTypes);
+            DerivedMetrics metrics = ComputeDerivedMetrics(
+                rawDataByYear, grouped.MostRecentSnapshot, grouped.OldestRetainedEarnings,
+                pricePerShare, sharesOutstanding, grouped.BalanceTypes);
 
             // Evaluate checks
             IReadOnlyList<ScoringCheck> scorecard = EvaluateChecks(metrics, yearsOfData);
@@ -337,8 +351,13 @@ public class ScoringService {
                 metrics.AdjustedRetainedEarnings, metrics.AverageNetCashFlow,
                 metrics.AverageOwnerEarnings, metrics.EstimatedReturnCF, metrics.EstimatedReturnOE,
                 pricePerShare, priceDate, sharesOutstanding, now));
+
+            scored++;
+            if (scored % logInterval == 0)
+                _logger?.LogInformation("Scored {Scored}/{Total} companies", scored, dataByCompany.Count);
         }
 
+        _logger?.LogInformation("Finished scoring {Count} companies", results.Count);
         return Result<IReadOnlyCollection<CompanyScoreSummary>>.Success(results);
     }
 
@@ -384,33 +403,26 @@ public class ScoringService {
             }
         }
 
-        // 5. Group raw data by report year
-        Dictionary<int, Dictionary<string, decimal>> rawByYear = GroupByYear(
-            dataResult.Value, out Dictionary<string, TaxonomyBalanceTypes> balanceTypes);
+        // 5. Group and partition raw data
+        GroupedScoringData grouped = GroupAndPartitionData(dataResult.Value);
 
-        // Build the IReadOnlyDictionary version
+        // Build the IReadOnlyDictionary version (annual only, for rawDataByYear in result)
         var rawDataByYear = new Dictionary<int, IReadOnlyDictionary<string, decimal>>();
-        foreach (KeyValuePair<int, Dictionary<string, decimal>> entry in rawByYear)
+        foreach (KeyValuePair<int, Dictionary<string, decimal>> entry in grouped.AnnualByYear)
             rawDataByYear[entry.Key] = entry.Value;
 
-        int yearsOfData = rawDataByYear.Count;
+        int yearsOfData = grouped.AnnualByYear.Count;
 
-        // 6. Extract shares outstanding from most recent year
+        // 6. Extract shares outstanding from most recent snapshot
         long? sharesOutstanding = null;
-        if (yearsOfData > 0) {
-            int mostRecentYear = int.MinValue;
-            foreach (int year in rawDataByYear.Keys) {
-                if (year > mostRecentYear)
-                    mostRecentYear = year;
-            }
-
-            decimal? sharesValue = ResolveField(rawDataByYear[mostRecentYear], SharesChain, null);
-            if (sharesValue.HasValue)
-                sharesOutstanding = (long)sharesValue.Value;
-        }
+        decimal? sharesValue = ResolveField(grouped.MostRecentSnapshot, SharesChain, null);
+        if (sharesValue.HasValue)
+            sharesOutstanding = (long)sharesValue.Value;
 
         // 7. Compute derived metrics
-        DerivedMetrics metrics = ComputeDerivedMetrics(rawDataByYear, pricePerShare, sharesOutstanding, balanceTypes);
+        DerivedMetrics metrics = ComputeDerivedMetrics(
+            rawDataByYear, grouped.MostRecentSnapshot, grouped.OldestRetainedEarnings,
+            pricePerShare, sharesOutstanding, grouped.BalanceTypes);
 
         // 8. Evaluate the 13 checks
         IReadOnlyList<ScoringCheck> scorecard = EvaluateChecks(metrics, yearsOfData);
@@ -702,28 +714,22 @@ public class ScoringService {
     }
 
     internal static DerivedMetrics ComputeDerivedMetrics(
-        IReadOnlyDictionary<int, IReadOnlyDictionary<string, decimal>> rawDataByYear,
+        IReadOnlyDictionary<int, IReadOnlyDictionary<string, decimal>> annualDataByYear,
+        IReadOnlyDictionary<string, decimal> mostRecentSnapshot,
+        decimal? oldestRetainedEarnings,
         decimal? pricePerShare,
         long? sharesOutstanding,
         IReadOnlyDictionary<string, TaxonomyBalanceTypes>? balanceTypes = null) {
 
-        if (rawDataByYear.Count == 0)
+        if (annualDataByYear.Count == 0)
             return new DerivedMetrics(null, null, null, null, null, null, null, null, null, null, null, null);
 
-        // Sort years descending to identify most recent and oldest
-        var sortedYears = new List<int>(rawDataByYear.Keys);
-        sortedYears.Sort();
-        int mostRecentYear = sortedYears[sortedYears.Count - 1];
-        int oldestYear = sortedYears[0];
-
-        IReadOnlyDictionary<string, decimal> mostRecentData = rawDataByYear[mostRecentYear];
-
-        // Balance sheet values from most recent year
-        decimal? equity = ResolveEquity(mostRecentData);
-        decimal? goodwill = ResolveField(mostRecentData, GoodwillChain, 0m);
-        decimal? intangibles = ResolveField(mostRecentData, IntangiblesChain, 0m);
-        decimal? debt = ResolveField(mostRecentData, DebtChain, 0m);
-        decimal? retainedEarnings = ResolveField(mostRecentData, RetainedEarningsChain, null);
+        // Balance sheet values from most recent snapshot (may be quarterly)
+        decimal? equity = ResolveEquity(mostRecentSnapshot);
+        decimal? goodwill = ResolveField(mostRecentSnapshot, GoodwillChain, 0m);
+        decimal? intangibles = ResolveField(mostRecentSnapshot, IntangiblesChain, 0m);
+        decimal? debt = ResolveField(mostRecentSnapshot, DebtChain, 0m);
+        decimal? retainedEarnings = ResolveField(mostRecentSnapshot, RetainedEarningsChain, null);
 
         // Book Value
         decimal? bookValue = null;
@@ -748,7 +754,10 @@ public class ScoringService {
         if (debt.HasValue && bookValue.HasValue && bookValue.Value != 0m)
             debtToBookRatio = debt.Value / bookValue.Value;
 
-        // Per-year computations for averages and totals
+        // Per-year computations for averages and totals (annual only)
+        var sortedYears = new List<int>(annualDataByYear.Keys);
+        sortedYears.Sort();
+
         decimal totalNetCashFlow = 0m;
         decimal totalOwnerEarnings = 0m;
         decimal totalDividends = 0m;
@@ -760,7 +769,7 @@ public class ScoringService {
         bool hasAnyOwnerEarnings = false;
 
         foreach (int year in sortedYears) {
-            IReadOnlyDictionary<string, decimal> yearData = rawDataByYear[year];
+            IReadOnlyDictionary<string, decimal> yearData = annualDataByYear[year];
 
             // Net Cash Flow for this year
             decimal? grossCashFlow = ResolveField(yearData, CashChangeChain, null);
@@ -825,19 +834,15 @@ public class ScoringService {
         if (hasAnyOwnerEarnings && yearsWithOE > 0)
             averageOwnerEarnings = totalOwnerEarnings / yearsWithOE;
 
-        // Adjusted Retained Earnings
+        // Adjusted Retained Earnings (current RE from snapshot, totals from annual)
         decimal? adjustedRetainedEarnings = null;
         if (retainedEarnings.HasValue)
             adjustedRetainedEarnings = retainedEarnings.Value + totalDividends
                 - totalStockIssuance - totalPreferredIssuance;
 
-        // Oldest Retained Earnings
-        decimal? oldestRetainedEarnings = null;
-        if (rawDataByYear.ContainsKey(oldestYear))
-            oldestRetainedEarnings = ResolveField(rawDataByYear[oldestYear], RetainedEarningsChain, null);
-
-        // Current dividends (most recent year, for estimated return)
-        decimal? currentDividendsPaid = ResolveField(mostRecentData, DividendsChain, 0m);
+        // Current dividends from most recent annual year (duration concept, not balance sheet)
+        int mostRecentAnnualYear = sortedYears[sortedYears.Count - 1];
+        decimal? currentDividendsPaid = ResolveField(annualDataByYear[mostRecentAnnualYear], DividendsChain, 0m);
 
         // Estimated Returns
         decimal? estimatedReturnCF = null;
@@ -957,24 +962,67 @@ public class ScoringService {
         return new ScoringCheck(number, name, value, threshold, result);
     }
 
-    internal static Dictionary<int, Dictionary<string, decimal>> GroupByYear(
-        IReadOnlyCollection<ScoringConceptValue> values,
-        out Dictionary<string, TaxonomyBalanceTypes> balanceTypes) {
-        var result = new Dictionary<int, Dictionary<string, decimal>>();
-        balanceTypes = new Dictionary<string, TaxonomyBalanceTypes>(StringComparer.Ordinal);
-        foreach (ScoringConceptValue v in values) {
-            int year = v.ReportDate.Year;
-            if (!result.ContainsKey(year))
-                result[year] = new Dictionary<string, decimal>(StringComparer.Ordinal);
+    internal record GroupedScoringData(
+        Dictionary<int, Dictionary<string, decimal>> AnnualByYear,
+        Dictionary<string, TaxonomyBalanceTypes> BalanceTypes,
+        Dictionary<string, decimal> MostRecentSnapshot,
+        decimal? OldestRetainedEarnings);
 
-            // Take the first value for each concept per year (skip duplicates)
-            if (!result[year].ContainsKey(v.ConceptName))
-                result[year][v.ConceptName] = v.Value;
+    internal static GroupedScoringData GroupAndPartitionData(IReadOnlyCollection<ScoringConceptValue> values) {
+        var balanceTypes = new Dictionary<string, TaxonomyBalanceTypes>(StringComparer.Ordinal);
+        var annualByYear = new Dictionary<int, Dictionary<string, decimal>>();
+
+        // Track most recent and oldest report dates across ALL filing types
+        DateOnly mostRecentDate = DateOnly.MinValue;
+        DateOnly oldestDate = DateOnly.MaxValue;
+
+        foreach (ScoringConceptValue v in values) {
+            if (v.ReportDate > mostRecentDate)
+                mostRecentDate = v.ReportDate;
+            if (v.ReportDate < oldestDate)
+                oldestDate = v.ReportDate;
 
             // Record balance type per concept (consistent across years)
             if (!balanceTypes.ContainsKey(v.ConceptName))
                 balanceTypes[v.ConceptName] = (TaxonomyBalanceTypes)v.BalanceTypeId;
+
+            // Annual partition: only 10-K
+            if (v.FilingTypeId == (int)FilingType.TenK) {
+                int year = v.ReportDate.Year;
+                if (!annualByYear.ContainsKey(year))
+                    annualByYear[year] = new Dictionary<string, decimal>(StringComparer.Ordinal);
+
+                // Take the first value for each concept per year (skip duplicates)
+                if (!annualByYear[year].ContainsKey(v.ConceptName))
+                    annualByYear[year][v.ConceptName] = v.Value;
+            }
         }
-        return result;
+
+        // Build most recent snapshot from values matching mostRecentDate (any filing type).
+        // NOTE: This snapshot contains ALL concepts at the most recent date, including duration
+        // concepts (e.g. NetIncomeLoss) that are quarterly if the latest filing is a 10-Q.
+        // Callers must only read instant/balance-sheet concepts from this snapshot.
+        var mostRecentSnapshot = new Dictionary<string, decimal>(StringComparer.Ordinal);
+        decimal? oldestRetainedEarnings = null;
+
+        if (mostRecentDate != DateOnly.MinValue) {
+            foreach (ScoringConceptValue v in values) {
+                if (v.ReportDate == mostRecentDate && !mostRecentSnapshot.ContainsKey(v.ConceptName))
+                    mostRecentSnapshot[v.ConceptName] = v.Value;
+            }
+        }
+
+        // Extract oldest retained earnings from values matching oldestDate (any filing type)
+        if (oldestDate != DateOnly.MaxValue) {
+            // Build a lookup for the oldest date's values, then resolve via the chain
+            var oldestDateValues = new Dictionary<string, decimal>(StringComparer.Ordinal);
+            foreach (ScoringConceptValue v in values) {
+                if (v.ReportDate == oldestDate && !oldestDateValues.ContainsKey(v.ConceptName))
+                    oldestDateValues[v.ConceptName] = v.Value;
+            }
+            oldestRetainedEarnings = ResolveField(oldestDateValues, RetainedEarningsChain, null);
+        }
+
+        return new GroupedScoringData(annualByYear, balanceTypes, mostRecentSnapshot, oldestRetainedEarnings);
     }
 }

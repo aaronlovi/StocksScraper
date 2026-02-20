@@ -850,6 +850,37 @@ public class ScoringServiceTests {
         };
     }
 
+    /// <summary>
+    /// Adapter for tests that use the old ComputeDerivedMetrics signature.
+    /// Derives mostRecentSnapshot and oldestRetainedEarnings from annual data
+    /// (simulating the all-10-K case where annual = most recent).
+    /// </summary>
+    private static DerivedMetrics CallComputeDerivedMetrics(
+        Dictionary<int, IReadOnlyDictionary<string, decimal>> rawData,
+        decimal? pricePerShare,
+        long? sharesOutstanding,
+        IReadOnlyDictionary<string, TaxonomyBalanceTypes>? balanceTypes = null) {
+        // Find most recent and oldest years
+        int mostRecentYear = int.MinValue;
+        int oldestYear = int.MaxValue;
+        foreach (int year in rawData.Keys) {
+            if (year > mostRecentYear) mostRecentYear = year;
+            if (year < oldestYear) oldestYear = year;
+        }
+
+        var mostRecentSnapshot = rawData.Count > 0
+            ? rawData[mostRecentYear]
+            : (IReadOnlyDictionary<string, decimal>)new Dictionary<string, decimal>();
+
+        decimal? oldestRetainedEarnings = null;
+        if (rawData.Count > 0 && rawData.ContainsKey(oldestYear))
+            oldestRetainedEarnings = ScoringService.ResolveField(rawData[oldestYear], ScoringService.RetainedEarningsChain, null);
+
+        return ScoringService.ComputeDerivedMetrics(
+            rawData, mostRecentSnapshot, oldestRetainedEarnings,
+            pricePerShare, sharesOutstanding, balanceTypes);
+    }
+
     [Fact]
     public void ComputeDerivedMetrics_BookValue_SubtractsGoodwillAndIntangibles() {
         var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
@@ -858,7 +889,7 @@ public class ScoringServiceTests {
             ["IntangibleAssetsNetExcludingGoodwill"] = 50_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         Assert.Equal(350_000_000m, metrics.BookValue);
     }
@@ -869,7 +900,7 @@ public class ScoringServiceTests {
             ["StockholdersEquity"] = 500_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         Assert.Equal(500_000_000m, metrics.BookValue);
     }
@@ -899,7 +930,7 @@ public class ScoringServiceTests {
             },
         };
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // Current RE = 100M
         // Total dividends = 5 + 6 + 7 = 18M
@@ -924,7 +955,7 @@ public class ScoringServiceTests {
             ["PaymentsForRepurchaseOfCommonStock"] = 1_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // NCF = 50M - ((10-5) + (3-1) + 0) = 50 - (5 + 2 + 0) = 50 - 7 = 43M
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -942,7 +973,7 @@ public class ScoringServiceTests {
             ["PaymentsForRepurchaseOfCommonStock"] = 1_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // NCF = 50M - ((40-20) + (3-1) + 0) = 50 - (20 + 2) = 50 - 22 = 28M
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -958,7 +989,7 @@ public class ScoringServiceTests {
             ["RepaymentsOfConvertibleDebt"] = 2_500_000m, // fallback (no LT or generic)
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // NCF = 50M - ((6-2.5) + 0 + 0) = 50 - 3.5 = 46.5M
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -977,7 +1008,7 @@ public class ScoringServiceTests {
             ["ProceedsFromIssuanceOfDebt"] = 12_000_000m, // should be ignored since LT variant exists
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // NCF = 50M - ((10-5) + 0 + 0) = 50 - 5 = 45M  (uses LT variants, not broader ones)
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -993,7 +1024,7 @@ public class ScoringServiceTests {
             ["PaymentsForRepurchaseOfCommonStock"] = 1_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // NCF = 50M - (0 + (4-1) + 0) = 50 - 3 = 47M
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -1009,7 +1040,7 @@ public class ScoringServiceTests {
             ["PaymentsForRepurchaseOfEquity"] = 2_000_000m, // fallback (no RepurchaseOfCommonStock)
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // NCF = 50M - (0 + (3-2) + 0) = 50 - 1 = 49M
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -1025,7 +1056,7 @@ public class ScoringServiceTests {
             ["RepaymentsOfSeniorDebt"] = 5_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // NCF = 50M - ((15-5) + 0 + 0) = 50 - 10 = 40M
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -1041,7 +1072,7 @@ public class ScoringServiceTests {
             ["RepaymentsOfNotesPayable"] = 3_000_000m, // fallback (no LT/generic/convertible)
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // NCF = 50M - ((8-3) + 0 + 0) = 50 - 5 = 45M
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -1058,7 +1089,7 @@ public class ScoringServiceTests {
         });
 
         // Price = 100, Shares = 10M → MarketCap = 1B
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 100m, 10_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 100m, 10_000_000);
 
         // Dividends should be picked up from fallback
         Assert.NotNull(metrics.CurrentDividendsPaid);
@@ -1072,7 +1103,7 @@ public class ScoringServiceTests {
             ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect"] = 50_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // NCF = 50M (no financing items)
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -1088,7 +1119,7 @@ public class ScoringServiceTests {
             ["Depreciation"] = 5_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // OE = 30 + (8-5) + 0 + 0 - 0 + 0 = 33M  (DDA fallback: D&A - Depreciation)
         Assert.NotNull(metrics.AverageOwnerEarnings);
@@ -1104,7 +1135,7 @@ public class ScoringServiceTests {
             ["OtherNoncashIncome"] = 1_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // OE = 30 + 0 + 0 + (3-1) - 0 + 0 = 32M
         Assert.NotNull(metrics.AverageOwnerEarnings);
@@ -1124,7 +1155,7 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInOperatingCapital"] = -2_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // OE = 30 + 1 + 2 + 3 + 0.5 - 10 + (-2) = 24.5M
         Assert.NotNull(metrics.AverageOwnerEarnings);
@@ -1150,7 +1181,7 @@ public class ScoringServiceTests {
             },
         };
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // Average NCF = (10 + 20 + 30) / 3 = 20M (no financing items to subtract)
         Assert.NotNull(metrics.AverageNetCashFlow);
@@ -1171,7 +1202,7 @@ public class ScoringServiceTests {
         });
 
         // Price = 100, Shares = 10M → MarketCap = 1B
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 100m, 10_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 100m, 10_000_000);
 
         Assert.Equal(1_000_000_000m, metrics.MarketCap);
 
@@ -1190,12 +1221,131 @@ public class ScoringServiceTests {
             ["NetIncomeLoss"] = 30_000_000m,
         });
 
-        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(rawData, 150m, 1_000_000);
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         Assert.Null(metrics.BookValue);
         Assert.Null(metrics.DebtToEquityRatio);
         Assert.Null(metrics.PriceToBookRatio);
         Assert.Null(metrics.DebtToBookRatio);
+    }
+
+    #endregion
+
+    #region GroupAndPartitionData tests
+
+    [Fact]
+    public void GroupAndPartitionData_MixedTenKAndTenQ_PartitionsCorrectly() {
+        // 2 years of 10-K data + 1 more recent 10-Q
+        var values = new List<ScoringConceptValue> {
+            // 10-K 2023
+            new("StockholdersEquity", 400_000_000m, new DateOnly(2023, 12, 31), 1, 1),
+            new("RetainedEarningsAccumulatedDeficit", 200_000_000m, new DateOnly(2023, 12, 31), 2, 1),
+            new("NetIncomeLoss", 50_000_000m, new DateOnly(2023, 12, 31), 1, 1),
+            // 10-K 2024
+            new("StockholdersEquity", 500_000_000m, new DateOnly(2024, 12, 31), 1, 1),
+            new("RetainedEarningsAccumulatedDeficit", 250_000_000m, new DateOnly(2024, 12, 31), 2, 1),
+            new("NetIncomeLoss", 60_000_000m, new DateOnly(2024, 12, 31), 1, 1),
+            // 10-Q 2025 Q1 (most recent)
+            new("StockholdersEquity", 520_000_000m, new DateOnly(2025, 3, 31), 1, 2),
+            new("RetainedEarningsAccumulatedDeficit", 270_000_000m, new DateOnly(2025, 3, 31), 2, 2),
+        };
+
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        // Annual partition should only have 10-K years
+        Assert.Equal(2, grouped.AnnualByYear.Count);
+        Assert.True(grouped.AnnualByYear.ContainsKey(2023));
+        Assert.True(grouped.AnnualByYear.ContainsKey(2024));
+        Assert.False(grouped.AnnualByYear.ContainsKey(2025));
+
+        // Most recent snapshot should use the 10-Q data (2025-03-31)
+        Assert.Equal(520_000_000m, grouped.MostRecentSnapshot["StockholdersEquity"]);
+        Assert.Equal(270_000_000m, grouped.MostRecentSnapshot["RetainedEarningsAccumulatedDeficit"]);
+
+        // Oldest retained earnings should be from 2023 (oldest date across all types)
+        Assert.Equal(200_000_000m, grouped.OldestRetainedEarnings);
+    }
+
+    [Fact]
+    public void GroupAndPartitionData_TenKOnly_IdenticalToPreviousBehavior() {
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 400_000_000m, new DateOnly(2023, 12, 31), 1, 1),
+            new("RetainedEarningsAccumulatedDeficit", 200_000_000m, new DateOnly(2023, 12, 31), 2, 1),
+            new("StockholdersEquity", 500_000_000m, new DateOnly(2024, 12, 31), 1, 1),
+            new("RetainedEarningsAccumulatedDeficit", 250_000_000m, new DateOnly(2024, 12, 31), 2, 1),
+        };
+
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        Assert.Equal(2, grouped.AnnualByYear.Count);
+        // Most recent snapshot uses the most recent 10-K date
+        Assert.Equal(500_000_000m, grouped.MostRecentSnapshot["StockholdersEquity"]);
+        // Oldest retained earnings from 2023
+        Assert.Equal(200_000_000m, grouped.OldestRetainedEarnings);
+    }
+
+    [Fact]
+    public void GroupAndPartitionData_TenQOnly_NoAnnualData() {
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 300_000_000m, new DateOnly(2025, 3, 31), 1, 2),
+        };
+
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        Assert.Empty(grouped.AnnualByYear);
+        Assert.Equal(300_000_000m, grouped.MostRecentSnapshot["StockholdersEquity"]);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_QuarterlyBalanceSheet_AnnualAverages() {
+        // Annual data: 2 years
+        var annualData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 400_000_000m,
+                ["Goodwill"] = 50_000_000m,
+                ["LongTermDebt"] = 100_000_000m,
+                ["NetIncomeLoss"] = 40_000_000m,
+                ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect"] = 30_000_000m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 500_000_000m,
+                ["Goodwill"] = 50_000_000m,
+                ["LongTermDebt"] = 100_000_000m,
+                ["NetIncomeLoss"] = 50_000_000m,
+                ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect"] = 40_000_000m,
+            },
+        };
+
+        // Most recent snapshot from 10-Q with updated balance sheet
+        var mostRecentSnapshot = new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 520_000_000m,
+            ["Goodwill"] = 55_000_000m,
+            ["LongTermDebt"] = 90_000_000m,
+            ["RetainedEarningsAccumulatedDeficit"] = 300_000_000m,
+        };
+
+        decimal? oldestRetainedEarnings = 200_000_000m;
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(
+            annualData, mostRecentSnapshot, oldestRetainedEarnings, 150m, 1_000_000);
+
+        // Balance sheet values should come from quarterly snapshot
+        // BookValue = Equity(520M) - Goodwill(55M) - Intangibles(0) = 465M
+        Assert.Equal(465_000_000m, metrics.BookValue);
+        // Debt-to-Equity = 90M / 520M
+        Assert.NotNull(metrics.DebtToEquityRatio);
+        Assert.Equal(90_000_000m / 520_000_000m, metrics.DebtToEquityRatio!.Value);
+
+        // Cash flow averages from annual data: (30M + 40M) / 2 = 35M
+        Assert.NotNull(metrics.AverageNetCashFlow);
+        Assert.Equal(35_000_000m, metrics.AverageNetCashFlow!.Value);
+
+        // OE averages from annual data: (40M + 50M) / 2 = 45M (no non-cash or capex)
+        Assert.NotNull(metrics.AverageOwnerEarnings);
+        Assert.Equal(45_000_000m, metrics.AverageOwnerEarnings!.Value);
+
+        // Oldest retained earnings passed directly
+        Assert.Equal(200_000_000m, metrics.OldestRetainedEarnings);
     }
 
     #endregion

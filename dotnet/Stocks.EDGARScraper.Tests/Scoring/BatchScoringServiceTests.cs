@@ -40,7 +40,7 @@ public class BatchScoringServiceTests {
 
     private async Task SeedCompanyWithScoringData(ulong companyId, ulong cik, string name,
         string ticker, string exchange, int numYears) {
-        await _dbm.BulkInsertCompanies([new Company(companyId, cik, "sec-edgar")], _ct);
+        await _dbm.BulkInsertCompanies([new Company(companyId, cik, "EDGAR")], _ct);
         await _dbm.BulkInsertCompanyNames([new CompanyName(companyId * 100, companyId, name)], _ct);
         await _dbm.BulkInsertCompanyTickers([new CompanyTicker(companyId, ticker, exchange)], _ct);
 
@@ -152,7 +152,7 @@ public class BatchScoringServiceTests {
         await SeedTaxonomyConcepts();
 
         // Company with only 10-Q filings
-        await _dbm.BulkInsertCompanies([new Company(5, 999999, "sec-edgar")], _ct);
+        await _dbm.BulkInsertCompanies([new Company(5, 999999, "EDGAR")], _ct);
         await _dbm.BulkInsertCompanyNames([new CompanyName(500, 5, "NoTenK Corp")], _ct);
         await _dbm.BulkInsertSubmissions([
             new Submission(5000, 5, "ref-5-q", FilingType.TenQ, FilingCategory.Quarterly,
@@ -210,5 +210,84 @@ public class BatchScoringServiceTests {
 
         IReadOnlyCollection<CompanyScoreSummary> afterTruncate = _dbm.GetInMemoryData().GetCompanyScores();
         Assert.Empty(afterTruncate);
+    }
+
+    [Fact]
+    public async Task ComputeAllScores_UsesQuarterlyBalanceSheet_WhenMoreRecent() {
+        await SeedTaxonomyConcepts();
+
+        // Seed company with 2 years of 10-K data
+        await SeedCompanyWithScoringData(1, 320193, "Apple Inc", "AAPL", "NASDAQ", 2);
+        await SeedPrices("AAPL", 250m);
+
+        // Add a more recent 10-Q with updated balance sheet values
+        var tenQDate = new DateOnly(2025, 3, 31);
+        await _dbm.BulkInsertSubmissions([
+            new Submission(9999, 1, "ref-1-q1", FilingType.TenQ, FilingCategory.Quarterly, tenQDate, null)
+        ], _ct);
+
+        var dp = new DatePair(new DateOnly(2025, 1, 1), tenQDate);
+        var filed = new DateOnly(2025, 5, 1);
+        await _dbm.BulkInsertDataPoints([
+            new DataPoint(99001, 1, "Assets", "ref", dp, 1_200_000_000m, UsdUnit, filed, 9999, 1),
+            new DataPoint(99002, 1, "Liabilities", "ref", dp, 500_000_000m, UsdUnit, filed, 9999, 2),
+            new DataPoint(99003, 1, "StockholdersEquity", "ref", dp, 700_000_000m, UsdUnit, filed, 9999, 3),
+            new DataPoint(99004, 1, "Goodwill", "ref", dp, 60_000_000m, UsdUnit, filed, 9999, 4),
+            new DataPoint(99005, 1, "IntangibleAssetsNetExcludingGoodwill", "ref", dp, 35_000_000m, UsdUnit, filed, 9999, 5),
+            new DataPoint(99006, 1, "LongTermDebt", "ref", dp, 180_000_000m, UsdUnit, filed, 9999, 6),
+            new DataPoint(99007, 1, "RetainedEarningsAccumulatedDeficit", "ref", dp, 280_000_000m, UsdUnit, filed, 9999, 7),
+            new DataPoint(99008, 1, "CommonStockSharesOutstanding", "ref", dp, 105_000_000m, SharesUnit, filed, 9999, 8),
+        ], _ct);
+
+        var service = new ScoringService(_dbm);
+        Result<IReadOnlyCollection<CompanyScoreSummary>> result = await service.ComputeAllScores(_ct);
+
+        Assert.True(result.IsSuccess);
+        CompanyScoreSummary score = Assert.Single(result.Value!);
+
+        // yearsOfData = 2 (only 10-K years count)
+        Assert.Equal(2, score.YearsOfData);
+
+        // Shares from quarterly snapshot
+        Assert.Equal(105_000_000, score.SharesOutstanding);
+
+        // BookValue from quarterly: Equity(700M) - Goodwill(60M) - Intangibles(35M) = 605M
+        Assert.Equal(605_000_000m, score.BookValue);
+    }
+
+    [Fact]
+    public async Task ComputeAllScores_TenKOneTenQ_UsesQuarterlyForBalanceSheet() {
+        await SeedTaxonomyConcepts();
+
+        // 1 year of 10-K data + more recent 10-Q
+        await SeedCompanyWithScoringData(1, 320193, "Apple Inc", "AAPL", "NASDAQ", 1);
+        await SeedPrices("AAPL", 250m);
+
+        var tenQDate = new DateOnly(2025, 6, 30);
+        await _dbm.BulkInsertSubmissions([
+            new Submission(8888, 1, "ref-1-q2", FilingType.TenQ, FilingCategory.Quarterly, tenQDate, null)
+        ], _ct);
+
+        var dp = new DatePair(new DateOnly(2025, 4, 1), tenQDate);
+        var filed = new DateOnly(2025, 8, 1);
+        await _dbm.BulkInsertDataPoints([
+            new DataPoint(88001, 1, "StockholdersEquity", "ref", dp, 750_000_000m, UsdUnit, filed, 8888, 3),
+            new DataPoint(88002, 1, "CommonStockSharesOutstanding", "ref", dp, 110_000_000m, SharesUnit, filed, 8888, 8),
+        ], _ct);
+
+        var service = new ScoringService(_dbm);
+
+        // Compute batch
+        Result<IReadOnlyCollection<CompanyScoreSummary>> batchResult = await service.ComputeAllScores(_ct);
+        Assert.True(batchResult.IsSuccess);
+        CompanyScoreSummary batchScore = Assert.Single(batchResult.Value!);
+
+        // Compute individual
+        Result<ScoringResult> individualResult = await service.ComputeScore(1, _ct);
+        Assert.True(individualResult.IsSuccess);
+
+        // Both should match and use the quarterly balance sheet
+        Assert.Equal(individualResult.Value!.OverallScore, batchScore.OverallScore);
+        Assert.Equal(1, batchScore.YearsOfData);
     }
 }

@@ -415,11 +415,11 @@ public sealed class DbmInMemoryData {
         var results = new List<ScoringConceptValue>();
 
         lock (_mutex) {
-            // Build a lookup of submission_id → Submission for 10-K filings of this company
-            var tenKSubmissions = new Dictionary<ulong, Submission>();
+            // Build a lookup of submission_id → Submission for 10-K and 10-Q filings of this company
+            var eligibleSubmissions = new Dictionary<ulong, Submission>();
             foreach (Submission s in _submissions) {
-                if (s.CompanyId == companyId && s.FilingType == FilingType.TenK)
-                    tenKSubmissions[s.SubmissionId] = s;
+                if (s.CompanyId == companyId && (s.FilingType == FilingType.TenK || s.FilingType == FilingType.TenQ))
+                    eligibleSubmissions[s.SubmissionId] = s;
             }
 
             // Build taxonomy concept id → (name, balanceTypeId) lookup
@@ -429,19 +429,24 @@ public sealed class DbmInMemoryData {
                     conceptIdToInfo[c.ConceptId] = (c.Name, c.BalanceTypeId);
             }
 
-            // Find the 5 most recent distinct report dates that have matching data points
-            var datesWithData = new HashSet<DateOnly>();
+            // Find the 5 most recent distinct 10-K report dates that have matching data points
+            var tenKDatesWithData = new HashSet<DateOnly>();
+            // Find the most recent report date across all eligible filing types
+            DateOnly latestAnyDate = DateOnly.MinValue;
             foreach (DataPoint dp in _dataPoints) {
                 if (dp.CompanyId != companyId)
                     continue;
-                if (!tenKSubmissions.TryGetValue(dp.SubmissionId, out Submission? sub))
+                if (!eligibleSubmissions.TryGetValue(dp.SubmissionId, out Submission? sub))
                     continue;
                 if (!conceptIdToInfo.ContainsKey(dp.TaxonomyConceptId))
                     continue;
-                datesWithData.Add(sub.ReportDate);
+                if (sub.FilingType == FilingType.TenK)
+                    tenKDatesWithData.Add(sub.ReportDate);
+                if (sub.ReportDate > latestAnyDate)
+                    latestAnyDate = sub.ReportDate;
             }
 
-            var sortedDates = new SortedSet<DateOnly>(datesWithData);
+            var sortedDates = new SortedSet<DateOnly>(tenKDatesWithData);
             var topDates = new HashSet<DateOnly>();
             int count = 0;
             foreach (DateOnly date in sortedDates.Reverse()) {
@@ -451,15 +456,19 @@ public sealed class DbmInMemoryData {
                     break;
             }
 
+            // Add the latest date across all types (may already be in topDates)
+            if (latestAnyDate != DateOnly.MinValue)
+                topDates.Add(latestAnyDate);
+
             // Collect candidate data points, keyed by (submissionId, conceptName)
             // Keep only the one with the max end_date per key (DISTINCT ON equivalent)
-            var bestByKey = new Dictionary<(ulong submissionId, string conceptName), (DateOnly endDate, decimal value, DateOnly reportDate, int balanceTypeId)>();
+            var bestByKey = new Dictionary<(ulong submissionId, string conceptName), (DateOnly endDate, decimal value, DateOnly reportDate, int balanceTypeId, int filingTypeId)>();
 
             foreach (DataPoint dp in _dataPoints) {
                 if (dp.CompanyId != companyId)
                     continue;
 
-                if (!tenKSubmissions.TryGetValue(dp.SubmissionId, out Submission? submission))
+                if (!eligibleSubmissions.TryGetValue(dp.SubmissionId, out Submission? submission))
                     continue;
 
                 if (!topDates.Contains(submission.ReportDate))
@@ -470,11 +479,11 @@ public sealed class DbmInMemoryData {
 
                 var key = (dp.SubmissionId, conceptInfo.Name);
                 if (!bestByKey.TryGetValue(key, out var existing) || dp.DatePair.EndDate > existing.endDate)
-                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate, conceptInfo.BalanceTypeId);
+                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate, conceptInfo.BalanceTypeId, (int)submission.FilingType);
             }
 
             foreach (var entry in bestByKey)
-                results.Add(new ScoringConceptValue(entry.Key.conceptName, entry.Value.value, entry.Value.reportDate, entry.Value.balanceTypeId));
+                results.Add(new ScoringConceptValue(entry.Key.conceptName, entry.Value.value, entry.Value.reportDate, entry.Value.balanceTypeId, entry.Value.filingTypeId));
         }
 
         // Sort by report_date DESC, then concept name
@@ -495,11 +504,11 @@ public sealed class DbmInMemoryData {
         var results = new List<BatchScoringConceptValue>();
 
         lock (_mutex) {
-            // Build a lookup of submission_id → Submission for 10-K filings
-            var tenKSubmissions = new Dictionary<ulong, Submission>();
+            // Build a lookup of submission_id → Submission for 10-K and 10-Q filings
+            var eligibleSubmissions = new Dictionary<ulong, Submission>();
             foreach (Submission s in _submissions) {
-                if (s.FilingType == FilingType.TenK)
-                    tenKSubmissions[s.SubmissionId] = s;
+                if (s.FilingType == FilingType.TenK || s.FilingType == FilingType.TenQ)
+                    eligibleSubmissions[s.SubmissionId] = s;
             }
 
             // Build taxonomy concept id → (name, balanceTypeId) lookup
@@ -509,25 +518,32 @@ public sealed class DbmInMemoryData {
                     conceptIdToInfo[c.ConceptId] = (c.Name, c.BalanceTypeId);
             }
 
-            // Find the 5 most recent distinct report dates per company that have matching data points
-            var datesWithDataByCompany = new Dictionary<ulong, HashSet<DateOnly>>();
+            // Find the 5 most recent distinct 10-K report dates per company that have matching data points
+            var tenKDatesByCompany = new Dictionary<ulong, HashSet<DateOnly>>();
+            // Track the latest report date across all eligible types per company
+            var latestAnyDateByCompany = new Dictionary<ulong, DateOnly>();
             foreach (DataPoint dp in _dataPoints) {
-                if (!tenKSubmissions.TryGetValue(dp.SubmissionId, out Submission? sub))
+                if (!eligibleSubmissions.TryGetValue(dp.SubmissionId, out Submission? sub))
                     continue;
                 if (sub.CompanyId != dp.CompanyId)
                     continue;
                 if (!conceptIdToInfo.ContainsKey(dp.TaxonomyConceptId))
                     continue;
-                if (!datesWithDataByCompany.TryGetValue(dp.CompanyId, out HashSet<DateOnly>? dates)) {
-                    dates = new HashSet<DateOnly>();
-                    datesWithDataByCompany[dp.CompanyId] = dates;
+                if (sub.FilingType == FilingType.TenK) {
+                    if (!tenKDatesByCompany.TryGetValue(dp.CompanyId, out HashSet<DateOnly>? dates)) {
+                        dates = new HashSet<DateOnly>();
+                        tenKDatesByCompany[dp.CompanyId] = dates;
+                    }
+                    dates.Add(sub.ReportDate);
                 }
-                dates.Add(sub.ReportDate);
+                if (!latestAnyDateByCompany.TryGetValue(dp.CompanyId, out DateOnly existingLatest)
+                    || sub.ReportDate > existingLatest)
+                    latestAnyDateByCompany[dp.CompanyId] = sub.ReportDate;
             }
 
-            // Limit to 5 most recent per company
+            // Build eligible dates per company: 5 most recent 10-K dates UNION latest any date
             var topDatesByCompany = new Dictionary<ulong, HashSet<DateOnly>>();
-            foreach (var entry in datesWithDataByCompany) {
+            foreach (var entry in tenKDatesByCompany) {
                 ulong companyId = entry.Key;
                 HashSet<DateOnly> allDates = entry.Value;
                 var sorted = new SortedSet<DateOnly>(allDates);
@@ -541,14 +557,22 @@ public sealed class DbmInMemoryData {
                 }
                 topDatesByCompany[companyId] = top;
             }
+            // Add latest any-type date per company
+            foreach (var entry in latestAnyDateByCompany) {
+                if (!topDatesByCompany.TryGetValue(entry.Key, out HashSet<DateOnly>? top)) {
+                    top = new HashSet<DateOnly>();
+                    topDatesByCompany[entry.Key] = top;
+                }
+                top.Add(entry.Value);
+            }
 
             // Collect candidate data points, keyed by (companyId, submissionId, conceptName)
             // Keep only the one with the max end_date per key (DISTINCT ON equivalent)
             var bestByKey = new Dictionary<(ulong companyId, ulong submissionId, string conceptName),
-                (DateOnly endDate, decimal value, DateOnly reportDate, int balanceTypeId)>();
+                (DateOnly endDate, decimal value, DateOnly reportDate, int balanceTypeId, int filingTypeId)>();
 
             foreach (DataPoint dp in _dataPoints) {
-                if (!tenKSubmissions.TryGetValue(dp.SubmissionId, out Submission? submission))
+                if (!eligibleSubmissions.TryGetValue(dp.SubmissionId, out Submission? submission))
                     continue;
                 if (submission.CompanyId != dp.CompanyId)
                     continue;
@@ -561,7 +585,7 @@ public sealed class DbmInMemoryData {
 
                 var key = (dp.CompanyId, dp.SubmissionId, conceptInfo.Name);
                 if (!bestByKey.TryGetValue(key, out var existing) || dp.DatePair.EndDate > existing.endDate)
-                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate, conceptInfo.BalanceTypeId);
+                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate, conceptInfo.BalanceTypeId, (int)submission.FilingType);
             }
 
             foreach (var entry in bestByKey) {
@@ -570,7 +594,8 @@ public sealed class DbmInMemoryData {
                     entry.Key.conceptName,
                     entry.Value.value,
                     entry.Value.reportDate,
-                    entry.Value.balanceTypeId));
+                    entry.Value.balanceTypeId,
+                    entry.Value.filingTypeId));
             }
         }
 

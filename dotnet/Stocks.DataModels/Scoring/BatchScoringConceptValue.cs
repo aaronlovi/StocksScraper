@@ -7,4 +7,5 @@ public record BatchScoringConceptValue(
     string ConceptName,
     decimal Value,
     DateOnly ReportDate,
-    int BalanceTypeId);
+    int BalanceTypeId,
+    int FilingTypeId);

@@ -337,10 +337,12 @@ export class ScoringComponent implements OnInit {
 
   private fmtCurrency(val: number | null | undefined): string {
     if (val == null) return 'N/A';
-    if (Math.abs(val) >= 1_000_000_000_000) return '$' + (val / 1_000_000_000_000).toFixed(2) + 'T';
-    if (Math.abs(val) >= 1_000_000_000) return '$' + (val / 1_000_000_000).toFixed(2) + 'B';
-    if (Math.abs(val) >= 1_000_000) return '$' + (val / 1_000_000).toFixed(2) + 'M';
-    return '$' + val.toFixed(2);
+    const sign = val < 0 ? '-' : '';
+    const abs = Math.abs(val);
+    if (abs >= 1_000_000_000_000) return sign + '$' + (abs / 1_000_000_000_000).toFixed(2) + 'T';
+    if (abs >= 1_000_000_000) return sign + '$' + (abs / 1_000_000_000).toFixed(2) + 'B';
+    if (abs >= 1_000_000) return sign + '$' + (abs / 1_000_000).toFixed(2) + 'M';
+    return sign + '$' + abs.toFixed(2);
   }
 
   private fmtRatio(val: number | null | undefined): string {

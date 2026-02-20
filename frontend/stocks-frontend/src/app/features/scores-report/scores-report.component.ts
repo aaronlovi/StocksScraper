@@ -90,7 +90,7 @@ import {
                 </span>
               </td>
               <td>
-                <a [routerLink]="['/company', row.cik, 'scoring']">{{ row.companyName ?? ('CIK ' + row.cik) }}</a>
+                <a [routerLink]="['/company', row.cik, 'scoring']" target="_blank">{{ row.companyName ?? ('CIK ' + row.cik) }}</a>
               </td>
               <td>{{ row.ticker ?? '' }}</td>
               <td>{{ row.exchange ?? '' }}</td>

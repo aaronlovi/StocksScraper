@@ -1017,7 +1017,7 @@ internal partial class Program {
     }
 
     private static async Task<Result> ComputeAndStoreAllScoresAsync() {
-        var scoringService = new Stocks.Persistence.Services.ScoringService(_dbm!);
+        var scoringService = new Stocks.Persistence.Services.ScoringService(_dbm!, _logger);
         CancellationToken ct = CancellationToken.None;
 
         _logger.LogInformation("Computing scores for all companies...");

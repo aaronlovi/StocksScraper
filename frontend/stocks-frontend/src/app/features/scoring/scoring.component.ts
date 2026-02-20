@@ -39,6 +39,10 @@ import {
               <span class="badge">{{ t.ticker }}<span class="exchange">{{ t.exchange }}</span></span>
             }
           </div>
+          <div class="company-links">
+            <a class="external-link" [href]="'https://finance.yahoo.com/quote/' + company()!.tickers[0].ticker" target="_blank" rel="noopener">Yahoo Finance</a>
+            <a class="external-link" [href]="'https://www.google.com/finance/quote/' + company()!.tickers[0].ticker + ':' + company()!.tickers[0].exchange" target="_blank" rel="noopener">Google Finance</a>
+          </div>
         }
       </div>
     }
@@ -182,6 +186,20 @@ import {
       margin-left: 4px;
       font-weight: 400;
       opacity: 0.8;
+    }
+    .company-links {
+      margin-top: 10px;
+      display: flex;
+      gap: 16px;
+    }
+    .external-link {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    .external-link:hover {
+      text-decoration: underline;
     }
     .score-summary {
       display: inline-flex;

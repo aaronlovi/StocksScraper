@@ -488,6 +488,111 @@ public sealed class DbmInMemoryData {
         return results;
     }
 
+    // Batch scoring data points (all companies)
+
+    public IReadOnlyCollection<BatchScoringConceptValue> GetAllScoringDataPoints(string[] conceptNames) {
+        var conceptSet = new HashSet<string>(conceptNames, StringComparer.Ordinal);
+        var results = new List<BatchScoringConceptValue>();
+
+        lock (_mutex) {
+            // Build a lookup of submission_id → Submission for 10-K filings
+            var tenKSubmissions = new Dictionary<ulong, Submission>();
+            foreach (Submission s in _submissions) {
+                if (s.FilingType == FilingType.TenK)
+                    tenKSubmissions[s.SubmissionId] = s;
+            }
+
+            // Build taxonomy concept id → (name, balanceTypeId) lookup
+            var conceptIdToInfo = new Dictionary<long, (string Name, int BalanceTypeId)>();
+            foreach (ConceptDetailsDTO c in _taxonomyConcepts) {
+                if (conceptSet.Contains(c.Name))
+                    conceptIdToInfo[c.ConceptId] = (c.Name, c.BalanceTypeId);
+            }
+
+            // Find the 5 most recent distinct report dates per company that have matching data points
+            var datesWithDataByCompany = new Dictionary<ulong, HashSet<DateOnly>>();
+            foreach (DataPoint dp in _dataPoints) {
+                if (!tenKSubmissions.TryGetValue(dp.SubmissionId, out Submission? sub))
+                    continue;
+                if (sub.CompanyId != dp.CompanyId)
+                    continue;
+                if (!conceptIdToInfo.ContainsKey(dp.TaxonomyConceptId))
+                    continue;
+                if (!datesWithDataByCompany.TryGetValue(dp.CompanyId, out HashSet<DateOnly>? dates)) {
+                    dates = new HashSet<DateOnly>();
+                    datesWithDataByCompany[dp.CompanyId] = dates;
+                }
+                dates.Add(sub.ReportDate);
+            }
+
+            // Limit to 5 most recent per company
+            var topDatesByCompany = new Dictionary<ulong, HashSet<DateOnly>>();
+            foreach (var entry in datesWithDataByCompany) {
+                ulong companyId = entry.Key;
+                HashSet<DateOnly> allDates = entry.Value;
+                var sorted = new SortedSet<DateOnly>(allDates);
+                var top = new HashSet<DateOnly>();
+                int count = 0;
+                foreach (DateOnly date in sorted.Reverse()) {
+                    top.Add(date);
+                    count++;
+                    if (count >= 5)
+                        break;
+                }
+                topDatesByCompany[companyId] = top;
+            }
+
+            // Collect candidate data points, keyed by (companyId, submissionId, conceptName)
+            // Keep only the one with the max end_date per key (DISTINCT ON equivalent)
+            var bestByKey = new Dictionary<(ulong companyId, ulong submissionId, string conceptName),
+                (DateOnly endDate, decimal value, DateOnly reportDate, int balanceTypeId)>();
+
+            foreach (DataPoint dp in _dataPoints) {
+                if (!tenKSubmissions.TryGetValue(dp.SubmissionId, out Submission? submission))
+                    continue;
+                if (submission.CompanyId != dp.CompanyId)
+                    continue;
+                if (!topDatesByCompany.TryGetValue(dp.CompanyId, out HashSet<DateOnly>? topDates))
+                    continue;
+                if (!topDates.Contains(submission.ReportDate))
+                    continue;
+                if (!conceptIdToInfo.TryGetValue(dp.TaxonomyConceptId, out var conceptInfo))
+                    continue;
+
+                var key = (dp.CompanyId, dp.SubmissionId, conceptInfo.Name);
+                if (!bestByKey.TryGetValue(key, out var existing) || dp.DatePair.EndDate > existing.endDate)
+                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate, conceptInfo.BalanceTypeId);
+            }
+
+            foreach (var entry in bestByKey) {
+                results.Add(new BatchScoringConceptValue(
+                    entry.Key.companyId,
+                    entry.Key.conceptName,
+                    entry.Value.value,
+                    entry.Value.reportDate,
+                    entry.Value.balanceTypeId));
+            }
+        }
+
+        return results;
+    }
+
+    // Latest prices (one per ticker)
+
+    public IReadOnlyCollection<LatestPrice> GetAllLatestPrices() {
+        var results = new List<LatestPrice>();
+        lock (_mutex) {
+            var latestByTicker = new Dictionary<string, (decimal close, DateOnly date)>(StringComparer.OrdinalIgnoreCase);
+            foreach (PriceRow price in _prices) {
+                if (!latestByTicker.TryGetValue(price.Ticker, out var existing) || price.PriceDate > existing.date)
+                    latestByTicker[price.Ticker] = (price.Close, price.PriceDate);
+            }
+            foreach (var entry in latestByTicker)
+                results.Add(new LatestPrice(entry.Key, entry.Value.close, entry.Value.date));
+        }
+        return results;
+    }
+
     // Data points by submission
 
     public IReadOnlyCollection<DataPoint> GetDataPointsForSubmission(ulong companyId, ulong submissionId) {

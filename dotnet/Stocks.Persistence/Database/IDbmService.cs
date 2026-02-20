@@ -69,6 +69,11 @@ public interface IDbmService {
     Task<Result<IReadOnlyCollection<ScoringConceptValue>>> GetScoringDataPoints(
         ulong companyId, string[] conceptNames, CancellationToken ct);
 
+    // Batch scoring data (all companies, 10-K filings, up to 5 most recent years per company)
+    Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
+        string[] conceptNames, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct);
+
     // Dashboard
     Task<Result<DashboardStats>> GetDashboardStats(CancellationToken ct);
 

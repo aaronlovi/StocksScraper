@@ -174,10 +174,10 @@ public sealed class DbmInMemoryService : IDbmService {
         return Task.FromResult(Result.Success);
     }
 
-    public Task<Result<IReadOnlyCollection<Company>>> GetCompaniesWithoutSharesData(
+    public Task<Result<CompaniesWithoutSharesDataResult>> GetCompaniesWithoutSharesData(
         string[] sharesConcepts, DateTime recentCutoff, CancellationToken ct) =>
-        Task.FromResult(Result<IReadOnlyCollection<Company>>.Success(
-            (IReadOnlyCollection<Company>)new List<Company>()));
+        Task.FromResult(Result<CompaniesWithoutSharesDataResult>.Success(
+            new CompaniesWithoutSharesDataResult(new List<Company>(), new List<ulong>())));
     public Task<Result> BulkInsertTaxonomyConcepts(List<ConceptDetailsDTO> taxonomyConcepts, CancellationToken ct) {
         _data.AddTaxonomyConcepts(taxonomyConcepts);
         return Task.FromResult(Result.Success);

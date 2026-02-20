@@ -9,6 +9,10 @@ using Stocks.Shared;
 
 namespace Stocks.Persistence.Database;
 
+public record CompaniesWithoutSharesDataResult(
+    IReadOnlyCollection<Company> Companies,
+    IReadOnlyCollection<ulong> MultiTickerCompanyIds);
+
 public interface IDbmService {
     // Utilities
 
@@ -49,7 +53,7 @@ public interface IDbmService {
     Task<Result> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct);
     Task<Result> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct);
     Task<Result> UpsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct);
-    Task<Result<IReadOnlyCollection<Company>>> GetCompaniesWithoutSharesData(string[] sharesConcepts, DateTime recentCutoff, CancellationToken ct);
+    Task<Result<CompaniesWithoutSharesDataResult>> GetCompaniesWithoutSharesData(string[] sharesConcepts, DateTime recentCutoff, CancellationToken ct);
     Task<Result> BulkInsertTaxonomyConcepts(List<ConceptDetailsDTO> taxonomyConcepts, CancellationToken ct);
     Task<Result<IReadOnlyCollection<ConceptDetailsDTO>>> GetTaxonomyConceptsByTaxonomyType(
         int taxonomyTypeId, CancellationToken ct);

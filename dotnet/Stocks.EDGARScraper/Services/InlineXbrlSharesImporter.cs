@@ -40,13 +40,19 @@ internal sealed class InlineXbrlSharesImporter {
         // Step 1: Find companies with price data but no recent shares data
         var recentCutoff = new DateTime(2020, 1, 1);
         _logger.LogInformation("InlineXbrlSharesImporter - Finding companies without recent shares data (cutoff: {Cutoff})...", recentCutoff);
-        Result<IReadOnlyCollection<Company>> companiesResult =
+        Result<CompaniesWithoutSharesDataResult> companiesResult =
             await _dbm.GetCompaniesWithoutSharesData(SharesConcepts, recentCutoff, ct);
         if (companiesResult.IsFailure)
             return Result.Failure(companiesResult);
 
-        IReadOnlyCollection<Company> targetCompanies = companiesResult.Value!;
-        _logger.LogInformation("InlineXbrlSharesImporter - Found {Count} companies without recent shares data", targetCompanies.Count);
+        CompaniesWithoutSharesDataResult sharesResult = companiesResult.Value!;
+        IReadOnlyCollection<Company> targetCompanies = sharesResult.Companies;
+        var multiTickerCompanyIds = new HashSet<ulong>();
+        foreach (ulong id in sharesResult.MultiTickerCompanyIds)
+            multiTickerCompanyIds.Add(id);
+        _logger.LogInformation(
+            "InlineXbrlSharesImporter - Found {Count} companies without recent shares data ({MultiTicker} multi-ticker)",
+            targetCompanies.Count, multiTickerCompanyIds.Count);
 
         if (targetCompanies.Count == 0)
             return Result.Success;
@@ -96,9 +102,10 @@ internal sealed class InlineXbrlSharesImporter {
                     "InlineXbrlSharesImporter - Progress: {Done}/{Total} companies, {DataPoints} data points, {Errors} errors",
                     totalCompanies, targetCompanies.Count, totalDataPoints, totalErrors);
 
+            bool useSmallestClass = multiTickerCompanyIds.Contains(company.CompanyId);
             int companyDataPoints = await ProcessCompanyAsync(
                 company, primaryDocsByFilingRef, httpClient, parser,
-                sharesUnit, taxonomyConceptId, dataPointsBatch, ct);
+                sharesUnit, taxonomyConceptId, dataPointsBatch, useSmallestClass, ct);
 
             if (companyDataPoints > 0)
                 ++companiesWithData;
@@ -140,6 +147,7 @@ internal sealed class InlineXbrlSharesImporter {
         DataPointUnit sharesUnit,
         long taxonomyConceptId,
         List<DataPoint> dataPointsBatch,
+        bool useSmallestClass,
         CancellationToken ct) {
 
         // Get company submissions
@@ -181,7 +189,7 @@ internal sealed class InlineXbrlSharesImporter {
 
             // Parse inline XBRL for shares
             IReadOnlyCollection<AggregatedSharesFact> sharesFacts =
-                await parser.ParseSharesFromHtmlAsync(htmlResult.Value!);
+                await parser.ParseSharesFromHtmlAsync(htmlResult.Value!, useSmallestClass);
 
             foreach (AggregatedSharesFact fact in sharesFacts) {
                 ulong dpId = await _dbm.GetNextId64(ct);

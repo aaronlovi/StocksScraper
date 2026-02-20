@@ -106,6 +106,42 @@ public class InlineXbrlParserTests {
     }
 
     [Fact]
+    public async Task ParseSharesFromHtml_MultiClass_UseSmallestClass_TakesSmallestClass() {
+        // Arrange: Berkshire-like scenario — Class A (small count, high price) and Class B (large count, low price)
+        string html = HtmlPrefix
+            + @"<xbrli:context id=""c-a"">
+                  <xbrli:entity>
+                    <xbrli:identifier>0001067983</xbrli:identifier>
+                    <xbrli:segment>
+                      <xbrldi:explicitmember dimension=""us-gaap:StatementClassOfStockAxis"">us-gaap:CommonClassAMember</xbrldi:explicitmember>
+                    </xbrli:segment>
+                  </xbrli:entity>
+                  <xbrli:period><xbrli:instant>2024-12-31</xbrli:instant></xbrli:period>
+                </xbrli:context>
+                <xbrli:context id=""c-b"">
+                  <xbrli:entity>
+                    <xbrli:identifier>0001067983</xbrli:identifier>
+                    <xbrli:segment>
+                      <xbrldi:explicitmember dimension=""us-gaap:StatementClassOfStockAxis"">us-gaap:CommonClassBMember</xbrldi:explicitmember>
+                    </xbrli:segment>
+                  </xbrli:entity>
+                  <xbrli:period><xbrli:instant>2024-12-31</xbrli:instant></xbrli:period>
+                </xbrli:context>"
+            + @"<ix:nonfraction contextref=""c-a"" name=""dei:EntityCommonStockSharesOutstanding"" unitref=""shares"" decimals=""0"">596,421</ix:nonfraction>"
+            + @"<ix:nonfraction contextref=""c-b"" name=""dei:EntityCommonStockSharesOutstanding"" unitref=""shares"" decimals=""0"">1,340,825,436</ix:nonfraction>"
+            + HtmlSuffix;
+
+        // Act
+        IReadOnlyCollection<AggregatedSharesFact> results = await _parser.ParseSharesFromHtmlAsync(html, useSmallestClass: true);
+
+        // Assert: smallest class (Class A) is used for multi-ticker companies
+        Assert.Single(results);
+        AggregatedSharesFact fact = Assert.Single(results);
+        Assert.Equal(new DateOnly(2024, 12, 31), fact.Date);
+        Assert.Equal(596421m, fact.TotalShares);
+    }
+
+    [Fact]
     public async Task ParseSharesFromHtml_NoSharesFacts_ReturnsEmpty() {
         // Arrange: HTML with context but no shares ix:nonfraction elements
         string html = HtmlPrefix

@@ -14,7 +14,8 @@ internal record AggregatedSharesFact(DateOnly Date, decimal TotalShares);
 internal sealed class InlineXbrlParser {
     private const string EntityCommonStockSharesOutstanding = ":EntityCommonStockSharesOutstanding";
 
-    internal async Task<IReadOnlyCollection<AggregatedSharesFact>> ParseSharesFromHtmlAsync(string html) {
+    internal async Task<IReadOnlyCollection<AggregatedSharesFact>> ParseSharesFromHtmlAsync(
+        string html, bool useSmallestClass = false) {
         IBrowsingContext browsingContext = BrowsingContext.New(Configuration.Default);
         IDocument document = await browsingContext.OpenAsync(req => req.Content(html));
 
@@ -26,8 +27,9 @@ internal sealed class InlineXbrlParser {
         // Step 2: Parse all xbrli:context elements to get instant dates
         Dictionary<string, XbrlContextInfo> contexts = ExtractContexts(document);
 
-        // Step 3: Group by date and take the largest share class per date
-        return LargestByDate(sharesFacts, contexts);
+        // Step 3: Group by date — take smallest class for multi-ticker companies,
+        //         largest class for single-ticker companies
+        return AggregateByDate(sharesFacts, contexts, useSmallestClass);
     }
 
     private static List<InlineXbrlSharesFact> ExtractSharesFacts(IDocument document) {
@@ -96,24 +98,27 @@ internal sealed class InlineXbrlParser {
         return contexts;
     }
 
-    private static IReadOnlyCollection<AggregatedSharesFact> LargestByDate(
+    private static IReadOnlyCollection<AggregatedSharesFact> AggregateByDate(
         List<InlineXbrlSharesFact> sharesFacts,
-        Dictionary<string, XbrlContextInfo> contexts) {
+        Dictionary<string, XbrlContextInfo> contexts,
+        bool useSmallest) {
 
-        var maxByDate = new Dictionary<DateOnly, decimal>();
+        var valueByDate = new Dictionary<DateOnly, decimal>();
 
         foreach (InlineXbrlSharesFact fact in sharesFacts) {
             if (!contexts.TryGetValue(fact.ContextRef, out XbrlContextInfo? context))
                 continue;
 
-            if (maxByDate.TryGetValue(context.InstantDate, out decimal existing))
-                maxByDate[context.InstantDate] = Math.Max(existing, fact.Value);
+            if (valueByDate.TryGetValue(context.InstantDate, out decimal existing))
+                valueByDate[context.InstantDate] = useSmallest
+                    ? Math.Min(existing, fact.Value)
+                    : Math.Max(existing, fact.Value);
             else
-                maxByDate[context.InstantDate] = fact.Value;
+                valueByDate[context.InstantDate] = fact.Value;
         }
 
-        var results = new List<AggregatedSharesFact>(maxByDate.Count);
-        foreach (KeyValuePair<DateOnly, decimal> entry in maxByDate)
+        var results = new List<AggregatedSharesFact>(valueByDate.Count);
+        foreach (KeyValuePair<DateOnly, decimal> entry in valueByDate)
             results.Add(new AggregatedSharesFact(entry.Key, entry.Value));
 
         return results;

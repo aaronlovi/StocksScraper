@@ -318,16 +318,17 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
-    public async Task<Result<IReadOnlyCollection<Company>>> GetCompaniesWithoutSharesData(
+    public async Task<Result<CompaniesWithoutSharesDataResult>> GetCompaniesWithoutSharesData(
         string[] sharesConcepts, DateTime recentCutoff, CancellationToken ct) {
         var stmt = new GetCompaniesWithoutSharesDataStmt(sharesConcepts, recentCutoff);
         DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess) {
             _logger.LogInformation("GetCompaniesWithoutSharesData success - Num companies: {NumCompanies}", stmt.Companies.Count);
-            return Result<IReadOnlyCollection<Company>>.Success(stmt.Companies);
+            var result = new CompaniesWithoutSharesDataResult(stmt.Companies, stmt.MultiTickerCompanyIds);
+            return Result<CompaniesWithoutSharesDataResult>.Success(result);
         } else {
             _logger.LogWarning("GetCompaniesWithoutSharesData failed with error {Error}", res.ErrorMessage);
-            return Result<IReadOnlyCollection<Company>>.Failure(res);
+            return Result<CompaniesWithoutSharesDataResult>.Failure(res);
         }
     }
 

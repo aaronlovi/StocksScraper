@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Stocks.DataModels;
@@ -47,6 +48,8 @@ public interface IDbmService {
     Task<Result<IReadOnlyCollection<DataPointUnit>>> GetDataPointUnits(CancellationToken ct);
     Task<Result> InsertDataPointUnit(DataPointUnit dataPointUnit, CancellationToken ct);
     Task<Result> BulkInsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct);
+    Task<Result> UpsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<Company>>> GetCompaniesWithoutSharesData(string[] sharesConcepts, DateTime recentCutoff, CancellationToken ct);
     Task<Result> BulkInsertTaxonomyConcepts(List<ConceptDetailsDTO> taxonomyConcepts, CancellationToken ct);
     Task<Result<IReadOnlyCollection<ConceptDetailsDTO>>> GetTaxonomyConceptsByTaxonomyType(
         int taxonomyTypeId, CancellationToken ct);

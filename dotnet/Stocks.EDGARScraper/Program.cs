@@ -178,6 +178,14 @@ internal partial class Program {
                 }
                 return 0;
             }
+            case "--import-inline-xbrl-shares": {
+                Result res = await ImportInlineXbrlSharesAsync();
+                if (res.IsFailure) {
+                    _logger.LogError("ImportInlineXbrlShares failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
             default: {
                 _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
                 return 3;
@@ -989,6 +997,15 @@ internal partial class Program {
             if (res.IsFailure)
                 _logger.LogWarning("Failed to save batch of data points. Error: {Error}", res.ErrorMessage);
         }));
+    }
+
+    private static async Task<Result> ImportInlineXbrlSharesAsync() {
+        string submissionsZipPath = GetConfigValue("EdgarSubmissionsBulkZipPath");
+
+        using var httpClient = new Services.RateLimitedHttpClient(_logger);
+        var importer = new Services.InlineXbrlSharesImporter(_dbm!, _logger);
+
+        return await importer.ImportAsync(submissionsZipPath, httpClient, CancellationToken.None);
     }
 
     private static string GetConfigValue(string key) {

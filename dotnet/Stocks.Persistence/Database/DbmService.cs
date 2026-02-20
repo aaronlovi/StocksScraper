@@ -308,6 +308,29 @@ public sealed class DbmService : IDisposable, IDbmService {
         return res;
     }
 
+    public async Task<Result> UpsertDataPoints(List<DataPoint> dataPoints, CancellationToken ct) {
+        var stmt = new UpsertDataPointsBatchStmt(dataPoints);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("UpsertDataPoints success - Num data points: {NumDataPoints}", dataPoints.Count);
+        else
+            _logger.LogError("UpsertDataPoints failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result<IReadOnlyCollection<Company>>> GetCompaniesWithoutSharesData(
+        string[] sharesConcepts, DateTime recentCutoff, CancellationToken ct) {
+        var stmt = new GetCompaniesWithoutSharesDataStmt(sharesConcepts, recentCutoff);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetCompaniesWithoutSharesData success - Num companies: {NumCompanies}", stmt.Companies.Count);
+            return Result<IReadOnlyCollection<Company>>.Success(stmt.Companies);
+        } else {
+            _logger.LogWarning("GetCompaniesWithoutSharesData failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<Company>>.Failure(res);
+        }
+    }
+
     public async Task<Result> BulkInsertTaxonomyConcepts(List<ConceptDetailsDTO> taxonomyConcepts, CancellationToken ct) {
         var stmt = new BulkInsertTaxonomyConceptsStmt(taxonomyConcepts);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);

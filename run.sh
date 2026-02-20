@@ -39,7 +39,8 @@ display_menu() {
     printf "  %-${col1_w}s  %s\n" "7) Import SEC ticker mappings" ""
     echo ""
     printf "  %-${col1_w}s  %s\n" "--- Other ---"                 ""
-    printf "  %-${col1_w}s  %s\n" "2) Print financial statement"  "q) Exit"
+    printf "  %-${col1_w}s  %s\n" "2) Print financial statement"  "8) Import inline XBRL shares"
+    printf "  %-${col1_w}s  %s\n" ""                              "q) Exit"
     echo "========================================================================"
 }
 
@@ -197,6 +198,15 @@ while true; do
             echo "Importing SEC ticker mappings..."
             pushd $WORKING_DIR > /dev/null
             dotnet run --project Stocks.EDGARScraper.csproj -- --import-sec-ticker-mappings
+            if [ $? -ne 0 ]; then
+                echo "The application failed to run. Check the output for errors."
+            fi
+            popd > /dev/null
+            ;;
+        8)
+            echo "Importing inline XBRL shares (multi-class companies)..."
+            pushd $WORKING_DIR > /dev/null
+            dotnet run --project Stocks.EDGARScraper.csproj -- --import-inline-xbrl-shares
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             fi

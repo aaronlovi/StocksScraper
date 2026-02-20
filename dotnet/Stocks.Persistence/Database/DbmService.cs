@@ -447,6 +447,20 @@ public sealed class DbmService : IDisposable, IDbmService {
             _logger.LogError("BulkInsertCompanyScores failed with error {Error}", res.ErrorMessage);
         return res;
     }
+
+    public async Task<Result<PagedResults<CompanyScoreSummary>>> GetCompanyScores(
+        PaginationRequest pagination, ScoresSortBy sortBy, SortDirection sortDir,
+        ScoresFilter? filter, CancellationToken ct) {
+        var stmt = new GetCompanyScoresStmt(pagination, sortBy, sortDir, filter);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetCompanyScores success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<PagedResults<CompanyScoreSummary>>.Success(stmt.GetPagedResults());
+        } else {
+            _logger.LogWarning("GetCompanyScores failed with error {Error}", res.ErrorMessage);
+            return Result<PagedResults<CompanyScoreSummary>>.Failure(res);
+        }
+    }
     #endregion
 
     #region Taxonomy types

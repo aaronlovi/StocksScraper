@@ -77,6 +77,9 @@ public interface IDbmService {
     // Company scores persistence
     Task<Result> TruncateCompanyScores(CancellationToken ct);
     Task<Result> BulkInsertCompanyScores(List<CompanyScoreSummary> scores, CancellationToken ct);
+    Task<Result<PagedResults<CompanyScoreSummary>>> GetCompanyScores(
+        PaginationRequest pagination, ScoresSortBy sortBy, SortDirection sortDir,
+        ScoresFilter? filter, CancellationToken ct);
 
     // Dashboard
     Task<Result<DashboardStats>> GetDashboardStats(CancellationToken ct);

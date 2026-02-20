@@ -222,4 +222,11 @@ public sealed class DbmInMemoryService : IDbmService {
         _data.AddCompanyScores(scores);
         return Task.FromResult(Result.Success);
     }
+
+    public Task<Result<PagedResults<CompanyScoreSummary>>> GetCompanyScores(
+        PaginationRequest pagination, ScoresSortBy sortBy, SortDirection sortDir,
+        ScoresFilter? filter, CancellationToken ct) {
+        PagedResults<CompanyScoreSummary> results = _data.GetCompanyScoresPaged(pagination, sortBy, sortDir, filter);
+        return Task.FromResult(Result<PagedResults<CompanyScoreSummary>>.Success(results));
+    }
 }

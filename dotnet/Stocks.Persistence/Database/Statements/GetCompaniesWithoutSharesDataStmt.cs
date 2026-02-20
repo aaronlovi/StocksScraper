@@ -18,7 +18,8 @@ WHERE NOT EXISTS (
     WHERE dp.company_id = c.company_id
       AND tc.name = ANY(@shares_concepts)
       AND dp.end_date >= @recent_cutoff
-);
+)
+AND (SELECT COUNT(DISTINCT pd2.ticker) FROM price_downloads pd2 WHERE pd2.cik = c.cik) = 1;
 ";
 
     private readonly string[] _sharesConcepts;

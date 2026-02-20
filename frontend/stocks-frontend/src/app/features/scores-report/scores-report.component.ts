@@ -263,10 +263,12 @@ export class ScoresReportComponent implements OnInit {
 
   fmtCurrency(val: number | null): string {
     if (val == null) return '';
-    if (Math.abs(val) >= 1_000_000_000_000) return '$' + (val / 1_000_000_000_000).toFixed(2) + 'T';
-    if (Math.abs(val) >= 1_000_000_000) return '$' + (val / 1_000_000_000).toFixed(2) + 'B';
-    if (Math.abs(val) >= 1_000_000) return '$' + (val / 1_000_000).toFixed(2) + 'M';
-    return '$' + val.toFixed(2);
+    const sign = val < 0 ? '-' : '';
+    const abs = Math.abs(val);
+    if (abs >= 1_000_000_000_000) return sign + '$' + (abs / 1_000_000_000_000).toFixed(2) + 'T';
+    if (abs >= 1_000_000_000) return sign + '$' + (abs / 1_000_000_000).toFixed(2) + 'B';
+    if (abs >= 1_000_000) return sign + '$' + (abs / 1_000_000).toFixed(2) + 'M';
+    return sign + '$' + abs.toFixed(2);
   }
 
   fmtRatio(val: number | null): string {

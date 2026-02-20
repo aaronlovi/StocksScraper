@@ -192,6 +192,156 @@ public class ScoringService {
 
     private static readonly Dictionary<string, TaxonomyBalanceTypes> EmptyBalanceTypes = new(StringComparer.Ordinal);
 
+    public async Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScores(CancellationToken ct) {
+        // 1. Fetch all scoring data points in one query
+        Result<IReadOnlyCollection<BatchScoringConceptValue>> dataResult =
+            await _dbmService.GetAllScoringDataPoints(AllConceptNames, ct);
+        if (dataResult.IsFailure || dataResult.Value is null)
+            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+                ErrorCodes.GenericError, "Failed to fetch batch scoring data points.");
+
+        // 2. Fetch latest prices for all tickers
+        Result<IReadOnlyCollection<LatestPrice>> pricesResult =
+            await _dbmService.GetAllLatestPrices(ct);
+        if (pricesResult.IsFailure || pricesResult.Value is null)
+            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+                ErrorCodes.GenericError, "Failed to fetch latest prices.");
+
+        // 3. Fetch company tickers (company_id → ticker)
+        Result<IReadOnlyCollection<CompanyTicker>> tickersResult =
+            await _dbmService.GetAllCompanyTickers(ct);
+        if (tickersResult.IsFailure || tickersResult.Value is null)
+            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+                ErrorCodes.GenericError, "Failed to fetch company tickers.");
+
+        // 4. Fetch company names (company_id → name)
+        Result<IReadOnlyCollection<CompanyName>> namesResult =
+            await _dbmService.GetAllCompanyNames(ct);
+        if (namesResult.IsFailure || namesResult.Value is null)
+            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+                ErrorCodes.GenericError, "Failed to fetch company names.");
+
+        // 5. Fetch all companies for CIK lookup
+        Result<IReadOnlyCollection<Company>> companiesResult =
+            await _dbmService.GetAllCompaniesByDataSource("sec-edgar", ct);
+        if (companiesResult.IsFailure || companiesResult.Value is null)
+            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+                ErrorCodes.GenericError, "Failed to fetch companies.");
+
+        // Build lookups
+        var companyLookup = new Dictionary<ulong, Company>();
+        foreach (Company c in companiesResult.Value)
+            companyLookup[c.CompanyId] = c;
+
+        var companyNameLookup = new Dictionary<ulong, string>();
+        foreach (CompanyName cn in namesResult.Value) {
+            if (!companyNameLookup.ContainsKey(cn.CompanyId))
+                companyNameLookup[cn.CompanyId] = cn.Name;
+        }
+
+        var tickerByCompany = new Dictionary<ulong, CompanyTicker>();
+        foreach (CompanyTicker ct2 in tickersResult.Value) {
+            if (!tickerByCompany.ContainsKey(ct2.CompanyId))
+                tickerByCompany[ct2.CompanyId] = ct2;
+        }
+
+        var priceByTicker = new Dictionary<string, LatestPrice>(StringComparer.OrdinalIgnoreCase);
+        foreach (LatestPrice lp in pricesResult.Value) {
+            if (!priceByTicker.ContainsKey(lp.Ticker))
+                priceByTicker[lp.Ticker] = lp;
+        }
+
+        // 6. Group batch scoring data by company_id into per-company List<ScoringConceptValue>
+        var dataByCompany = new Dictionary<ulong, List<ScoringConceptValue>>();
+        foreach (BatchScoringConceptValue bv in dataResult.Value) {
+            if (!dataByCompany.TryGetValue(bv.CompanyId, out List<ScoringConceptValue>? list)) {
+                list = new List<ScoringConceptValue>();
+                dataByCompany[bv.CompanyId] = list;
+            }
+            list.Add(new ScoringConceptValue(bv.ConceptName, bv.Value, bv.ReportDate, bv.BalanceTypeId));
+        }
+
+        // 7. Compute scores for each company
+        DateTime now = DateTime.UtcNow;
+        var results = new List<CompanyScoreSummary>(dataByCompany.Count);
+
+        foreach (var entry in dataByCompany) {
+            ulong companyId = entry.Key;
+            List<ScoringConceptValue> values = entry.Value;
+
+            // Group by year
+            Dictionary<int, Dictionary<string, decimal>> rawByYear = GroupByYear(
+                values, out Dictionary<string, TaxonomyBalanceTypes> balanceTypes);
+
+            var rawDataByYear = new Dictionary<int, IReadOnlyDictionary<string, decimal>>();
+            foreach (var yearEntry in rawByYear)
+                rawDataByYear[yearEntry.Key] = yearEntry.Value;
+
+            int yearsOfData = rawDataByYear.Count;
+
+            // Extract shares outstanding from most recent year
+            long? sharesOutstanding = null;
+            if (yearsOfData > 0) {
+                int mostRecentYear = int.MinValue;
+                foreach (int year in rawDataByYear.Keys) {
+                    if (year > mostRecentYear)
+                        mostRecentYear = year;
+                }
+                decimal? sharesValue = ResolveField(rawDataByYear[mostRecentYear], SharesChain, null);
+                if (sharesValue.HasValue)
+                    sharesOutstanding = (long)sharesValue.Value;
+            }
+
+            // Look up ticker and price
+            decimal? pricePerShare = null;
+            DateOnly? priceDate = null;
+            string? ticker = null;
+            string? exchange = null;
+            if (tickerByCompany.TryGetValue(companyId, out CompanyTicker? companyTicker)) {
+                ticker = companyTicker.Ticker;
+                exchange = companyTicker.Exchange;
+                if (priceByTicker.TryGetValue(companyTicker.Ticker, out LatestPrice? price)) {
+                    pricePerShare = price.Close;
+                    priceDate = price.PriceDate;
+                }
+            }
+
+            // Compute derived metrics
+            DerivedMetrics metrics = ComputeDerivedMetrics(rawDataByYear, pricePerShare, sharesOutstanding, balanceTypes);
+
+            // Evaluate checks
+            IReadOnlyList<ScoringCheck> scorecard = EvaluateChecks(metrics, yearsOfData);
+
+            int overallScore = 0;
+            int computableChecks = 0;
+            foreach (ScoringCheck check in scorecard) {
+                if (check.Result != ScoringCheckResult.NotAvailable) {
+                    computableChecks++;
+                    if (check.Result == ScoringCheckResult.Pass)
+                        overallScore++;
+                }
+            }
+
+            // Look up CIK and name
+            string cik = "0";
+            if (companyLookup.TryGetValue(companyId, out Company? company))
+                cik = company.Cik.ToString();
+
+            companyNameLookup.TryGetValue(companyId, out string? companyName);
+
+            results.Add(new CompanyScoreSummary(
+                companyId, cik, companyName, ticker, exchange,
+                overallScore, computableChecks, yearsOfData,
+                metrics.BookValue, metrics.MarketCap,
+                metrics.DebtToEquityRatio, metrics.PriceToBookRatio, metrics.DebtToBookRatio,
+                metrics.AdjustedRetainedEarnings, metrics.AverageNetCashFlow,
+                metrics.AverageOwnerEarnings, metrics.EstimatedReturnCF, metrics.EstimatedReturnOE,
+                pricePerShare, priceDate, sharesOutstanding, now));
+        }
+
+        return Result<IReadOnlyCollection<CompanyScoreSummary>>.Success(results);
+    }
+
     public async Task<Result<ScoringResult>> ComputeScore(ulong companyId, CancellationToken ct) {
         // 1. Get raw scoring data points
         Result<IReadOnlyCollection<ScoringConceptValue>> dataResult =

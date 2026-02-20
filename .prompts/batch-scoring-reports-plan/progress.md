@@ -8,10 +8,12 @@
 - [x] Checkpoint 2: Batch Data Fetch Statements
   - Files: GetAllScoringDataPointsStmt.cs, GetAllLatestPricesStmt.cs, IDbmService.cs, DbmService.cs, DbmInMemoryService.cs, DbmInMemoryData.cs, BatchScoringDataFetchTests.cs
   - Tests: 9 new tests (6 for GetAllScoringDataPoints, 3 for GetAllLatestPrices)
-  - Committed: pending
+  - Committed: 3707ba8
 
-- [ ] Checkpoint 3: Score Persistence, Batch Scoring Service, and CLI Command
-  - (pending)
+- [x] Checkpoint 3: Score Persistence, Batch Scoring Service, and CLI Command
+  - Files: TruncateCompanyScoresStmt.cs, BulkInsertCompanyScoresStmt.cs, IDbmService.cs, DbmService.cs, DbmInMemoryService.cs, DbmInMemoryData.cs, ScoringService.cs (ComputeAllScores), Program.cs (--compute-all-scores), BatchScoringServiceTests.cs
+  - Tests: 6 new tests (5 for ComputeAllScores, 1 for truncate+insert round-trip)
+  - Committed: pending
 
 - [ ] Checkpoint 4: Report Query Statement and API Endpoint
   - (pending)

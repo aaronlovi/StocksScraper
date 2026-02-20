@@ -427,6 +427,26 @@ public sealed class DbmService : IDisposable, IDbmService {
             return Result<IReadOnlyCollection<LatestPrice>>.Failure(res);
         }
     }
+
+    public async Task<Result> TruncateCompanyScores(CancellationToken ct) {
+        var stmt = new TruncateCompanyScoresStmt();
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("TruncateCompanyScores success");
+        else
+            _logger.LogError("TruncateCompanyScores failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result> BulkInsertCompanyScores(List<CompanyScoreSummary> scores, CancellationToken ct) {
+        var stmt = new BulkInsertCompanyScoresStmt(scores);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertCompanyScores success - Num scores: {NumScores}", scores.Count);
+        else
+            _logger.LogError("BulkInsertCompanyScores failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
     #endregion
 
     #region Taxonomy types

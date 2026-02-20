@@ -186,6 +186,14 @@ internal partial class Program {
                 }
                 return 0;
             }
+            case "--compute-all-scores": {
+                Result res = await ComputeAndStoreAllScoresAsync();
+                if (res.IsFailure) {
+                    _logger.LogError("ComputeAllScores failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
             default: {
                 _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
                 return 3;
@@ -1006,6 +1014,32 @@ internal partial class Program {
         var importer = new Services.InlineXbrlSharesImporter(_dbm!, _logger);
 
         return await importer.ImportAsync(submissionsZipPath, httpClient, CancellationToken.None);
+    }
+
+    private static async Task<Result> ComputeAndStoreAllScoresAsync() {
+        var scoringService = new Stocks.Persistence.Services.ScoringService(_dbm!);
+        CancellationToken ct = CancellationToken.None;
+
+        _logger.LogInformation("Computing scores for all companies...");
+        Result<IReadOnlyCollection<Stocks.DataModels.Scoring.CompanyScoreSummary>> computeResult =
+            await scoringService.ComputeAllScores(ct);
+        if (computeResult.IsFailure || computeResult.Value is null)
+            return Result.Failure(ErrorCodes.GenericError, computeResult.ErrorMessage);
+
+        List<Stocks.DataModels.Scoring.CompanyScoreSummary> scores = new(computeResult.Value);
+        _logger.LogInformation("Computed {NumScores} company scores, truncating old scores...", scores.Count);
+
+        Result truncateResult = await _dbm!.TruncateCompanyScores(ct);
+        if (truncateResult.IsFailure)
+            return truncateResult;
+
+        _logger.LogInformation("Inserting {NumScores} company scores...", scores.Count);
+        Result insertResult = await _dbm.BulkInsertCompanyScores(scores, ct);
+        if (insertResult.IsFailure)
+            return insertResult;
+
+        _logger.LogInformation("Successfully computed and stored {NumScores} company scores", scores.Count);
+        return Result.Success;
     }
 
     private static string GetConfigValue(string key) {

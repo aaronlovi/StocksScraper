@@ -94,6 +94,40 @@ export interface DerivedMetricsResponse {
   currentDividendsPaid: number | null;
 }
 
+export interface CompanyScoreSummary {
+  companyId: number;
+  cik: string;
+  companyName: string | null;
+  ticker: string | null;
+  exchange: string | null;
+  overallScore: number;
+  computableChecks: number;
+  yearsOfData: number;
+  bookValue: number | null;
+  marketCap: number | null;
+  debtToEquityRatio: number | null;
+  priceToBookRatio: number | null;
+  debtToBookRatio: number | null;
+  adjustedRetainedEarnings: number | null;
+  averageNetCashFlow: number | null;
+  averageOwnerEarnings: number | null;
+  estimatedReturnCF: number | null;
+  estimatedReturnOE: number | null;
+  pricePerShare: number | null;
+  priceDate: string | null;
+  sharesOutstanding: number | null;
+  computedAt: string;
+}
+
+export interface ScoresReportParams {
+  page: number;
+  pageSize: number;
+  sortBy: string;
+  sortDir: string;
+  minScore: number | null;
+  exchange: string | null;
+}
+
 export interface ScoringResponse {
   rawDataByYear: Record<string, Record<string, number>>;
   metrics: DerivedMetricsResponse;
@@ -149,5 +183,19 @@ export class ApiService {
 
   getScoring(cik: string): Observable<ScoringResponse> {
     return this.http.get<ScoringResponse>(`/api/companies/${cik}/scoring`);
+  }
+
+  getScoresReport(params: ScoresReportParams): Observable<PaginatedResponse<CompanyScoreSummary>> {
+    const parts: string[] = [
+      `page=${params.page}`,
+      `pageSize=${params.pageSize}`,
+      `sortBy=${params.sortBy}`,
+      `sortDir=${params.sortDir}`
+    ];
+    if (params.minScore != null) parts.push(`minScore=${params.minScore}`);
+    if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
+    return this.http.get<PaginatedResponse<CompanyScoreSummary>>(
+      `/api/reports/scores?${parts.join('&')}`
+    );
   }
 }

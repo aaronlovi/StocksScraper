@@ -18,7 +18,9 @@
 - [x] Checkpoint 4: Report Query Statement and API Endpoint
   - Files: GetCompanyScoresStmt.cs, IDbmService.cs, DbmService.cs, DbmInMemoryService.cs, DbmInMemoryData.cs, ReportEndpoints.cs, WebApi/Program.cs, CompanyScoresReportTests.cs
   - Tests: 10 new tests (pagination, sorting, filtering, combined, empty)
-  - Committed: pending
+  - Committed: ecc996d
 
-- [ ] Checkpoint 5: Angular Frontend — Scores Report Page
-  - (pending)
+- [x] Checkpoint 5: Angular Frontend — Scores Report Page
+  - Files: scores-report.component.ts, api.service.ts (interfaces + getScoresReport), app.routes.ts, sidebar.component.ts
+  - Tests: None (frontend UI checkpoint, manual verification)
+  - Committed: pending

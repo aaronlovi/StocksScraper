@@ -1,0 +1,308 @@
+import { Component, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import {
+  ApiService,
+  CompanyScoreSummary,
+  PaginationResponse
+} from '../../core/services/api.service';
+
+@Component({
+  selector: 'app-scores-report',
+  standalone: true,
+  imports: [RouterLink, FormsModule],
+  template: `
+    <h2>Company Scores Report</h2>
+
+    <div class="filters">
+      <label>
+        Min Score
+        <select [(ngModel)]="minScore" (ngModelChange)="onFilterChange()">
+          <option [ngValue]="null">Any</option>
+          <option [ngValue]="10">10+</option>
+          <option [ngValue]="9">9+</option>
+          <option [ngValue]="8">8+</option>
+          <option [ngValue]="7">7+</option>
+          <option [ngValue]="5">5+</option>
+        </select>
+      </label>
+      <label>
+        Exchange
+        <select [(ngModel)]="exchange" (ngModelChange)="onFilterChange()">
+          <option [ngValue]="null">All</option>
+          <option value="NASDAQ">NASDAQ</option>
+          <option value="NYSE">NYSE</option>
+          <option value="CBOE">CBOE</option>
+        </select>
+      </label>
+      <label>
+        Page Size
+        <select [(ngModel)]="pageSize" (ngModelChange)="onFilterChange()">
+          <option [ngValue]="25">25</option>
+          <option [ngValue]="50">50</option>
+          <option [ngValue]="100">100</option>
+        </select>
+      </label>
+    </div>
+
+    @if (loading()) {
+      <p>Loading scores...</p>
+    } @else if (error()) {
+      <p class="error">{{ error() }}</p>
+    } @else if (items().length === 0) {
+      <p class="no-results">No companies match the current filters.</p>
+    } @else {
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable" (click)="toggleSort('overallScore')">
+              Score {{ sortIndicator('overallScore') }}
+            </th>
+            <th>Company</th>
+            <th>Ticker</th>
+            <th>Exchange</th>
+            <th class="num sortable" (click)="toggleSort('bookValue')">
+              Book Value {{ sortIndicator('bookValue') }}
+            </th>
+            <th class="num sortable" (click)="toggleSort('marketCap')">
+              Market Cap {{ sortIndicator('marketCap') }}
+            </th>
+            <th class="num sortable" (click)="toggleSort('priceToBookRatio')">
+              P/B {{ sortIndicator('priceToBookRatio') }}
+            </th>
+            <th class="num sortable" (click)="toggleSort('debtToEquityRatio')">
+              D/E {{ sortIndicator('debtToEquityRatio') }}
+            </th>
+            <th class="num sortable" (click)="toggleSort('estimatedReturnCF')">
+              Est. Return (CF) {{ sortIndicator('estimatedReturnCF') }}
+            </th>
+            <th class="num sortable" (click)="toggleSort('estimatedReturnOE')">
+              Est. Return (OE) {{ sortIndicator('estimatedReturnOE') }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of items(); track row.companyId) {
+            <tr>
+              <td>
+                <span class="score-badge" [class]="scoreBadgeClass(row.overallScore)">
+                  {{ row.overallScore }}/{{ row.computableChecks }}
+                </span>
+              </td>
+              <td>
+                <a [routerLink]="['/company', row.cik, 'scoring']">{{ row.companyName ?? ('CIK ' + row.cik) }}</a>
+              </td>
+              <td>{{ row.ticker ?? '' }}</td>
+              <td>{{ row.exchange ?? '' }}</td>
+              <td class="num">{{ fmtCurrency(row.bookValue) }}</td>
+              <td class="num">{{ fmtCurrency(row.marketCap) }}</td>
+              <td class="num">{{ fmtRatio(row.priceToBookRatio) }}</td>
+              <td class="num">{{ fmtRatio(row.debtToEquityRatio) }}</td>
+              <td class="num">{{ fmtPct(row.estimatedReturnCF) }}</td>
+              <td class="num">{{ fmtPct(row.estimatedReturnOE) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      @if (pagination()) {
+        <div class="pagination">
+          <button [disabled]="page() <= 1" (click)="goToPage(page() - 1)">Previous</button>
+          <span>Page {{ page() }} of {{ pagination()!.totalPages }} ({{ pagination()!.totalItems }} companies)</span>
+          <button [disabled]="page() >= pagination()!.totalPages" (click)="goToPage(page() + 1)">Next</button>
+        </div>
+      }
+
+      @if (computedAt()) {
+        <p class="computed-at">Scores computed: {{ computedAt() }}</p>
+      }
+    }
+  `,
+  styles: [`
+    .filters {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .filters label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+    }
+    .filters select {
+      padding: 4px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      padding: 4px 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+    .sortable:hover {
+      background: #e2e8f0;
+    }
+    .num { text-align: right; }
+    a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .score-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 12px;
+      text-align: center;
+      min-width: 40px;
+    }
+    .score-green { background: #dcfce7; color: #166534; }
+    .score-yellow { background: #fef9c3; color: #854d0e; }
+    .score-red { background: #fee2e2; color: #991b1b; }
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .pagination button {
+      padding: 6px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .pagination button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .no-results {
+      color: #64748b;
+    }
+    .error { color: #dc2626; }
+    .computed-at {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 12px;
+    }
+  `]
+})
+export class ScoresReportComponent implements OnInit {
+  page = signal(1);
+  pageSize = 50;
+  sortBy = 'overallScore';
+  sortDir = 'desc';
+  minScore: number | null = null;
+  exchange: string | null = null;
+
+  items = signal<CompanyScoreSummary[]>([]);
+  pagination = signal<PaginationResponse | null>(null);
+  loading = signal(true);
+  error = signal<string | null>(null);
+  computedAt = signal<string | null>(null);
+
+  constructor(private api: ApiService) {}
+
+  ngOnInit(): void {
+    this.fetchScores();
+  }
+
+  toggleSort(column: string): void {
+    if (this.sortBy === column) {
+      this.sortDir = this.sortDir === 'desc' ? 'asc' : 'desc';
+    } else {
+      this.sortBy = column;
+      this.sortDir = 'desc';
+    }
+    this.page.set(1);
+    this.fetchScores();
+  }
+
+  sortIndicator(column: string): string {
+    if (this.sortBy !== column) return '';
+    return this.sortDir === 'desc' ? '\u25BC' : '\u25B2';
+  }
+
+  onFilterChange(): void {
+    this.page.set(1);
+    this.fetchScores();
+  }
+
+  goToPage(p: number): void {
+    this.page.set(p);
+    this.fetchScores();
+  }
+
+  scoreBadgeClass(score: number): string {
+    if (score >= 10) return 'score-green';
+    if (score >= 7) return 'score-yellow';
+    return 'score-red';
+  }
+
+  fmtCurrency(val: number | null): string {
+    if (val == null) return '';
+    if (Math.abs(val) >= 1_000_000_000_000) return '$' + (val / 1_000_000_000_000).toFixed(2) + 'T';
+    if (Math.abs(val) >= 1_000_000_000) return '$' + (val / 1_000_000_000).toFixed(2) + 'B';
+    if (Math.abs(val) >= 1_000_000) return '$' + (val / 1_000_000).toFixed(2) + 'M';
+    return '$' + val.toFixed(2);
+  }
+
+  fmtRatio(val: number | null): string {
+    if (val == null) return '';
+    return val.toFixed(2);
+  }
+
+  fmtPct(val: number | null): string {
+    if (val == null) return '';
+    return val.toFixed(2) + '%';
+  }
+
+  private fetchScores(): void {
+    this.loading.set(true);
+    this.error.set(null);
+
+    this.api.getScoresReport({
+      page: this.page(),
+      pageSize: this.pageSize,
+      sortBy: this.sortBy,
+      sortDir: this.sortDir,
+      minScore: this.minScore,
+      exchange: this.exchange
+    }).subscribe({
+      next: data => {
+        this.items.set(data.items);
+        this.pagination.set(data.pagination);
+        if (data.items.length > 0) {
+          this.computedAt.set(data.items[0].computedAt);
+        }
+        this.loading.set(false);
+      },
+      error: () => {
+        this.error.set('Failed to load scores report.');
+        this.loading.set(false);
+      }
+    });
+  }
+}

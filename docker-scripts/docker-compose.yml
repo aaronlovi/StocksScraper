@@ -28,53 +28,9 @@ services:
     restart: unless-stopped
     networks:
       - stocks-data-network
-  
-  elasticsearch:
-    container_name: elasticsearch
-    image: elasticsearch:${ELASTIC_STACK_VERSION}
-    volumes:
-      - esdata:/usr/share/elasticsearch/data
-    ports:
-      - ${ES_PORT}:9200
-    environment:
-      - node.name=elasticsearch
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - xpack.security.enabled=false
-    mem_limit: ${ES_MEM_LIMIT}
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    networks:
-      - stocks-data-network
-    healthcheck:
-      test: [ "CMD-SHELL", "curl", "-f", "http://localhost:9200 || exit 1" ]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-
-  kibana:
-    container_name: kibana
-    image: kibana:${ELASTIC_STACK_VERSION}
-    environment:
-      - SERVER_NAME=kibana
-      - ELASTICSEARCH_URL=http://elasticsearch:${ES_PORT}
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:${ES_PORT}
-    mem_limit: ${KB_MEM_LIMIT}
-    ports:
-      - "${KIBANA_PORT}:5601"
-    volumes:
-      - kibanadata:/usr/share/kibana/data
-    networks:
-      - stocks-data-network
 
 volumes:
   postgres-data:
-    driver: local
-  esdata:
-    driver: local
-  kibanadata:
     driver: local
 
 networks:

@@ -13,10 +13,12 @@
 - [x] Checkpoint 3: Score Persistence, Batch Scoring Service, and CLI Command
   - Files: TruncateCompanyScoresStmt.cs, BulkInsertCompanyScoresStmt.cs, IDbmService.cs, DbmService.cs, DbmInMemoryService.cs, DbmInMemoryData.cs, ScoringService.cs (ComputeAllScores), Program.cs (--compute-all-scores), BatchScoringServiceTests.cs
   - Tests: 6 new tests (5 for ComputeAllScores, 1 for truncate+insert round-trip)
-  - Committed: pending
+  - Committed: d9e5e20
 
-- [ ] Checkpoint 4: Report Query Statement and API Endpoint
-  - (pending)
+- [x] Checkpoint 4: Report Query Statement and API Endpoint
+  - Files: GetCompanyScoresStmt.cs, IDbmService.cs, DbmService.cs, DbmInMemoryService.cs, DbmInMemoryData.cs, ReportEndpoints.cs, WebApi/Program.cs, CompanyScoresReportTests.cs
+  - Tests: 10 new tests (pagination, sorting, filtering, combined, empty)
+  - Committed: pending
 
 - [ ] Checkpoint 5: Angular Frontend — Scores Report Page
   - (pending)

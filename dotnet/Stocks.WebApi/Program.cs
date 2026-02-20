@@ -47,6 +47,7 @@ public class Program {
         app.MapStatementEndpoints();
         app.MapTypeaheadEndpoints();
         app.MapScoringEndpoints();
+        app.MapReportEndpoints();
 
         app.Run();
     }

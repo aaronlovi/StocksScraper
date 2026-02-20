@@ -625,6 +625,69 @@ public sealed class DbmInMemoryData {
             return [.. _companyScores];
     }
 
+    public PagedResults<CompanyScoreSummary> GetCompanyScoresPaged(
+        PaginationRequest pagination, ScoresSortBy sortBy, SortDirection sortDir,
+        ScoresFilter? filter) {
+        lock (_mutex) {
+            // Filter
+            var filtered = new List<CompanyScoreSummary>();
+            foreach (CompanyScoreSummary s in _companyScores) {
+                if (filter is not null) {
+                    if (filter.MinScore.HasValue && s.OverallScore < filter.MinScore.Value)
+                        continue;
+                    if (filter.MaxScore.HasValue && s.OverallScore > filter.MaxScore.Value)
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(filter.Exchange)
+                        && !string.Equals(s.Exchange, filter.Exchange, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
+                filtered.Add(s);
+            }
+
+            // Sort
+            filtered.Sort((a, b) => {
+                int cmp = CompareByField(a, b, sortBy);
+                if (sortDir == SortDirection.Descending)
+                    cmp = -cmp;
+                if (cmp != 0)
+                    return cmp;
+                return a.CompanyId.CompareTo(b.CompanyId);
+            });
+
+            // Paginate
+            uint totalItems = (uint)filtered.Count;
+            int offset = (int)((pagination.PageNumber - 1) * pagination.PageSize);
+            int limit = (int)pagination.PageSize;
+
+            var page = new List<CompanyScoreSummary>();
+            for (int i = offset; i < filtered.Count && page.Count < limit; i++)
+                page.Add(filtered[i]);
+
+            uint totalPages = totalItems == 0 ? 0 : (uint)Math.Ceiling(totalItems / (double)pagination.PageSize);
+            var paginationResponse = new PaginationResponse(pagination.PageNumber, totalItems, totalPages);
+            return new PagedResults<CompanyScoreSummary>(page, paginationResponse);
+        }
+    }
+
+    private static int CompareByField(CompanyScoreSummary a, CompanyScoreSummary b, ScoresSortBy sortBy) {
+        return sortBy switch {
+            ScoresSortBy.BookValue => CompareNullable(a.BookValue, b.BookValue),
+            ScoresSortBy.MarketCap => CompareNullable(a.MarketCap, b.MarketCap),
+            ScoresSortBy.EstimatedReturnCF => CompareNullable(a.EstimatedReturnCF, b.EstimatedReturnCF),
+            ScoresSortBy.EstimatedReturnOE => CompareNullable(a.EstimatedReturnOE, b.EstimatedReturnOE),
+            ScoresSortBy.DebtToEquityRatio => CompareNullable(a.DebtToEquityRatio, b.DebtToEquityRatio),
+            ScoresSortBy.PriceToBookRatio => CompareNullable(a.PriceToBookRatio, b.PriceToBookRatio),
+            _ => a.OverallScore.CompareTo(b.OverallScore),
+        };
+    }
+
+    private static int CompareNullable(decimal? a, decimal? b) {
+        if (!a.HasValue && !b.HasValue) return 0;
+        if (!a.HasValue) return -1;
+        if (!b.HasValue) return 1;
+        return a.Value.CompareTo(b.Value);
+    }
+
     // Helpers
 
     private static string BuildImportKey(ulong cik, string ticker, string? exchange) {

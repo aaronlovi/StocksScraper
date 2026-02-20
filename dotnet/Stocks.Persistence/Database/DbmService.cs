@@ -402,6 +402,31 @@ public sealed class DbmService : IDisposable, IDbmService {
             return Result<IReadOnlyCollection<ScoringConceptValue>>.Failure(res);
         }
     }
+
+    public async Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
+        string[] conceptNames, CancellationToken ct) {
+        var stmt = new GetAllScoringDataPointsStmt(conceptNames);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetAllScoringDataPoints success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<IReadOnlyCollection<BatchScoringConceptValue>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetAllScoringDataPoints failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<BatchScoringConceptValue>>.Failure(res);
+        }
+    }
+
+    public async Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct) {
+        var stmt = new GetAllLatestPricesStmt();
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetAllLatestPrices success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<IReadOnlyCollection<LatestPrice>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetAllLatestPrices failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<LatestPrice>>.Failure(res);
+        }
+    }
     #endregion
 
     #region Taxonomy types

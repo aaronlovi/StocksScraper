@@ -201,4 +201,13 @@ public sealed class DbmInMemoryService : IDbmService {
         ulong companyId, string[] conceptNames, CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<ScoringConceptValue>>.Success(
             _data.GetScoringDataPoints(companyId, conceptNames)));
+
+    public Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
+        string[] conceptNames, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<BatchScoringConceptValue>>.Success(
+            _data.GetAllScoringDataPoints(conceptNames)));
+
+    public Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<LatestPrice>>.Success(
+            _data.GetAllLatestPrices()));
 }

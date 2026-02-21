@@ -171,6 +171,8 @@ import {
                 }
               </svg>
             </div>
+          } @else {
+            <div class="sparkline-empty">Not enough data</div>
           }
         </div>
       }
@@ -333,6 +335,17 @@ import {
     .sparkline-svg {
       width: 100%;
       height: auto;
+    }
+    .sparkline-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 300px;
+      height: 120px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      color: #94a3b8;
+      font-size: 13px;
     }
     .axis-line {
       stroke: #94a3b8;

@@ -343,6 +343,12 @@ public class ScoringService {
 
             companyNameLookup.TryGetValue(companyId, out string? companyName);
 
+            decimal? maxBuyPrice = ComputeMaxBuyPrice(
+                metrics.BookValue, metrics.AverageNetCashFlow,
+                metrics.AverageOwnerEarnings, metrics.CurrentDividendsPaid,
+                sharesOutstanding);
+            decimal? percentageUpside = ComputePercentageUpside(maxBuyPrice, pricePerShare);
+
             results.Add(new CompanyScoreSummary(
                 companyId, cik, companyName, ticker, exchange,
                 overallScore, computableChecks, yearsOfData,
@@ -350,7 +356,8 @@ public class ScoringService {
                 metrics.DebtToEquityRatio, metrics.PriceToBookRatio, metrics.DebtToBookRatio,
                 metrics.AdjustedRetainedEarnings, metrics.AverageNetCashFlow,
                 metrics.AverageOwnerEarnings, metrics.EstimatedReturnCF, metrics.EstimatedReturnOE,
-                pricePerShare, priceDate, sharesOutstanding, now));
+                pricePerShare, priceDate, sharesOutstanding,
+                metrics.CurrentDividendsPaid, maxBuyPrice, percentageUpside, now));
 
             scored++;
             if (scored % logInterval == 0)
@@ -438,6 +445,12 @@ public class ScoringService {
             }
         }
 
+        decimal? maxBuyPrice = ComputeMaxBuyPrice(
+            metrics.BookValue, metrics.AverageNetCashFlow,
+            metrics.AverageOwnerEarnings, metrics.CurrentDividendsPaid,
+            sharesOutstanding);
+        decimal? percentageUpside = ComputePercentageUpside(maxBuyPrice, pricePerShare);
+
         var result = new ScoringResult(
             rawDataByYear,
             metrics,
@@ -447,7 +460,9 @@ public class ScoringService {
             yearsOfData,
             pricePerShare,
             priceDate,
-            sharesOutstanding);
+            sharesOutstanding,
+            maxBuyPrice,
+            percentageUpside);
 
         return Result<ScoringResult>.Success(result);
     }
@@ -711,6 +726,44 @@ public class ScoringService {
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// Computes the maximum buy price using the TSX formula:
+    /// min(3 × bookValue, 20 × (avgNCF - dividends), 20 × (avgOE - dividends)) / shares
+    /// Returns null if any required input is missing or shares ≤ 0.
+    /// </summary>
+    internal static decimal? ComputeMaxBuyPrice(
+        decimal? bookValue,
+        decimal? averageNetCashFlow,
+        decimal? averageOwnerEarnings,
+        decimal? currentDividendsPaid,
+        long? sharesOutstanding) {
+        if (!bookValue.HasValue || !averageNetCashFlow.HasValue
+            || !averageOwnerEarnings.HasValue || !currentDividendsPaid.HasValue
+            || !sharesOutstanding.HasValue || sharesOutstanding.Value <= 0)
+            return null;
+
+        decimal val1 = 3m * bookValue.Value;
+        decimal val2 = 20m * (averageNetCashFlow.Value - currentDividendsPaid.Value);
+        decimal val3 = 20m * (averageOwnerEarnings.Value - currentDividendsPaid.Value);
+
+        decimal minVal = val1;
+        if (val2 < minVal) minVal = val2;
+        if (val3 < minVal) minVal = val3;
+
+        return minVal / sharesOutstanding.Value;
+    }
+
+    /// <summary>
+    /// Computes the percentage upside: (maxBuyPrice - pricePerShare) / pricePerShare × 100.
+    /// Returns null if either input is missing or price is zero.
+    /// </summary>
+    internal static decimal? ComputePercentageUpside(decimal? maxBuyPrice, decimal? pricePerShare) {
+        if (!maxBuyPrice.HasValue || !pricePerShare.HasValue || pricePerShare.Value == 0m)
+            return null;
+
+        return (maxBuyPrice.Value - pricePerShare.Value) / pricePerShare.Value * 100m;
     }
 
     internal static DerivedMetrics ComputeDerivedMetrics(

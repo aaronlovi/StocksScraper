@@ -12,4 +12,6 @@ public record ScoringResult(
     int YearsOfData,
     decimal? PricePerShare,
     DateOnly? PriceDate,
-    long? SharesOutstanding);
+    long? SharesOutstanding,
+    decimal? MaxBuyPrice,
+    decimal? PercentageUpside);

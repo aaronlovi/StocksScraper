@@ -1,4 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
+import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import {
@@ -262,7 +263,8 @@ export class ScoringComponent implements OnInit {
 
   constructor(
     private route: ActivatedRoute,
-    private api: ApiService
+    private api: ApiService,
+    private titleService: Title
   ) {}
 
   ngOnInit(): void {
@@ -274,7 +276,11 @@ export class ScoringComponent implements OnInit {
     }
 
     this.api.getCompany(this.cik).subscribe({
-      next: data => this.company.set(data),
+      next: data => {
+        this.company.set(data);
+        const ticker = data.tickers.length > 0 ? data.tickers[0].ticker : ('CIK ' + data.cik);
+        this.titleService.setTitle('Stocks - ' + ticker);
+      },
       error: () => {}
     });
 
@@ -324,6 +330,8 @@ export class ScoringComponent implements OnInit {
       { label: 'Est. Return (CF)', display: this.fmtPct(m.estimatedReturnCF) },
       { label: 'Est. Return (OE)', display: this.fmtPct(m.estimatedReturnOE) },
       { label: 'Current Dividends Paid', display: this.fmtCurrency(m.currentDividendsPaid) },
+      { label: 'Max Buy Price', display: this.fmtPrice(this.scoring()!.maxBuyPrice) },
+      { label: '% Upside', display: this.fmtPct(this.scoring()!.percentageUpside) },
     ];
   }
 
@@ -351,6 +359,11 @@ export class ScoringComponent implements OnInit {
       }
       return { concept, values };
     });
+  }
+
+  private fmtPrice(val: number | null | undefined): string {
+    if (val == null) return 'N/A';
+    return '$' + val.toFixed(2);
   }
 
   private fmtCurrency(val: number | null | undefined): string {

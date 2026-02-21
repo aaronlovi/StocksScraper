@@ -48,6 +48,8 @@ function makeScoringResponse(): ScoringResponse {
     pricePerShare: 174.0,
     priceDate: '2024-12-20',
     sharesOutstanding: 15000000000,
+    maxBuyPrice: 12.50,
+    percentageUpside: -92.82,
   };
 }
 

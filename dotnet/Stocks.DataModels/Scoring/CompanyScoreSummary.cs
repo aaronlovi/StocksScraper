@@ -24,4 +24,7 @@ public record CompanyScoreSummary(
     decimal? PricePerShare,
     DateOnly? PriceDate,
     long? SharesOutstanding,
+    decimal? CurrentDividendsPaid,
+    decimal? MaxBuyPrice,
+    decimal? PercentageUpside,
     DateTime ComputedAt);

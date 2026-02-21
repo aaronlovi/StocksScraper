@@ -58,6 +58,10 @@ public static class ReportEndpoints {
             return ScoresSortBy.DebtToEquityRatio;
         if (string.Equals(value, "priceToBookRatio", StringComparison.OrdinalIgnoreCase))
             return ScoresSortBy.PriceToBookRatio;
+        if (string.Equals(value, "maxBuyPrice", StringComparison.OrdinalIgnoreCase))
+            return ScoresSortBy.MaxBuyPrice;
+        if (string.Equals(value, "percentageUpside", StringComparison.OrdinalIgnoreCase))
+            return ScoresSortBy.PercentageUpside;
 
         return ScoresSortBy.OverallScore;
     }

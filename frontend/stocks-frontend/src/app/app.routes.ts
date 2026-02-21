@@ -4,16 +4,19 @@ export const routes: Routes = [
   { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
   {
     path: 'dashboard',
+    title: 'Stocks - Dashboard',
     loadComponent: () =>
       import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
   {
     path: 'search',
+    title: 'Stocks - Search',
     loadComponent: () =>
       import('./features/search/search.component').then(m => m.SearchComponent)
   },
   {
     path: 'scores',
+    title: 'Stocks - Scores',
     loadComponent: () =>
       import('./features/scores-report/scores-report.component').then(m => m.ScoresReportComponent)
   },

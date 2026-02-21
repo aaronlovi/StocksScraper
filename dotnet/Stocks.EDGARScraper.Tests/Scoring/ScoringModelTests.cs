@@ -42,7 +42,9 @@ public class ScoringModelTests {
             YearsOfData: 5,
             PricePerShare: 150.0m,
             PriceDate: new DateOnly(2025, 1, 15),
-            SharesOutstanding: 1_000_000);
+            SharesOutstanding: 1_000_000,
+            MaxBuyPrice: null,
+            PercentageUpside: null);
 
         Assert.Equal(9, result.OverallScore);
         Assert.Equal(10, result.ComputableChecks);

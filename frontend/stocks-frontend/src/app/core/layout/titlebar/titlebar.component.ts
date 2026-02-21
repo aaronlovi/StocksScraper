@@ -11,7 +11,10 @@ import { ApiService, TypeaheadResult } from '../../services/api.service';
   imports: [FormsModule],
   template: `
     <header class="titlebar">
-      <h1>Stocks Explorer</h1>
+      <div class="brand">
+        <img src="favicon.svg" alt="" class="brand-icon" />
+        <h1>Stocks Explorer</h1>
+      </div>
       <div class="search-wrapper">
         <input
           type="text"
@@ -43,6 +46,15 @@ import { ApiService, TypeaheadResult } from '../../services/api.service';
       height: 56px;
       background: #0f172a;
       color: #f8fafc;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-icon {
+      width: 28px;
+      height: 28px;
     }
     h1 {
       font-size: 18px;

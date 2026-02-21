@@ -1445,6 +1445,107 @@ public class ScoringServiceTests {
 
     #endregion
 
+    #region ComputeMaxBuyPrice tests
+
+    [Fact]
+    public void ComputeMaxBuyPrice_TypicalValues_ReturnsMinimumDividedByShares() {
+        // bookValue = 600M, avgNCF = 50M, avgOE = 40M, dividends = 5M, shares = 10M
+        // val1 = 3 × 600M = 1800M
+        // val2 = 20 × (50M - 5M) = 900M
+        // val3 = 20 × (40M - 5M) = 700M  ← min
+        // maxBuyPrice = 700M / 10M = 70
+        decimal? result = ScoringService.ComputeMaxBuyPrice(
+            600_000_000m, 50_000_000m, 40_000_000m, 5_000_000m, 10_000_000);
+
+        Assert.NotNull(result);
+        Assert.Equal(70m, result!.Value);
+    }
+
+    [Fact]
+    public void ComputeMaxBuyPrice_ReturnsNull_WhenBookValueMissing() {
+        decimal? result = ScoringService.ComputeMaxBuyPrice(
+            null, 50_000_000m, 40_000_000m, 5_000_000m, 10_000_000);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ComputeMaxBuyPrice_ReturnsNull_WhenSharesZero() {
+        decimal? result = ScoringService.ComputeMaxBuyPrice(
+            600_000_000m, 50_000_000m, 40_000_000m, 5_000_000m, 0);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ComputeMaxBuyPrice_ReturnsNull_WhenSharesNegative() {
+        decimal? result = ScoringService.ComputeMaxBuyPrice(
+            600_000_000m, 50_000_000m, 40_000_000m, 5_000_000m, -1);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ComputeMaxBuyPrice_ReturnsNull_WhenAvgNCFMissing() {
+        decimal? result = ScoringService.ComputeMaxBuyPrice(
+            600_000_000m, null, 40_000_000m, 5_000_000m, 10_000_000);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ComputeMaxBuyPrice_ReturnsNull_WhenDividendsMissing() {
+        decimal? result = ScoringService.ComputeMaxBuyPrice(
+            600_000_000m, 50_000_000m, 40_000_000m, null, 10_000_000);
+
+        Assert.Null(result);
+    }
+
+    #endregion
+
+    #region ComputePercentageUpside tests
+
+    [Fact]
+    public void ComputePercentageUpside_TypicalValues_ReturnsCorrectPercentage() {
+        // maxBuyPrice = 70, price = 50 → upside = (70-50)/50 × 100 = 40%
+        decimal? result = ScoringService.ComputePercentageUpside(70m, 50m);
+
+        Assert.NotNull(result);
+        Assert.Equal(40m, result!.Value);
+    }
+
+    [Fact]
+    public void ComputePercentageUpside_Negative_WhenOverpriced() {
+        // maxBuyPrice = 30, price = 50 → upside = (30-50)/50 × 100 = -40%
+        decimal? result = ScoringService.ComputePercentageUpside(30m, 50m);
+
+        Assert.NotNull(result);
+        Assert.Equal(-40m, result!.Value);
+    }
+
+    [Fact]
+    public void ComputePercentageUpside_ReturnsNull_WhenMaxBuyPriceMissing() {
+        decimal? result = ScoringService.ComputePercentageUpside(null, 50m);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ComputePercentageUpside_ReturnsNull_WhenPriceZero() {
+        decimal? result = ScoringService.ComputePercentageUpside(70m, 0m);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ComputePercentageUpside_ReturnsNull_WhenPriceMissing() {
+        decimal? result = ScoringService.ComputePercentageUpside(70m, null);
+
+        Assert.Null(result);
+    }
+
+    #endregion
+
     #region Integration test
 
     [Fact]

@@ -7,7 +7,8 @@ namespace Stocks.Persistence.Database.Statements;
 internal sealed class GetAllCompanyTickersStmt : QueryDbStmtBase {
     private const string sql = @"
 SELECT company_id, ticker, exchange
-FROM company_tickers;
+FROM company_tickers
+ORDER BY company_id, ticker;
 ";
 
     private readonly List<CompanyTicker> _tickers;

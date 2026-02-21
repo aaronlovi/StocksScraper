@@ -18,7 +18,8 @@ internal sealed class BulkInsertCompanyScoresStmt : BulkInsertDbStmtBase<Company
         + " price_to_book_ratio, debt_to_book_ratio,"
         + " adjusted_retained_earnings, average_net_cash_flow,"
         + " average_owner_earnings, estimated_return_cf, estimated_return_oe,"
-        + " price_per_share, price_date, shares_outstanding, computed_at)"
+        + " price_per_share, price_date, shares_outstanding,"
+        + " current_dividends_paid, max_buy_price, percentage_upside, computed_at)"
         + " FROM STDIN (FORMAT BINARY)";
 
     protected override async Task WriteItemAsync(NpgsqlBinaryImporter writer, CompanyScoreSummary s) {
@@ -46,6 +47,9 @@ internal sealed class BulkInsertCompanyScoresStmt : BulkInsertDbStmtBase<Company
         else
             await writer.WriteNullAsync();
         await writer.WriteNullableAsync(s.SharesOutstanding, NpgsqlDbType.Bigint);
+        await writer.WriteNullableAsync(s.CurrentDividendsPaid, NpgsqlDbType.Numeric);
+        await writer.WriteNullableAsync(s.MaxBuyPrice, NpgsqlDbType.Numeric);
+        await writer.WriteNullableAsync(s.PercentageUpside, NpgsqlDbType.Numeric);
         await writer.WriteAsync(s.ComputedAt, NpgsqlDbType.TimestampTz);
     }
 }

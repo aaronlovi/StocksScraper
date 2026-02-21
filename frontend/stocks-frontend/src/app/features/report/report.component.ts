@@ -1,4 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
+import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -200,7 +201,8 @@ export class ReportComponent implements OnInit {
 
   constructor(
     private route: ActivatedRoute,
-    private api: ApiService
+    private api: ApiService,
+    private titleService: Title
   ) {}
 
   ngOnInit(): void {
@@ -216,7 +218,11 @@ export class ReportComponent implements OnInit {
     }
 
     this.api.getCompany(this.cik).subscribe({
-      next: data => this.company.set(data)
+      next: data => {
+        this.company.set(data);
+        const ticker = data.tickers.length > 0 ? data.tickers[0].ticker : ('CIK ' + data.cik);
+        this.titleService.setTitle('Stocks - ' + ticker);
+      }
     });
 
     this.loadStatement();

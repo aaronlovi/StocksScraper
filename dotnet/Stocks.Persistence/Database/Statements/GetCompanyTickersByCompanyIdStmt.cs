@@ -8,7 +8,8 @@ internal sealed class GetCompanyTickersByCompanyIdStmt : QueryDbStmtBase {
     private const string sql = @"
 SELECT company_id, ticker, exchange
 FROM company_tickers
-WHERE company_id = @company_id;
+WHERE company_id = @company_id
+ORDER BY ticker;
 ";
 
     private readonly ulong _companyId;

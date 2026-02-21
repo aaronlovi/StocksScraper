@@ -7,7 +7,9 @@ public enum ScoresSortBy {
     EstimatedReturnCF,
     EstimatedReturnOE,
     DebtToEquityRatio,
-    PriceToBookRatio
+    PriceToBookRatio,
+    MaxBuyPrice,
+    PercentageUpside
 }
 
 public enum SortDirection {

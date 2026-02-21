@@ -61,17 +61,15 @@ import {
             <th>Company</th>
             <th>Ticker</th>
             <th>Exchange</th>
-            <th class="num sortable" (click)="toggleSort('bookValue')">
-              Book Value {{ sortIndicator('bookValue') }}
+            <th class="num">Price</th>
+            <th class="num sortable" (click)="toggleSort('maxBuyPrice')">
+              Max Buy Price {{ sortIndicator('maxBuyPrice') }}
+            </th>
+            <th class="num sortable" (click)="toggleSort('percentageUpside')">
+              % Upside {{ sortIndicator('percentageUpside') }}
             </th>
             <th class="num sortable" (click)="toggleSort('marketCap')">
               Market Cap {{ sortIndicator('marketCap') }}
-            </th>
-            <th class="num sortable" (click)="toggleSort('priceToBookRatio')">
-              P/B {{ sortIndicator('priceToBookRatio') }}
-            </th>
-            <th class="num sortable" (click)="toggleSort('debtToEquityRatio')">
-              D/E {{ sortIndicator('debtToEquityRatio') }}
             </th>
             <th class="num sortable" (click)="toggleSort('estimatedReturnCF')">
               Est. Return (CF) {{ sortIndicator('estimatedReturnCF') }}
@@ -83,7 +81,7 @@ import {
         </thead>
         <tbody>
           @for (row of items(); track row.companyId) {
-            <tr>
+            <tr [class]="rowHighlightClass(row.overallScore, row.computableChecks)">
               <td>
                 <span class="score-badge" [class]="scoreBadgeClass(row.overallScore)">
                   {{ row.overallScore }}/{{ row.computableChecks }}
@@ -94,10 +92,10 @@ import {
               </td>
               <td>{{ row.ticker ?? '' }}</td>
               <td>{{ row.exchange ?? '' }}</td>
-              <td class="num">{{ fmtCurrency(row.bookValue) }}</td>
+              <td class="num">{{ fmtPrice(row.pricePerShare) }}</td>
+              <td class="num">{{ fmtPrice(row.maxBuyPrice) }}</td>
+              <td class="num">{{ fmtPct(row.percentageUpside) }}</td>
               <td class="num">{{ fmtCurrency(row.marketCap) }}</td>
-              <td class="num">{{ fmtRatio(row.priceToBookRatio) }}</td>
-              <td class="num">{{ fmtRatio(row.debtToEquityRatio) }}</td>
               <td class="num">{{ fmtPct(row.estimatedReturnCF) }}</td>
               <td class="num">{{ fmtPct(row.estimatedReturnOE) }}</td>
             </tr>
@@ -201,6 +199,8 @@ import {
     .no-results {
       color: #64748b;
     }
+    .row-perfect { background: #dcfce7; }
+    .row-near-perfect { background: #fef9c3; }
     .error { color: #dc2626; }
     .computed-at {
       font-size: 12px;
@@ -259,6 +259,17 @@ export class ScoresReportComponent implements OnInit {
     if (score >= 10) return 'score-green';
     if (score >= 7) return 'score-yellow';
     return 'score-red';
+  }
+
+  rowHighlightClass(score: number, computableChecks: number): string {
+    if (score === computableChecks && computableChecks === 13) return 'row-perfect';
+    if (score === computableChecks - 1 && computableChecks === 13) return 'row-near-perfect';
+    return '';
+  }
+
+  fmtPrice(val: number | null): string {
+    if (val == null) return '';
+    return '$' + val.toFixed(2);
   }
 
   fmtCurrency(val: number | null): string {

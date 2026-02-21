@@ -35,6 +35,9 @@ internal sealed class GetCompanyScoresStmt : QueryDbStmtBase {
     private int _pricePerShareIndex = -1;
     private int _priceDateIndex = -1;
     private int _sharesOutstandingIndex = -1;
+    private int _currentDividendsPaidIndex = -1;
+    private int _maxBuyPriceIndex = -1;
+    private int _percentageUpsideIndex = -1;
     private int _computedAtIndex = -1;
     private int _totalCountIndex = -1;
 
@@ -60,6 +63,8 @@ internal sealed class GetCompanyScoresStmt : QueryDbStmtBase {
             ScoresSortBy.EstimatedReturnOE => "estimated_return_oe",
             ScoresSortBy.DebtToEquityRatio => "debt_to_equity_ratio",
             ScoresSortBy.PriceToBookRatio => "price_to_book_ratio",
+            ScoresSortBy.MaxBuyPrice => "max_buy_price",
+            ScoresSortBy.PercentageUpside => "percentage_upside",
             _ => "overall_score",
         };
 
@@ -87,7 +92,8 @@ SELECT company_id, cik, company_name, ticker, exchange,
     price_to_book_ratio, debt_to_book_ratio,
     adjusted_retained_earnings, average_net_cash_flow,
     average_owner_earnings, estimated_return_cf, estimated_return_oe,
-    price_per_share, price_date, shares_outstanding, computed_at,
+    price_per_share, price_date, shares_outstanding,
+    current_dividends_paid, max_buy_price, percentage_upside, computed_at,
     COUNT(*) OVER() AS total_count
 FROM company_scores
 {whereClause}
@@ -118,6 +124,9 @@ LIMIT @limit OFFSET @offset";
         _pricePerShareIndex = reader.GetOrdinal("price_per_share");
         _priceDateIndex = reader.GetOrdinal("price_date");
         _sharesOutstandingIndex = reader.GetOrdinal("shares_outstanding");
+        _currentDividendsPaidIndex = reader.GetOrdinal("current_dividends_paid");
+        _maxBuyPriceIndex = reader.GetOrdinal("max_buy_price");
+        _percentageUpsideIndex = reader.GetOrdinal("percentage_upside");
         _computedAtIndex = reader.GetOrdinal("computed_at");
         _totalCountIndex = reader.GetOrdinal("total_count");
     }
@@ -174,6 +183,9 @@ LIMIT @limit OFFSET @offset";
             reader.IsDBNull(_pricePerShareIndex) ? null : reader.GetDecimal(_pricePerShareIndex),
             reader.IsDBNull(_priceDateIndex) ? null : DateOnly.FromDateTime(reader.GetDateTime(_priceDateIndex)),
             reader.IsDBNull(_sharesOutstandingIndex) ? null : reader.GetInt64(_sharesOutstandingIndex),
+            reader.IsDBNull(_currentDividendsPaidIndex) ? null : reader.GetDecimal(_currentDividendsPaidIndex),
+            reader.IsDBNull(_maxBuyPriceIndex) ? null : reader.GetDecimal(_maxBuyPriceIndex),
+            reader.IsDBNull(_percentageUpsideIndex) ? null : reader.GetDecimal(_percentageUpsideIndex),
             reader.GetDateTime(_computedAtIndex));
         _results.Add(result);
         return true;

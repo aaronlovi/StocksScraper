@@ -37,6 +37,8 @@ function makeScoringResponse(): ScoringResponse {
       oldestRetainedEarnings: 50000000000,
       averageNetCashFlow: 10000000000,
       averageOwnerEarnings: 12000000000,
+      averageRoeCF: 15.5,
+      averageRoeOE: 12.3,
       estimatedReturnCF: 0.0038,
       estimatedReturnOE: 0.0046,
       currentDividendsPaid: 3000000000,

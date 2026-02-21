@@ -30,6 +30,8 @@ internal sealed class GetCompanyScoresStmt : QueryDbStmtBase {
     private int _adjustedRetainedEarningsIndex = -1;
     private int _averageNetCashFlowIndex = -1;
     private int _averageOwnerEarningsIndex = -1;
+    private int _averageRoeCFIndex = -1;
+    private int _averageRoeOEIndex = -1;
     private int _estimatedReturnCfIndex = -1;
     private int _estimatedReturnOeIndex = -1;
     private int _pricePerShareIndex = -1;
@@ -65,6 +67,8 @@ internal sealed class GetCompanyScoresStmt : QueryDbStmtBase {
             ScoresSortBy.PriceToBookRatio => "price_to_book_ratio",
             ScoresSortBy.MaxBuyPrice => "max_buy_price",
             ScoresSortBy.PercentageUpside => "percentage_upside",
+            ScoresSortBy.AverageRoeCF => "average_roe_cf",
+            ScoresSortBy.AverageRoeOE => "average_roe_oe",
             _ => "overall_score",
         };
 
@@ -91,7 +95,8 @@ SELECT company_id, cik, company_name, ticker, exchange,
     book_value, market_cap, debt_to_equity_ratio,
     price_to_book_ratio, debt_to_book_ratio,
     adjusted_retained_earnings, average_net_cash_flow,
-    average_owner_earnings, estimated_return_cf, estimated_return_oe,
+    average_owner_earnings, average_roe_cf, average_roe_oe,
+    estimated_return_cf, estimated_return_oe,
     price_per_share, price_date, shares_outstanding,
     current_dividends_paid, max_buy_price, percentage_upside, computed_at,
     COUNT(*) OVER() AS total_count
@@ -119,6 +124,8 @@ LIMIT @limit OFFSET @offset";
         _adjustedRetainedEarningsIndex = reader.GetOrdinal("adjusted_retained_earnings");
         _averageNetCashFlowIndex = reader.GetOrdinal("average_net_cash_flow");
         _averageOwnerEarningsIndex = reader.GetOrdinal("average_owner_earnings");
+        _averageRoeCFIndex = reader.GetOrdinal("average_roe_cf");
+        _averageRoeOEIndex = reader.GetOrdinal("average_roe_oe");
         _estimatedReturnCfIndex = reader.GetOrdinal("estimated_return_cf");
         _estimatedReturnOeIndex = reader.GetOrdinal("estimated_return_oe");
         _pricePerShareIndex = reader.GetOrdinal("price_per_share");
@@ -178,6 +185,8 @@ LIMIT @limit OFFSET @offset";
             reader.IsDBNull(_adjustedRetainedEarningsIndex) ? null : reader.GetDecimal(_adjustedRetainedEarningsIndex),
             reader.IsDBNull(_averageNetCashFlowIndex) ? null : reader.GetDecimal(_averageNetCashFlowIndex),
             reader.IsDBNull(_averageOwnerEarningsIndex) ? null : reader.GetDecimal(_averageOwnerEarningsIndex),
+            reader.IsDBNull(_averageRoeCFIndex) ? null : reader.GetDecimal(_averageRoeCFIndex),
+            reader.IsDBNull(_averageRoeOEIndex) ? null : reader.GetDecimal(_averageRoeOEIndex),
             reader.IsDBNull(_estimatedReturnCfIndex) ? null : reader.GetDecimal(_estimatedReturnCfIndex),
             reader.IsDBNull(_estimatedReturnOeIndex) ? null : reader.GetDecimal(_estimatedReturnOeIndex),
             reader.IsDBNull(_pricePerShareIndex) ? null : reader.GetDecimal(_pricePerShareIndex),

@@ -55,6 +55,9 @@ describe('CompanyComponent', () => {
         { submissionId: 101, filingType: '10-Q', filingCategory: 'Quarterly', reportDate: '2024-06-29', filingReference: 'ref2' }
       ]
     });
+
+    const arRevenueReq = httpMock.expectOne('/api/companies/320193/ar-revenue');
+    arRevenueReq.flush([]);
   }
 
   it('should create and fire initial requests', () => {
@@ -135,6 +138,9 @@ describe('CompanyComponent', () => {
 
     const subsReq = httpMock.expectOne('/api/companies/320193/submissions');
     subsReq.flush({ items: [] });
+
+    const arRevenueReq = httpMock.expectOne('/api/companies/320193/ar-revenue');
+    arRevenueReq.flush([]);
 
     fixture.detectChanges();
 

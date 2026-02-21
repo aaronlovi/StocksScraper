@@ -19,6 +19,8 @@ public record CompanyScoreSummary(
     decimal? AdjustedRetainedEarnings,
     decimal? AverageNetCashFlow,
     decimal? AverageOwnerEarnings,
+    decimal? AverageRoeCF,
+    decimal? AverageRoeOE,
     decimal? EstimatedReturnCF,
     decimal? EstimatedReturnOE,
     decimal? PricePerShare,

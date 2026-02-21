@@ -17,7 +17,8 @@ internal sealed class BulkInsertCompanyScoresStmt : BulkInsertDbStmtBase<Company
         + " book_value, market_cap, debt_to_equity_ratio,"
         + " price_to_book_ratio, debt_to_book_ratio,"
         + " adjusted_retained_earnings, average_net_cash_flow,"
-        + " average_owner_earnings, estimated_return_cf, estimated_return_oe,"
+        + " average_owner_earnings, average_roe_cf, average_roe_oe,"
+        + " estimated_return_cf, estimated_return_oe,"
         + " price_per_share, price_date, shares_outstanding,"
         + " current_dividends_paid, max_buy_price, percentage_upside, computed_at)"
         + " FROM STDIN (FORMAT BINARY)";
@@ -39,6 +40,8 @@ internal sealed class BulkInsertCompanyScoresStmt : BulkInsertDbStmtBase<Company
         await writer.WriteNullableAsync(s.AdjustedRetainedEarnings, NpgsqlDbType.Numeric);
         await writer.WriteNullableAsync(s.AverageNetCashFlow, NpgsqlDbType.Numeric);
         await writer.WriteNullableAsync(s.AverageOwnerEarnings, NpgsqlDbType.Numeric);
+        await writer.WriteNullableAsync(s.AverageRoeCF, NpgsqlDbType.Numeric);
+        await writer.WriteNullableAsync(s.AverageRoeOE, NpgsqlDbType.Numeric);
         await writer.WriteNullableAsync(s.EstimatedReturnCF, NpgsqlDbType.Numeric);
         await writer.WriteNullableAsync(s.EstimatedReturnOE, NpgsqlDbType.Numeric);
         await writer.WriteNullableAsync(s.PricePerShare, NpgsqlDbType.Numeric);

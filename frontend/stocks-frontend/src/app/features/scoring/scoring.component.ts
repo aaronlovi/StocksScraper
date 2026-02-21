@@ -327,6 +327,8 @@ export class ScoringComponent implements OnInit {
       { label: 'Oldest Retained Earnings', display: this.fmtCurrency(m.oldestRetainedEarnings) },
       { label: 'Avg Net Cash Flow', display: this.fmtCurrency(m.averageNetCashFlow) },
       { label: 'Avg Owner Earnings', display: this.fmtCurrency(m.averageOwnerEarnings) },
+      { label: 'Avg ROE (CF)', display: this.fmtPct(m.averageRoeCF) },
+      { label: 'Avg ROE (OE)', display: this.fmtPct(m.averageRoeOE) },
       { label: 'Est. Return (CF)', display: this.fmtPct(m.estimatedReturnCF) },
       { label: 'Est. Return (OE)', display: this.fmtPct(m.estimatedReturnOE) },
       { label: 'Current Dividends Paid', display: this.fmtCurrency(m.currentDividendsPaid) },

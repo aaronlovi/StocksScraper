@@ -62,6 +62,10 @@ public static class ReportEndpoints {
             return ScoresSortBy.MaxBuyPrice;
         if (string.Equals(value, "percentageUpside", StringComparison.OrdinalIgnoreCase))
             return ScoresSortBy.PercentageUpside;
+        if (string.Equals(value, "averageRoeCF", StringComparison.OrdinalIgnoreCase))
+            return ScoresSortBy.AverageRoeCF;
+        if (string.Equals(value, "averageRoeOE", StringComparison.OrdinalIgnoreCase))
+            return ScoresSortBy.AverageRoeOE;
 
         return ScoresSortBy.OverallScore;
     }

@@ -195,7 +195,7 @@ public class BatchScoringServiceTests {
         var scores = new List<CompanyScoreSummary> {
             new CompanyScoreSummary(1, "320193", "Apple Inc", "AAPL", "NASDAQ",
                 10, 13, 5, 500_000_000m, 3_000_000_000_000m, 0.3m, 5.0m, 0.4m,
-                200_000_000m, 100_000_000m, 90_000_000m, 8.5m, 7.2m,
+                200_000_000m, 100_000_000m, 90_000_000m, 12.5m, 11.0m, 8.5m, 7.2m,
                 250m, new DateOnly(2024, 12, 19), 100_000_000, null, null, null, now),
         };
 

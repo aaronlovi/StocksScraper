@@ -77,6 +77,12 @@ import {
             <th class="num sortable" (click)="toggleSort('estimatedReturnOE')">
               Est. Return (OE) {{ sortIndicator('estimatedReturnOE') }}
             </th>
+            <th class="num sortable" (click)="toggleSort('averageRoeCF')">
+              Avg ROE (CF) {{ sortIndicator('averageRoeCF') }}
+            </th>
+            <th class="num sortable" (click)="toggleSort('averageRoeOE')">
+              Avg ROE (OE) {{ sortIndicator('averageRoeOE') }}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -98,6 +104,8 @@ import {
               <td class="num">{{ fmtCurrency(row.marketCap) }}</td>
               <td class="num">{{ fmtPct(row.estimatedReturnCF) }}</td>
               <td class="num">{{ fmtPct(row.estimatedReturnOE) }}</td>
+              <td class="num">{{ fmtPct(row.averageRoeCF) }}</td>
+              <td class="num">{{ fmtPct(row.averageRoeOE) }}</td>
             </tr>
           }
         </tbody>
@@ -262,8 +270,8 @@ export class ScoresReportComponent implements OnInit {
   }
 
   rowHighlightClass(score: number, computableChecks: number): string {
-    if (score === computableChecks && computableChecks === 13) return 'row-perfect';
-    if (score === computableChecks - 1 && computableChecks === 13) return 'row-near-perfect';
+    if (score === computableChecks && computableChecks === 15) return 'row-perfect';
+    if (score === computableChecks - 1 && computableChecks === 15) return 'row-near-perfect';
     return '';
   }
 

@@ -67,6 +67,8 @@ public static class ScoringEndpoints {
                         oldestRetainedEarnings = result.Metrics.OldestRetainedEarnings,
                         averageNetCashFlow = result.Metrics.AverageNetCashFlow,
                         averageOwnerEarnings = result.Metrics.AverageOwnerEarnings,
+                        averageRoeCF = result.Metrics.AverageRoeCF,
+                        averageRoeOE = result.Metrics.AverageRoeOE,
                         estimatedReturnCF = result.Metrics.EstimatedReturnCF,
                         estimatedReturnOE = result.Metrics.EstimatedReturnOE,
                         currentDividendsPaid = result.Metrics.CurrentDividendsPaid,

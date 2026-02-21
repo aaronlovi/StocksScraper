@@ -10,6 +10,8 @@ public record DerivedMetrics(
     decimal? OldestRetainedEarnings,
     decimal? AverageNetCashFlow,
     decimal? AverageOwnerEarnings,
+    decimal? AverageRoeCF,
+    decimal? AverageRoeOE,
     decimal? EstimatedReturnCF,
     decimal? EstimatedReturnOE,
     decimal? CurrentDividendsPaid);

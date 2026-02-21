@@ -89,6 +89,8 @@ export interface DerivedMetricsResponse {
   oldestRetainedEarnings: number | null;
   averageNetCashFlow: number | null;
   averageOwnerEarnings: number | null;
+  averageRoeCF: number | null;
+  averageRoeOE: number | null;
   estimatedReturnCF: number | null;
   estimatedReturnOE: number | null;
   currentDividendsPaid: number | null;
@@ -111,6 +113,8 @@ export interface CompanyScoreSummary {
   adjustedRetainedEarnings: number | null;
   averageNetCashFlow: number | null;
   averageOwnerEarnings: number | null;
+  averageRoeCF: number | null;
+  averageRoeOE: number | null;
   estimatedReturnCF: number | null;
   estimatedReturnOE: number | null;
   pricePerShare: number | null;

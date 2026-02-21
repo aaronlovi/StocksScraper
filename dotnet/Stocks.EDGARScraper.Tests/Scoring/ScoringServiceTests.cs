@@ -1193,6 +1193,83 @@ public class ScoringServiceTests {
     }
 
     [Fact]
+    public void ComputeDerivedMetrics_AverageRoeCF_AcrossMultipleYears() {
+        // Each year has cash flow and equity for ROE(CF) computation
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2022] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 200_000_000m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 20_000_000m,
+            },
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 250_000_000m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 30_000_000m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 400_000_000m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 40_000_000m,
+            },
+        };
+
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // ROE(CF) per year: 2022 = 100*20/200 = 10%, 2023 = 100*30/250 = 12%, 2024 = 100*40/400 = 10%
+        // Average = (10 + 12 + 10) / 3 = 32/3
+        Assert.NotNull(metrics.AverageRoeCF);
+        Assert.Equal(32m / 3m, metrics.AverageRoeCF!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_AverageRoeOE_AcrossMultipleYears() {
+        // Each year has net income (for OE) and equity
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2022] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 200_000_000m,
+                ["NetIncomeLoss"] = 20_000_000m,
+            },
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 250_000_000m,
+                ["NetIncomeLoss"] = 30_000_000m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 400_000_000m,
+                ["NetIncomeLoss"] = 40_000_000m,
+            },
+        };
+
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        // OE per year = NetIncome (no non-cash or capex items)
+        // ROE(OE) per year: 2022 = 100*20/200 = 10%, 2023 = 100*30/250 = 12%, 2024 = 100*40/400 = 10%
+        // Average = (10 + 12 + 10) / 3 = 32/3
+        Assert.NotNull(metrics.AverageRoeOE);
+        Assert.Equal(32m / 3m, metrics.AverageRoeOE!.Value);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_AverageRoeCF_NullWhenNoCashFlow() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 200_000_000m,
+            ["NetIncomeLoss"] = 30_000_000m,
+        });
+
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        Assert.Null(metrics.AverageRoeCF);
+    }
+
+    [Fact]
+    public void ComputeDerivedMetrics_AverageRoeOE_NullWhenNoNetIncome() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 200_000_000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 30_000_000m,
+        });
+
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
+
+        Assert.Null(metrics.AverageRoeOE);
+    }
+
+    [Fact]
     public void ComputeDerivedMetrics_EstimatedReturn_Formula() {
         var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
             ["StockholdersEquity"] = 500_000_000m,
@@ -1363,6 +1440,8 @@ public class ScoringServiceTests {
             OldestRetainedEarnings: 30_000_000m,
             AverageNetCashFlow: 40_000_000m,
             AverageOwnerEarnings: 35_000_000m,
+            AverageRoeCF: 10.0m,
+            AverageRoeOE: 10.0m,
             EstimatedReturnCF: 7.0m,
             EstimatedReturnOE: 6.0m,
             CurrentDividendsPaid: 5_000_000m);
@@ -1373,14 +1452,14 @@ public class ScoringServiceTests {
         DerivedMetrics metrics = MakeGoodMetrics();
         IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
 
-        Assert.Equal(13, checks.Count);
+        Assert.Equal(15, checks.Count);
 
         int passCount = 0;
         foreach (ScoringCheck check in checks) {
             if (check.Result == ScoringCheckResult.Pass)
                 passCount++;
         }
-        Assert.Equal(13, passCount);
+        Assert.Equal(15, passCount);
     }
 
     [Fact]
@@ -1544,6 +1623,60 @@ public class ScoringServiceTests {
         Assert.Null(result);
     }
 
+    [Fact]
+    public void EvaluateChecks_AverageRoeCF_PassesAt10Percent() {
+        DerivedMetrics metrics = MakeGoodMetrics() with { AverageRoeCF = 10.0m };
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(14, checks[13].CheckNumber);
+        Assert.Equal(ScoringCheckResult.Pass, checks[13].Result);
+    }
+
+    [Fact]
+    public void EvaluateChecks_AverageRoeCF_FailsBelow10Percent() {
+        DerivedMetrics metrics = MakeGoodMetrics() with { AverageRoeCF = 9.99m };
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(14, checks[13].CheckNumber);
+        Assert.Equal(ScoringCheckResult.Fail, checks[13].Result);
+    }
+
+    [Fact]
+    public void EvaluateChecks_AverageRoeCF_NotAvailableWhenNull() {
+        DerivedMetrics metrics = MakeGoodMetrics() with { AverageRoeCF = null };
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(14, checks[13].CheckNumber);
+        Assert.Equal(ScoringCheckResult.NotAvailable, checks[13].Result);
+    }
+
+    [Fact]
+    public void EvaluateChecks_AverageRoeOE_PassesAt10Percent() {
+        DerivedMetrics metrics = MakeGoodMetrics() with { AverageRoeOE = 10.0m };
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(15, checks[14].CheckNumber);
+        Assert.Equal(ScoringCheckResult.Pass, checks[14].Result);
+    }
+
+    [Fact]
+    public void EvaluateChecks_AverageRoeOE_FailsBelow10Percent() {
+        DerivedMetrics metrics = MakeGoodMetrics() with { AverageRoeOE = 9.99m };
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(15, checks[14].CheckNumber);
+        Assert.Equal(ScoringCheckResult.Fail, checks[14].Result);
+    }
+
+    [Fact]
+    public void EvaluateChecks_AverageRoeOE_NotAvailableWhenNull() {
+        DerivedMetrics metrics = MakeGoodMetrics() with { AverageRoeOE = null };
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(15, checks[14].CheckNumber);
+        Assert.Equal(ScoringCheckResult.NotAvailable, checks[14].Result);
+    }
+
     #endregion
 
     #region Integration test
@@ -1627,13 +1760,13 @@ public class ScoringServiceTests {
         ScoringResult scoring = result.Value!;
 
         // Verify structure
-        Assert.Equal(13, scoring.Scorecard.Count);
+        Assert.Equal(15, scoring.Scorecard.Count);
         Assert.Equal(5, scoring.YearsOfData);
         Assert.Equal(196m, scoring.PricePerShare);
         Assert.Equal(new DateOnly(2025, 1, 15), scoring.PriceDate);
         Assert.Equal(15_000_000_000, scoring.SharesOutstanding);
         Assert.True(scoring.OverallScore <= scoring.ComputableChecks);
-        Assert.True(scoring.ComputableChecks <= 13);
+        Assert.True(scoring.ComputableChecks <= 15);
 
         // Verify derived metrics are populated
         Assert.NotNull(scoring.Metrics.BookValue);

@@ -21,6 +21,8 @@ public class ScoringModelTests {
             new(11, "Retained Earnings Positive", 1_000_000m, "> 0", ScoringCheckResult.Pass),
             new(12, "History Long Enough", 5m, "≥ 4 years", ScoringCheckResult.Pass),
             new(13, "Retained Earnings Increased", 1m, "increased", ScoringCheckResult.Pass),
+            new(14, "Avg ROE (CF)", 12.0m, ">= 10%", ScoringCheckResult.Pass),
+            new(15, "Avg ROE (OE)", 11.0m, ">= 10%", ScoringCheckResult.Pass),
         };
 
         int overallScore = 0;
@@ -35,7 +37,7 @@ public class ScoringModelTests {
 
         var result = new ScoringResult(
             RawDataByYear: new Dictionary<int, IReadOnlyDictionary<string, decimal>>(),
-            Metrics: new DerivedMetrics(null, null, null, null, null, null, null, null, null, null, null, null),
+            Metrics: new DerivedMetrics(null, null, null, null, null, null, null, null, null, null, null, null, null, null),
             Scorecard: scorecard,
             OverallScore: overallScore,
             ComputableChecks: computableChecks,
@@ -46,10 +48,10 @@ public class ScoringModelTests {
             MaxBuyPrice: null,
             PercentageUpside: null);
 
-        Assert.Equal(9, result.OverallScore);
-        Assert.Equal(10, result.ComputableChecks);
+        Assert.Equal(11, result.OverallScore);
+        Assert.Equal(12, result.ComputableChecks);
         Assert.True(result.OverallScore <= result.ComputableChecks);
-        Assert.True(result.ComputableChecks <= 13);
+        Assert.True(result.ComputableChecks <= 15);
     }
 
     [Fact]
@@ -64,6 +66,8 @@ public class ScoringModelTests {
             OldestRetainedEarnings: null,
             AverageNetCashFlow: null,
             AverageOwnerEarnings: null,
+            AverageRoeCF: null,
+            AverageRoeOE: null,
             EstimatedReturnCF: null,
             EstimatedReturnOE: null,
             CurrentDividendsPaid: null);
@@ -77,6 +81,8 @@ public class ScoringModelTests {
         Assert.Null(metrics.OldestRetainedEarnings);
         Assert.Null(metrics.AverageNetCashFlow);
         Assert.Null(metrics.AverageOwnerEarnings);
+        Assert.Null(metrics.AverageRoeCF);
+        Assert.Null(metrics.AverageRoeOE);
         Assert.Null(metrics.EstimatedReturnCF);
         Assert.Null(metrics.EstimatedReturnOE);
         Assert.Null(metrics.CurrentDividendsPaid);

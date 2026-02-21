@@ -355,7 +355,8 @@ public class ScoringService {
                 metrics.BookValue, metrics.MarketCap,
                 metrics.DebtToEquityRatio, metrics.PriceToBookRatio, metrics.DebtToBookRatio,
                 metrics.AdjustedRetainedEarnings, metrics.AverageNetCashFlow,
-                metrics.AverageOwnerEarnings, metrics.EstimatedReturnCF, metrics.EstimatedReturnOE,
+                metrics.AverageOwnerEarnings, metrics.AverageRoeCF, metrics.AverageRoeOE,
+                metrics.EstimatedReturnCF, metrics.EstimatedReturnOE,
                 pricePerShare, priceDate, sharesOutstanding,
                 metrics.CurrentDividendsPaid, maxBuyPrice, percentageUpside, now));
 
@@ -431,7 +432,7 @@ public class ScoringService {
             rawDataByYear, grouped.MostRecentSnapshot, grouped.OldestRetainedEarnings,
             pricePerShare, sharesOutstanding, grouped.BalanceTypes);
 
-        // 8. Evaluate the 13 checks
+        // 8. Evaluate the 15 checks
         IReadOnlyList<ScoringCheck> scorecard = EvaluateChecks(metrics, yearsOfData);
 
         // 9. Count scores
@@ -775,7 +776,7 @@ public class ScoringService {
         IReadOnlyDictionary<string, TaxonomyBalanceTypes>? balanceTypes = null) {
 
         if (annualDataByYear.Count == 0)
-            return new DerivedMetrics(null, null, null, null, null, null, null, null, null, null, null, null);
+            return new DerivedMetrics(null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         // Balance sheet values from most recent snapshot (may be quarterly)
         decimal? equity = ResolveEquity(mostRecentSnapshot);
@@ -813,11 +814,15 @@ public class ScoringService {
 
         decimal totalNetCashFlow = 0m;
         decimal totalOwnerEarnings = 0m;
+        decimal totalRoeCF = 0m;
+        decimal totalRoeOE = 0m;
         decimal totalDividends = 0m;
         decimal totalStockIssuance = 0m;
         decimal totalPreferredIssuance = 0m;
         int yearsWithNCF = 0;
         int yearsWithOE = 0;
+        int yearsWithRoeCF = 0;
+        int yearsWithRoeOE = 0;
         bool hasAnyCashFlow = false;
         bool hasAnyOwnerEarnings = false;
 
@@ -844,6 +849,13 @@ public class ScoringService {
                     - (netDebtIssuance + netStockIssuance + netPreferredIssuance);
                 totalNetCashFlow += netCashFlow;
                 yearsWithNCF++;
+
+                // ROE (CF) for this year: net cash flow / equity
+                decimal? ncfEquity = ResolveEquity(yearData);
+                if (ncfEquity.HasValue && ncfEquity.Value != 0m) {
+                    totalRoeCF += 100m * netCashFlow / ncfEquity.Value;
+                    yearsWithRoeCF++;
+                }
             }
 
             // Owner Earnings for this year
@@ -863,6 +875,13 @@ public class ScoringService {
                     - capEx + workingCapitalChange;
                 totalOwnerEarnings += ownerEarnings;
                 yearsWithOE++;
+
+                // ROE (OE) for this year: owner earnings / equity
+                decimal? oeEquity = ResolveEquity(yearData);
+                if (oeEquity.HasValue && oeEquity.Value != 0m) {
+                    totalRoeOE += 100m * ownerEarnings / oeEquity.Value;
+                    yearsWithRoeOE++;
+                }
             }
 
             // Accumulate totals for Adjusted Retained Earnings
@@ -886,6 +905,14 @@ public class ScoringService {
         decimal? averageOwnerEarnings = null;
         if (hasAnyOwnerEarnings && yearsWithOE > 0)
             averageOwnerEarnings = totalOwnerEarnings / yearsWithOE;
+
+        decimal? averageRoeCF = null;
+        if (yearsWithRoeCF > 0)
+            averageRoeCF = totalRoeCF / yearsWithRoeCF;
+
+        decimal? averageRoeOE = null;
+        if (yearsWithRoeOE > 0)
+            averageRoeOE = totalRoeOE / yearsWithRoeOE;
 
         // Adjusted Retained Earnings (current RE from snapshot, totals from annual)
         decimal? adjustedRetainedEarnings = null;
@@ -916,13 +943,15 @@ public class ScoringService {
             oldestRetainedEarnings,
             averageNetCashFlow,
             averageOwnerEarnings,
+            averageRoeCF,
+            averageRoeOE,
             estimatedReturnCF,
             estimatedReturnOE,
             currentDividendsPaid);
     }
 
     internal static IReadOnlyList<ScoringCheck> EvaluateChecks(DerivedMetrics metrics, int yearsOfData) {
-        var checks = new List<ScoringCheck>(13);
+        var checks = new List<ScoringCheck>(15);
 
         // Check 1: Debt-to-Equity < 0.5
         checks.Add(MakeCheck(1, "Debt-to-Equity", metrics.DebtToEquityRatio, "< 0.5",
@@ -1007,6 +1036,18 @@ public class ScoringService {
             check13Value = metrics.AdjustedRetainedEarnings.Value - metrics.OldestRetainedEarnings.Value;
 
         checks.Add(MakeCheck(13, "Retained Earnings Increased", check13Value, "increased", check13Result));
+
+        // Check 14: Average ROE (CF) >= 10%
+        checks.Add(MakeCheck(14, "Avg ROE (CF)", metrics.AverageRoeCF, ">= 10%",
+            metrics.AverageRoeCF.HasValue
+                ? (metrics.AverageRoeCF.Value >= 10m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                : ScoringCheckResult.NotAvailable));
+
+        // Check 15: Average ROE (OE) >= 10%
+        checks.Add(MakeCheck(15, "Avg ROE (OE)", metrics.AverageRoeOE, ">= 10%",
+            metrics.AverageRoeOE.HasValue
+                ? (metrics.AverageRoeOE.Value >= 10m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                : ScoringCheckResult.NotAvailable));
 
         return checks;
     }

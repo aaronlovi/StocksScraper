@@ -116,7 +116,7 @@ public class ScoringEndpointsTests : IClassFixture<WebApplicationFactory<Program
     }
 
     [Fact]
-    public async Task GetScoring_ResponseContainsScorecard_With13Checks() {
+    public async Task GetScoring_ResponseContainsScorecard_With15Checks() {
         await SeedScoringData();
 
         HttpResponseMessage response = await _client.GetAsync($"/api/companies/{CompanyCik}/scoring");
@@ -125,7 +125,7 @@ public class ScoringEndpointsTests : IClassFixture<WebApplicationFactory<Program
         using JsonDocument doc = JsonDocument.Parse(body);
         JsonElement root = doc.RootElement;
         JsonElement scorecard = root.GetProperty("scorecard");
-        Assert.Equal(13, scorecard.GetArrayLength());
+        Assert.Equal(15, scorecard.GetArrayLength());
 
         // Verify each check has required fields
         foreach (JsonElement check in scorecard.EnumerateArray()) {

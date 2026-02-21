@@ -68,7 +68,7 @@ ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_dat
 
     public IReadOnlyCollection<BatchScoringConceptValue> Results => _results;
 
-    protected override int CommandTimeoutSeconds => 300;
+    protected override int CommandTimeoutSeconds => 600;
 
     protected override void BeforeRowProcessing(NpgsqlDataReader reader) {
         base.BeforeRowProcessing(reader);

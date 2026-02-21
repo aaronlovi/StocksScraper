@@ -1,9 +1,8 @@
-import { Component, OnInit, computed, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   ApiService,
-  ArRevenueRow,
   CompanyDetail,
   SubmissionItem,
   StatementListItem
@@ -41,77 +40,6 @@ import {
           }
         </div>
       </div>
-
-      @if (arRevenueRows().length > 0) {
-        <div class="ar-revenue-section">
-          <h3 class="collapsible-heading" (click)="arRevenueExpanded.set(!arRevenueExpanded())">
-            <span class="collapse-indicator" [class.expanded]="arRevenueExpanded()">&#9654;</span>
-            AR / Revenue Trend
-          </h3>
-          @if (arRevenueExpanded()) {
-          <div class="ar-revenue-content">
-            <table class="ar-revenue-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th class="num">AR</th>
-                  <th class="num">Revenue</th>
-                  <th class="num">AR / Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (row of arRevenueRows(); track row.year) {
-                  <tr>
-                    <td>{{ row.year }}</td>
-                    <td class="num">{{ row.accountsReceivable != null ? formatAbbrev(row.accountsReceivable) : '—' }}</td>
-                    <td class="num">{{ row.revenue != null ? formatAbbrev(row.revenue) : '—' }}</td>
-                    <td class="num">{{ row.ratio != null ? formatPct(row.ratio) : '—' }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-            @if (sparklineData().points.length > 0) {
-              <div class="sparkline-container">
-                <svg viewBox="0 0 240 120" class="sparkline-svg">
-                  <!-- Y-axis gridlines and labels -->
-                  @for (tick of sparklineData().yTicks; track tick.label) {
-                    <line [attr.x1]="sparklineData().axisLeft" [attr.y1]="tick.y"
-                          [attr.x2]="sparklineData().axisRight" [attr.y2]="tick.y"
-                          class="grid-line" />
-                    <text [attr.x]="sparklineData().axisLeft - 4" [attr.y]="tick.y + 2.5"
-                          text-anchor="end" class="axis-label">{{ tick.label }}</text>
-                  }
-                  <!-- Y-axis line -->
-                  <line [attr.x1]="sparklineData().axisLeft" [attr.y1]="sparklineData().axisTop"
-                        [attr.x2]="sparklineData().axisLeft" [attr.y2]="sparklineData().axisBottom"
-                        class="axis-line" />
-                  <!-- X-axis line -->
-                  <line [attr.x1]="sparklineData().axisLeft" [attr.y1]="sparklineData().axisBottom"
-                        [attr.x2]="sparklineData().axisRight" [attr.y2]="sparklineData().axisBottom"
-                        class="axis-line" />
-                  <!-- Data line -->
-                  <polyline
-                    [attr.points]="sparklineData().polyline"
-                    fill="none"
-                    stroke="#3b82f6"
-                    stroke-width="2"
-                    stroke-linejoin="round"
-                    stroke-linecap="round" />
-                  <!-- Data points and year labels -->
-                  @for (pt of sparklineData().points; track pt.year) {
-                    <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="3" fill="#3b82f6">
-                      <title>{{ pt.year }}: {{ formatPct(pt.ratio) }}</title>
-                    </circle>
-                    <text [attr.x]="pt.x" [attr.y]="sparklineData().axisBottom + 12"
-                          text-anchor="middle" class="axis-label">{{ pt.year }}</text>
-                  }
-                </svg>
-              </div>
-            }
-          </div>
-          }
-        </div>
-      }
 
       @if (submissions().length > 0) {
         <table>
@@ -297,64 +225,6 @@ import {
       font-weight: 500;
       font-size: 14px;
     }
-    .ar-revenue-section {
-      margin-bottom: 24px;
-    }
-    .collapsible-heading {
-      font-size: 16px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      user-select: none;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .collapsible-heading:hover {
-      color: #3b82f6;
-    }
-    .collapse-indicator {
-      font-size: 11px;
-      color: #94a3b8;
-      transition: transform 0.15s ease;
-      display: inline-block;
-    }
-    .collapse-indicator.expanded {
-      transform: rotate(90deg);
-    }
-    .ar-revenue-content {
-      display: flex;
-      align-items: flex-start;
-      gap: 24px;
-    }
-    .ar-revenue-table {
-      width: auto;
-      min-width: 400px;
-    }
-    .ar-revenue-table .num {
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-    }
-    .sparkline-container {
-      flex-shrink: 0;
-      width: 300px;
-      padding-top: 8px;
-    }
-    .sparkline-svg {
-      width: 100%;
-      height: auto;
-    }
-    .axis-line {
-      stroke: #94a3b8;
-      stroke-width: 1;
-    }
-    .grid-line {
-      stroke: #e2e8f0;
-      stroke-width: 0.5;
-    }
-    .axis-label {
-      font-size: 6.5px;
-      fill: #64748b;
-    }
     .error {
       color: #dc2626;
     }
@@ -367,79 +237,7 @@ export class CompanyComponent implements OnInit {
   expandedRow = signal<number | null>(null);
   statements = signal<StatementListItem[]>([]);
   statementsLoading = signal(false);
-  arRevenueRows = signal<ArRevenueRow[]>([]);
-  arRevenueExpanded = signal(false);
   error = signal<string | null>(null);
-
-  sparklineData = computed(() => {
-    const rows = this.arRevenueRows();
-    const chronological = [...rows].reverse();
-    const withRatio: Array<{ year: number; ratio: number }> = [];
-    for (const row of chronological) {
-      if (row.ratio != null) {
-        withRatio.push({ year: row.year, ratio: row.ratio });
-      }
-    }
-    const empty = {
-      polyline: '',
-      points: [] as Array<{ x: number; y: number; year: number; ratio: number }>,
-      yTicks: [] as Array<{ y: number; label: string }>,
-      axisLeft: 0, axisRight: 0, axisTop: 0, axisBottom: 0
-    };
-    if (withRatio.length < 2) {
-      return empty;
-    }
-
-    const padLeft = 35;
-    const padRight = 10;
-    const padTop = 10;
-    const padBottom = 20;
-    const width = 240;
-    const height = 120;
-    const plotW = width - padLeft - padRight;
-    const plotH = height - padTop - padBottom;
-
-    const minR = 0;
-    let maxR = 0;
-    for (const item of withRatio) {
-      if (item.ratio > maxR) maxR = item.ratio;
-    }
-    if (maxR === 0) maxR = 0.1;
-
-    // Round maxR up to a clean percentage for nice tick marks
-    const maxPct = Math.ceil(maxR * 100);
-    const niceMax = maxPct <= 5 ? maxPct : Math.ceil(maxPct / 5) * 5;
-    const rangeR = niceMax / 100;
-
-    // Generate y-axis ticks (0% to niceMax%, ~3-5 ticks)
-    let tickStep = 1;
-    if (niceMax > 10) tickStep = 5;
-    if (niceMax > 30) tickStep = 10;
-    const yTicks: Array<{ y: number; label: string }> = [];
-    for (let pct = 0; pct <= niceMax; pct += tickStep) {
-      const y = padTop + plotH - (pct / 100 / rangeR) * plotH;
-      yTicks.push({ y: Math.round(y * 10) / 10, label: pct + '%' });
-    }
-
-    const points: Array<{ x: number; y: number; year: number; ratio: number }> = [];
-    for (let i = 0; i < withRatio.length; i++) {
-      const x = padLeft + (i / (withRatio.length - 1)) * plotW;
-      const y = padTop + plotH - ((withRatio[i].ratio - minR) / rangeR) * plotH;
-      points.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, year: withRatio[i].year, ratio: withRatio[i].ratio });
-    }
-
-    let polyline = '';
-    for (const pt of points) {
-      if (polyline.length > 0) polyline += ' ';
-      polyline += pt.x + ',' + pt.y;
-    }
-
-    return {
-      polyline, points, yTicks,
-      axisLeft: padLeft, axisRight: width - padRight,
-      axisTop: padTop, axisBottom: padTop + plotH
-    };
-  });
 
   constructor(
     private route: ActivatedRoute,
@@ -467,30 +265,11 @@ export class CompanyComponent implements OnInit {
       next: data => this.submissions.set(data.items),
       error: () => this.error.set('Failed to load submissions.')
     });
-
-    this.api.getArRevenue(this.cik).subscribe({
-      next: data => this.arRevenueRows.set(data),
-      error: () => {} // silently ignore — section just won't show
-    });
   }
 
   formatRoleName(roleName: string): string {
     const match = roleName.match(/^\d+\s*-\s*Statement\s*-\s*(.+)$/);
     return match ? match[1] : roleName;
-  }
-
-  formatAbbrev(value: number): string {
-    const abs = Math.abs(value);
-    const sign = value < 0 ? '-' : '';
-    if (abs >= 1e12) return sign + '$' + (abs / 1e12).toFixed(2) + 'T';
-    if (abs >= 1e9) return sign + '$' + (abs / 1e9).toFixed(2) + 'B';
-    if (abs >= 1e6) return sign + '$' + (abs / 1e6).toFixed(2) + 'M';
-    if (abs >= 1e3) return sign + '$' + (abs / 1e3).toFixed(1) + 'K';
-    return sign + '$' + abs.toFixed(0);
-  }
-
-  formatPct(value: number): string {
-    return (value * 100).toFixed(1) + '%';
   }
 
   toggleRow(submissionId: number): void {

@@ -89,6 +89,9 @@ describe('ScoringComponent', () => {
 
     const scoringReq = httpMock.expectOne('/api/companies/320193/scoring');
     scoringReq.flush(scoringData ?? makeScoringResponse());
+
+    const arRevenueReq = httpMock.expectOne('/api/companies/320193/ar-revenue');
+    arRevenueReq.flush([]);
   }
 
   it('should create', () => {
@@ -153,6 +156,9 @@ describe('ScoringComponent', () => {
 
     const scoringReq = httpMock.expectOne('/api/companies/320193/scoring');
     scoringReq.error(new ProgressEvent('error'));
+
+    const arRevenueReq = httpMock.expectOne('/api/companies/320193/ar-revenue');
+    arRevenueReq.flush([]);
 
     fixture.detectChanges();
 

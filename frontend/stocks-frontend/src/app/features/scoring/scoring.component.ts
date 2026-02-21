@@ -1,9 +1,10 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import {
   ApiService,
+  ArRevenueRow,
   CompanyDetail,
   ScoringResponse,
   ScoringCheckResponse
@@ -114,6 +115,65 @@ import {
           }
         </tbody>
       </table>
+
+      @if (arRevenueRows().length > 0) {
+        <h3>AR / Revenue Trend</h3>
+        <div class="ar-revenue-content">
+          <table class="ar-revenue-table">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th class="num">AR</th>
+                <th class="num">Revenue</th>
+                <th class="num">AR / Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of arRevenueRows(); track row.year) {
+                <tr>
+                  <td>{{ row.year }}</td>
+                  <td class="num">{{ row.accountsReceivable != null ? formatAbbrev(row.accountsReceivable) : '—' }}</td>
+                  <td class="num">{{ row.revenue != null ? formatAbbrev(row.revenue) : '—' }}</td>
+                  <td class="num">{{ row.ratio != null ? formatArPct(row.ratio) : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          @if (sparklineData().points.length > 0) {
+            <div class="sparkline-container">
+              <svg viewBox="0 0 240 120" class="sparkline-svg">
+                @for (tick of sparklineData().yTicks; track tick.label) {
+                  <line [attr.x1]="sparklineData().axisLeft" [attr.y1]="tick.y"
+                        [attr.x2]="sparklineData().axisRight" [attr.y2]="tick.y"
+                        class="grid-line" />
+                  <text [attr.x]="sparklineData().axisLeft - 4" [attr.y]="tick.y + 2.5"
+                        text-anchor="end" class="axis-label">{{ tick.label }}</text>
+                }
+                <line [attr.x1]="sparklineData().axisLeft" [attr.y1]="sparklineData().axisTop"
+                      [attr.x2]="sparklineData().axisLeft" [attr.y2]="sparklineData().axisBottom"
+                      class="axis-line" />
+                <line [attr.x1]="sparklineData().axisLeft" [attr.y1]="sparklineData().axisBottom"
+                      [attr.x2]="sparklineData().axisRight" [attr.y2]="sparklineData().axisBottom"
+                      class="axis-line" />
+                <polyline
+                  [attr.points]="sparklineData().polyline"
+                  fill="none"
+                  stroke="#3b82f6"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                  stroke-linecap="round" />
+                @for (pt of sparklineData().points; track pt.year) {
+                  <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="3" fill="#3b82f6">
+                    <title>{{ pt.year }}: {{ formatArPct(pt.ratio) }}</title>
+                  </circle>
+                  <text [attr.x]="pt.x" [attr.y]="sparklineData().axisBottom + 12"
+                        text-anchor="middle" class="axis-label">{{ pt.year }}</text>
+                }
+              </svg>
+            </div>
+          }
+        </div>
+      }
 
       @if (yearKeys().length > 0) {
         <h3>Raw Data</h3>
@@ -252,6 +312,40 @@ import {
     .raw-table { font-size: 12px; }
     .raw-table th { font-size: 11px; text-transform: uppercase; }
     .error { color: #dc2626; }
+    .ar-revenue-content {
+      display: flex;
+      align-items: flex-start;
+      gap: 24px;
+    }
+    .ar-revenue-table {
+      width: auto;
+      min-width: 400px;
+    }
+    .ar-revenue-table .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .sparkline-container {
+      flex-shrink: 0;
+      width: 300px;
+      padding-top: 8px;
+    }
+    .sparkline-svg {
+      width: 100%;
+      height: auto;
+    }
+    .axis-line {
+      stroke: #94a3b8;
+      stroke-width: 1;
+    }
+    .grid-line {
+      stroke: #e2e8f0;
+      stroke-width: 0.5;
+    }
+    .axis-label {
+      font-size: 6.5px;
+      fill: #64748b;
+    }
   `]
 })
 export class ScoringComponent implements OnInit {
@@ -260,6 +354,75 @@ export class ScoringComponent implements OnInit {
   scoring = signal<ScoringResponse | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
+  arRevenueRows = signal<ArRevenueRow[]>([]);
+
+  sparklineData = computed(() => {
+    const rows = this.arRevenueRows();
+    const chronological = [...rows].reverse();
+    const withRatio: Array<{ year: number; ratio: number }> = [];
+    for (const row of chronological) {
+      if (row.ratio != null) {
+        withRatio.push({ year: row.year, ratio: row.ratio });
+      }
+    }
+    const empty = {
+      polyline: '',
+      points: [] as Array<{ x: number; y: number; year: number; ratio: number }>,
+      yTicks: [] as Array<{ y: number; label: string }>,
+      axisLeft: 0, axisRight: 0, axisTop: 0, axisBottom: 0
+    };
+    if (withRatio.length < 2) {
+      return empty;
+    }
+
+    const padLeft = 35;
+    const padRight = 10;
+    const padTop = 10;
+    const padBottom = 20;
+    const width = 240;
+    const height = 120;
+    const plotW = width - padLeft - padRight;
+    const plotH = height - padTop - padBottom;
+
+    const minR = 0;
+    let maxR = 0;
+    for (const item of withRatio) {
+      if (item.ratio > maxR) maxR = item.ratio;
+    }
+    if (maxR === 0) maxR = 0.1;
+
+    const maxPct = Math.ceil(maxR * 100);
+    const niceMax = maxPct <= 5 ? maxPct : Math.ceil(maxPct / 5) * 5;
+    const rangeR = niceMax / 100;
+
+    let tickStep = 1;
+    if (niceMax > 10) tickStep = 5;
+    if (niceMax > 30) tickStep = 10;
+    const yTicks: Array<{ y: number; label: string }> = [];
+    for (let pct = 0; pct <= niceMax; pct += tickStep) {
+      const y = padTop + plotH - (pct / 100 / rangeR) * plotH;
+      yTicks.push({ y: Math.round(y * 10) / 10, label: pct + '%' });
+    }
+
+    const points: Array<{ x: number; y: number; year: number; ratio: number }> = [];
+    for (let i = 0; i < withRatio.length; i++) {
+      const x = padLeft + (i / (withRatio.length - 1)) * plotW;
+      const y = padTop + plotH - ((withRatio[i].ratio - minR) / rangeR) * plotH;
+      points.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, year: withRatio[i].year, ratio: withRatio[i].ratio });
+    }
+
+    let polyline = '';
+    for (const pt of points) {
+      if (polyline.length > 0) polyline += ' ';
+      polyline += pt.x + ',' + pt.y;
+    }
+
+    return {
+      polyline, points, yTicks,
+      axisLeft: padLeft, axisRight: width - padRight,
+      axisTop: padTop, axisBottom: padTop + plotH
+    };
+  });
 
   constructor(
     private route: ActivatedRoute,
@@ -293,6 +456,11 @@ export class ScoringComponent implements OnInit {
         this.error.set('Failed to load scoring data.');
         this.loading.set(false);
       }
+    });
+
+    this.api.getArRevenue(this.cik).subscribe({
+      next: data => this.arRevenueRows.set(data),
+      error: () => {}
     });
   }
 
@@ -361,6 +529,20 @@ export class ScoringComponent implements OnInit {
       }
       return { concept, values };
     });
+  }
+
+  formatAbbrev(value: number): string {
+    const abs = Math.abs(value);
+    const sign = value < 0 ? '-' : '';
+    if (abs >= 1e12) return sign + '$' + (abs / 1e12).toFixed(2) + 'T';
+    if (abs >= 1e9) return sign + '$' + (abs / 1e9).toFixed(2) + 'B';
+    if (abs >= 1e6) return sign + '$' + (abs / 1e6).toFixed(2) + 'M';
+    if (abs >= 1e3) return sign + '$' + (abs / 1e3).toFixed(1) + 'K';
+    return sign + '$' + abs.toFixed(0);
+  }
+
+  formatArPct(value: number): string {
+    return (value * 100).toFixed(1) + '%';
   }
 
   private fmtPrice(val: number | null | undefined): string {

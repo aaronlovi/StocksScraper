@@ -1,7 +1,9 @@
 import { Component, OnInit, signal } from '@angular/core';
+import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   ApiService,
+  ArRevenueRow,
   CompanyDetail,
   SubmissionItem,
   StatementListItem
@@ -39,6 +41,32 @@ import {
           }
         </div>
       </div>
+
+      @if (arRevenueRows().length > 0) {
+        <div class="ar-revenue-section">
+          <h3>AR / Revenue Trend</h3>
+          <table class="ar-revenue-table">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th class="num">AR</th>
+                <th class="num">Revenue</th>
+                <th class="num">AR / Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of arRevenueRows(); track row.year) {
+                <tr>
+                  <td>{{ row.year }}</td>
+                  <td class="num">{{ row.accountsReceivable != null ? formatAbbrev(row.accountsReceivable) : '—' }}</td>
+                  <td class="num">{{ row.revenue != null ? formatAbbrev(row.revenue) : '—' }}</td>
+                  <td class="num">{{ row.ratio != null ? formatPct(row.ratio) : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
 
       @if (submissions().length > 0) {
         <table>
@@ -224,6 +252,21 @@ import {
       font-weight: 500;
       font-size: 14px;
     }
+    .ar-revenue-section {
+      margin-bottom: 24px;
+    }
+    .ar-revenue-section h3 {
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+    .ar-revenue-table {
+      width: auto;
+      min-width: 400px;
+    }
+    .ar-revenue-table .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
     .error {
       color: #dc2626;
     }
@@ -236,11 +279,13 @@ export class CompanyComponent implements OnInit {
   expandedRow = signal<number | null>(null);
   statements = signal<StatementListItem[]>([]);
   statementsLoading = signal(false);
+  arRevenueRows = signal<ArRevenueRow[]>([]);
   error = signal<string | null>(null);
 
   constructor(
     private route: ActivatedRoute,
-    private api: ApiService
+    private api: ApiService,
+    private titleService: Title
   ) {}
 
   ngOnInit(): void {
@@ -251,7 +296,11 @@ export class CompanyComponent implements OnInit {
     }
 
     this.api.getCompany(this.cik).subscribe({
-      next: data => this.company.set(data),
+      next: data => {
+        this.company.set(data);
+        const ticker = data.tickers.length > 0 ? data.tickers[0].ticker : ('CIK ' + data.cik);
+        this.titleService.setTitle('Stocks - ' + ticker);
+      },
       error: () => this.error.set('Failed to load company.')
     });
 
@@ -259,11 +308,30 @@ export class CompanyComponent implements OnInit {
       next: data => this.submissions.set(data.items),
       error: () => this.error.set('Failed to load submissions.')
     });
+
+    this.api.getArRevenue(this.cik).subscribe({
+      next: data => this.arRevenueRows.set(data),
+      error: () => {} // silently ignore — section just won't show
+    });
   }
 
   formatRoleName(roleName: string): string {
     const match = roleName.match(/^\d+\s*-\s*Statement\s*-\s*(.+)$/);
     return match ? match[1] : roleName;
+  }
+
+  formatAbbrev(value: number): string {
+    const abs = Math.abs(value);
+    const sign = value < 0 ? '-' : '';
+    if (abs >= 1e12) return sign + '$' + (abs / 1e12).toFixed(2) + 'T';
+    if (abs >= 1e9) return sign + '$' + (abs / 1e9).toFixed(2) + 'B';
+    if (abs >= 1e6) return sign + '$' + (abs / 1e6).toFixed(2) + 'M';
+    if (abs >= 1e3) return sign + '$' + (abs / 1e3).toFixed(1) + 'K';
+    return sign + '$' + abs.toFixed(0);
+  }
+
+  formatPct(value: number): string {
+    return (value * 100).toFixed(1) + '%';
   }
 
   toggleRow(submissionId: number): void {

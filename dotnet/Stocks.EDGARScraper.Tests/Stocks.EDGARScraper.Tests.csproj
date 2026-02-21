@@ -24,6 +24,7 @@
     <ProjectReference Include="..\Stocks.Shared\Stocks.Shared.csproj" />
     <ProjectReference Include="..\Stocks.DataModels\Stocks.DataModels.csproj" />
     <ProjectReference Include="..\Stocks.Persistence\Stocks.Persistence.csproj" />
+    <ProjectReference Include="..\Stocks.WebApi\Stocks.WebApi.csproj" />
   </ItemGroup>
 
 </Project>

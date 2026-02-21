@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Stocks.EDGARScraper.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Stocks.Persistence\Stocks.Persistence.csproj" />
     <ProjectReference Include="..\Stocks.DataModels\Stocks.DataModels.csproj" />
     <ProjectReference Include="..\Stocks.Shared\Stocks.Shared.csproj" />

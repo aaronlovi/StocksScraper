@@ -116,6 +116,9 @@ export interface CompanyScoreSummary {
   pricePerShare: number | null;
   priceDate: string | null;
   sharesOutstanding: number | null;
+  currentDividendsPaid: number | null;
+  maxBuyPrice: number | null;
+  percentageUpside: number | null;
   computedAt: string;
 }
 
@@ -128,6 +131,15 @@ export interface ScoresReportParams {
   exchange: string | null;
 }
 
+export interface ArRevenueRow {
+  year: number;
+  accountsReceivable: number | null;
+  revenue: number | null;
+  ratio: number | null;
+  arConceptUsed: string | null;
+  revenueConceptUsed: string | null;
+}
+
 export interface ScoringResponse {
   rawDataByYear: Record<string, Record<string, number>>;
   metrics: DerivedMetricsResponse;
@@ -138,6 +150,8 @@ export interface ScoringResponse {
   pricePerShare: number | null;
   priceDate: string | null;
   sharesOutstanding: number | null;
+  maxBuyPrice: number | null;
+  percentageUpside: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -179,6 +193,10 @@ export class ApiService {
 
   getTypeahead(query: string): Observable<TypeaheadResult[]> {
     return this.http.get<TypeaheadResult[]>(`/api/typeahead?q=${encodeURIComponent(query)}`);
+  }
+
+  getArRevenue(cik: string): Observable<ArRevenueRow[]> {
+    return this.http.get<ArRevenueRow[]>(`/api/companies/${cik}/ar-revenue`);
   }
 
   getScoring(cik: string): Observable<ScoringResponse> {

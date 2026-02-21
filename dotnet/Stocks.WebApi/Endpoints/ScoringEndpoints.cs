@@ -78,6 +78,8 @@ public static class ScoringEndpoints {
                     pricePerShare = result.PricePerShare,
                     priceDate = result.PriceDate?.ToString("yyyy-MM-dd"),
                     sharesOutstanding = result.SharesOutstanding,
+                    maxBuyPrice = result.MaxBuyPrice,
+                    percentageUpside = result.PercentageUpside,
                 });
             });
     }

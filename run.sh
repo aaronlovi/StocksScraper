@@ -34,13 +34,13 @@ display_menu() {
     printf "  %-${col1_w}s  %s\n" "ka) Kill Angular (:4201)"      "1) Build the solution"
     echo ""
     printf "  %-${col1_w}s  %s\n" "--- Data Import ---"           "--- Data Download ---"
-    printf "  %-${col1_w}s  %s\n" "5) Import price CSVs"          "3) Download SEC ticker mappings"
-    printf "  %-${col1_w}s  %s\n" "6) Import bulk Stooq files"    "4) Download Stooq prices (batch CSV)"
-    printf "  %-${col1_w}s  %s\n" "7) Import SEC ticker mappings" ""
+    printf "  %-${col1_w}s  %s\n" "4) Import price CSVs"          "3) Download SEC ticker mappings"
+    printf "  %-${col1_w}s  %s\n" "5) Import bulk Stooq files"    ""
+    printf "  %-${col1_w}s  %s\n" "6) Import SEC ticker mappings" ""
     echo ""
     printf "  %-${col1_w}s  %s\n" "--- Other ---"                 ""
-    printf "  %-${col1_w}s  %s\n" "2) Print financial statement"  "8) Import inline XBRL shares"
-    printf "  %-${col1_w}s  %s\n" "9) Compute all scores"         "q) Exit"
+    printf "  %-${col1_w}s  %s\n" "2) Print financial statement"  "7) Import inline XBRL shares"
+    printf "  %-${col1_w}s  %s\n" "8) Compute all scores"         "q) Exit"
     echo "========================================================================"
 }
 
@@ -153,30 +153,6 @@ while true; do
             popd > /dev/null
             ;;
         4)
-            echo "Downloading Stooq prices..."
-            pushd $WORKING_DIR > /dev/null
-            dotnet run --project Stocks.EDGARScraper.csproj -- --download-prices-stooq
-            if [ $? -ne 0 ]; then
-                echo "The application failed to run. Check the output for errors."
-            else
-                OUTPUT_DIR=$(rg -n "\"OutputDir\"" appsettings.json | sed -E 's/.*: \"([^\"]+)\".*/\1/')
-                if [ -z "$OUTPUT_DIR" ]; then
-                    DATA_DIR=$(rg -n "\"EdgarDataDir\"" appsettings.json | sed -E 's/.*: \"([^\"]+)\".*/\1/')
-                    if [ -n "$DATA_DIR" ]; then
-                        OUTPUT_DIR="$DATA_DIR/prices/stooq"
-                    fi
-                fi
-                if [ -n "$OUTPUT_DIR" ]; then
-                    if [ -d "$OUTPUT_DIR" ]; then
-                        echo "  - $OUTPUT_DIR"
-                    else
-                        echo "  - Missing: $OUTPUT_DIR"
-                    fi
-                fi
-            fi
-            popd > /dev/null
-            ;;
-        5)
             echo "Importing price CSVs..."
             pushd $WORKING_DIR > /dev/null
             dotnet run --project Stocks.EDGARScraper.csproj -- --import-prices-stooq
@@ -185,7 +161,7 @@ while true; do
             fi
             popd > /dev/null
             ;;
-        6)
+        5)
             echo "Importing bulk Stooq files..."
             pushd $WORKING_DIR > /dev/null
             dotnet run --project Stocks.EDGARScraper.csproj -- --import-prices-stooq-bulk
@@ -194,7 +170,7 @@ while true; do
             fi
             popd > /dev/null
             ;;
-        7)
+        6)
             echo "Importing SEC ticker mappings..."
             pushd $WORKING_DIR > /dev/null
             dotnet run --project Stocks.EDGARScraper.csproj -- --import-sec-ticker-mappings
@@ -203,7 +179,7 @@ while true; do
             fi
             popd > /dev/null
             ;;
-        8)
+        7)
             echo "Importing inline XBRL shares (multi-class companies)..."
             pushd $WORKING_DIR > /dev/null
             dotnet run --project Stocks.EDGARScraper.csproj -- --import-inline-xbrl-shares
@@ -212,7 +188,7 @@ while true; do
             fi
             popd > /dev/null
             ;;
-        9)
+        8)
             echo "Computing all company scores..."
             pushd $WORKING_DIR > /dev/null
             dotnet run --project Stocks.EDGARScraper.csproj -- --compute-all-scores

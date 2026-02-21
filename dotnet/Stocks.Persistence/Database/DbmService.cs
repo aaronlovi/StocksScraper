@@ -680,18 +680,6 @@ public sealed class DbmService : IDisposable, IDbmService {
 
     #region Price downloads
 
-    public async Task<Result<IReadOnlyCollection<PriceDownloadStatus>>> GetPriceDownloadStatuses(CancellationToken ct) {
-        var stmt = new GetPriceDownloadsStmt();
-        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
-        if (res.IsSuccess) {
-            _logger.LogInformation("GetPriceDownloadStatuses success - Num downloads: {NumDownloads}", stmt.Downloads.Count);
-            return Result<IReadOnlyCollection<PriceDownloadStatus>>.Success(stmt.Downloads);
-        } else {
-            _logger.LogWarning("GetPriceDownloadStatuses failed with error {Error}", res.ErrorMessage);
-            return Result<IReadOnlyCollection<PriceDownloadStatus>>.Failure(res);
-        }
-    }
-
     public async Task<Result> UpsertPriceDownload(PriceDownloadStatus status, CancellationToken ct) {
         var stmt = new UpsertPriceDownloadStmt(status);
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);

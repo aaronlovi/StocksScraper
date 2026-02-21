@@ -231,3 +231,5 @@ public static class SecTickerJsonParser {
         return trimmed.ToUpperInvariant();
     }
 }
+
+public record SecTickerMapping(ulong Cik, string Ticker, string? Exchange);

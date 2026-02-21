@@ -296,11 +296,6 @@ public sealed class DbmInMemoryData {
             _priceImports[key] = status;
     }
 
-    public IReadOnlyCollection<PriceDownloadStatus> GetPriceDownloads() {
-        lock (_mutex)
-            return [.. _priceDownloads.Values];
-    }
-
     public void UpsertPriceDownload(PriceDownloadStatus status) {
         string key = BuildImportKey(status.Cik, status.Ticker, status.Exchange);
         lock (_mutex)

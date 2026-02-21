@@ -154,14 +154,6 @@ internal partial class Program {
                 }
                 return 0;
             }
-            case "--download-prices-stooq": {
-                Result res = await DownloadStooqPricesAsync();
-                if (res.IsFailure) {
-                    _logger.LogError("DownloadStooqPrices failed: {Error}", res.ErrorMessage);
-                    return 2;
-                }
-                return 0;
-            }
             case "--import-prices-stooq": {
                 Result res = await ImportStooqPricesAsync();
                 if (res.IsFailure) {
@@ -498,46 +490,6 @@ internal partial class Program {
         ILogger<SecTickerMappingsImporter> logger = _svp.GetRequiredService<ILogger<SecTickerMappingsImporter>>();
         var importer = new SecTickerMappingsImporter(_dbm!, logger);
         return await importer.ImportAsync(edgarDataDir, batchSize, CancellationToken.None);
-    }
-
-    private static async Task<Result> DownloadStooqPricesAsync() {
-        if (_svp is null)
-            return Result.Failure(ErrorCodes.ValidationError, "Service provider is not initialized.");
-
-        IConfiguration configuration = _svp.GetRequiredService<IConfiguration>();
-        string? edgarDataDir = configuration["EdgarDataDir"];
-        if (string.IsNullOrWhiteSpace(edgarDataDir))
-            return Result.Failure(ErrorCodes.GenericError, "Missing config: EdgarDataDir");
-
-        IOptions<StooqPricesOptions> options = _svp.GetRequiredService<IOptions<StooqPricesOptions>>();
-        StooqPricesOptions stooqOptions = options.Value;
-        string outputDir = stooqOptions.ResolveOutputDir(edgarDataDir);
-        string userAgent = stooqOptions.ResolveUserAgent();
-        int delayMilliseconds = stooqOptions.ResolveDelayMilliseconds();
-        int maxRetries = stooqOptions.ResolveMaxRetries();
-
-        IHttpClientFactory httpClientFactory = _svp.GetRequiredService<IHttpClientFactory>();
-
-        HttpClient httpClient = httpClientFactory.CreateClient();
-        ILogger<StooqPriceDownloader> logger = _svp.GetRequiredService<ILogger<StooqPriceDownloader>>();
-        var downloader = new StooqPriceDownloader(httpClient, logger);
-        IReadOnlyCollection<PriceDownloadStatus> downloadStatuses = [];
-        if (_dbm is not null) {
-            Result<IReadOnlyCollection<PriceDownloadStatus>> statusResult =
-                await _dbm.GetPriceDownloadStatuses(CancellationToken.None);
-            if (statusResult.IsSuccess && statusResult.Value is not null)
-                downloadStatuses = statusResult.Value;
-        }
-        return await downloader.DownloadBatchAsync(
-            edgarDataDir,
-            outputDir,
-            userAgent,
-            delayMilliseconds,
-            maxRetries,
-            downloadStatuses,
-            _dbm is null ? null : mapping =>
-                _dbm.UpsertPriceDownload(new PriceDownloadStatus(mapping.Cik, mapping.Ticker, mapping.Exchange, DateTime.UtcNow), CancellationToken.None),
-            CancellationToken.None);
     }
 
     private static async Task<Result> ImportStooqPricesAsync() {

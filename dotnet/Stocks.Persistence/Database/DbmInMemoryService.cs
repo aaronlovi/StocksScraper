@@ -115,9 +115,6 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<IReadOnlyCollection<PriceRow>>> GetPricesByTicker(string ticker, CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<PriceRow>>.Success(_data.GetPricesByTicker(ticker)));
 
-    public Task<Result<IReadOnlyCollection<PriceDownloadStatus>>> GetPriceDownloadStatuses(CancellationToken ct) =>
-        Task.FromResult(Result<IReadOnlyCollection<PriceDownloadStatus>>.Success(_data.GetPriceDownloads()));
-
     public Task<Result> UpsertPriceImport(PriceImportStatus status, CancellationToken ct) {
         _data.UpsertPriceImport(status);
         return Task.FromResult(Result.Success);

@@ -49,10 +49,6 @@ public class StooqBulkPriceImporterTests {
             IReadOnlyCollection<PriceImportStatus> imports = importResult.Value ?? Array.Empty<PriceImportStatus>();
             _ = Assert.Single(imports);
 
-            Result<IReadOnlyCollection<PriceDownloadStatus>> downloadResult = await dbm.GetPriceDownloadStatuses(CancellationToken.None);
-            Assert.True(downloadResult.IsSuccess);
-            IReadOnlyCollection<PriceDownloadStatus> downloads = downloadResult.Value ?? Array.Empty<PriceDownloadStatus>();
-            _ = Assert.Single(downloads);
         } finally {
             if (Directory.Exists(tempDir))
                 Directory.Delete(tempDir, true);

@@ -403,12 +403,40 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
+    public async Task<Result<IReadOnlyCollection<ScoringConceptValue>>> GetScoringDataPoints(
+        ulong companyId, string[] conceptNames, int yearLimit, CancellationToken ct) {
+        var stmt = new GetScoringDataPointsStmt(companyId, conceptNames, yearLimit);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetScoringDataPoints success - CompanyId: {CompanyId}, YearLimit: {YearLimit}, Num results: {NumResults}",
+                companyId, yearLimit, stmt.Results.Count);
+            return Result<IReadOnlyCollection<ScoringConceptValue>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetScoringDataPoints failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<ScoringConceptValue>>.Failure(res);
+        }
+    }
+
     public async Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
         string[] conceptNames, CancellationToken ct) {
         var stmt = new GetAllScoringDataPointsStmt(conceptNames);
         DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
         if (res.IsSuccess) {
             _logger.LogInformation("GetAllScoringDataPoints success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<IReadOnlyCollection<BatchScoringConceptValue>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetAllScoringDataPoints failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<BatchScoringConceptValue>>.Failure(res);
+        }
+    }
+
+    public async Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
+        string[] conceptNames, int yearLimit, CancellationToken ct) {
+        var stmt = new GetAllScoringDataPointsStmt(conceptNames, yearLimit);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetAllScoringDataPoints success - YearLimit: {YearLimit}, Num results: {NumResults}",
+                yearLimit, stmt.Results.Count);
             return Result<IReadOnlyCollection<BatchScoringConceptValue>>.Success(stmt.Results);
         } else {
             _logger.LogWarning("GetAllScoringDataPoints failed with error {Error}", res.ErrorMessage);
@@ -459,6 +487,40 @@ public sealed class DbmService : IDisposable, IDbmService {
         } else {
             _logger.LogWarning("GetCompanyScores failed with error {Error}", res.ErrorMessage);
             return Result<PagedResults<CompanyScoreSummary>>.Failure(res);
+        }
+    }
+
+    public async Task<Result> TruncateCompanyMoatScores(CancellationToken ct) {
+        var stmt = new TruncateCompanyMoatScoresStmt();
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("TruncateCompanyMoatScores success");
+        else
+            _logger.LogError("TruncateCompanyMoatScores failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result> BulkInsertCompanyMoatScores(List<CompanyMoatScoreSummary> scores, CancellationToken ct) {
+        var stmt = new BulkInsertCompanyMoatScoresStmt(scores);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertCompanyMoatScores success - Num scores: {NumScores}", scores.Count);
+        else
+            _logger.LogError("BulkInsertCompanyMoatScores failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result<PagedResults<CompanyMoatScoreSummary>>> GetCompanyMoatScores(
+        PaginationRequest pagination, MoatScoresSortBy sortBy, SortDirection sortDir,
+        ScoresFilter? filter, CancellationToken ct) {
+        var stmt = new GetCompanyMoatScoresStmt(pagination, sortBy, sortDir, filter);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetCompanyMoatScores success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<PagedResults<CompanyMoatScoreSummary>>.Success(stmt.GetPagedResults());
+        } else {
+            _logger.LogWarning("GetCompanyMoatScores failed with error {Error}", res.ErrorMessage);
+            return Result<PagedResults<CompanyMoatScoreSummary>>.Failure(res);
         }
     }
     #endregion

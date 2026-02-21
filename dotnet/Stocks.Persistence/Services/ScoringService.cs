@@ -1052,7 +1052,7 @@ public class ScoringService {
         return checks;
     }
 
-    private static ScoringCheck MakeCheck(int number, string name, decimal? value, string threshold, ScoringCheckResult result) {
+    internal static ScoringCheck MakeCheck(int number, string name, decimal? value, string threshold, ScoringCheckResult result) {
         return new ScoringCheck(number, name, value, threshold, result);
     }
 

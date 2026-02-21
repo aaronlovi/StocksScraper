@@ -21,6 +21,12 @@ export const routes: Routes = [
       import('./features/scores-report/scores-report.component').then(m => m.ScoresReportComponent)
   },
   {
+    path: 'moat-scores',
+    title: 'Stocks - Moat Scores',
+    loadComponent: () =>
+      import('./features/moat-scores-report/moat-scores-report.component').then(m => m.MoatScoresReportComponent)
+  },
+  {
     path: 'company/:cik',
     loadComponent: () =>
       import('./features/company/company.component').then(m => m.CompanyComponent)
@@ -29,6 +35,12 @@ export const routes: Routes = [
     path: 'company/:cik/scoring',
     loadComponent: () =>
       import('./features/scoring/scoring.component').then(m => m.ScoringComponent)
+  },
+  {
+    path: 'company/:cik/moat-scoring',
+    title: 'Stocks - Moat Score',
+    loadComponent: () =>
+      import('./features/moat-scoring/moat-scoring.component').then(m => m.MoatScoringComponent)
   },
   {
     path: 'company/:cik/report/:submissionId/:concept',

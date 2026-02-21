@@ -21,6 +21,7 @@ public class Program {
             _ = builder.Services.AddSingleton<IDbmService, DbmService>();
             _ = builder.Services.AddSingleton<StatementDataService>();
             _ = builder.Services.AddSingleton<ScoringService>();
+            _ = builder.Services.AddSingleton<MoatScoringService>();
             _ = builder.Services.AddSingleton<TypeaheadTrieService>();
             _ = builder.Services.AddHostedService(sp => sp.GetRequiredService<TypeaheadTrieService>());
         }
@@ -48,6 +49,8 @@ public class Program {
         app.MapTypeaheadEndpoints();
         app.MapScoringEndpoints();
         app.MapReportEndpoints();
+        app.MapMoatScoringEndpoints();
+        app.MapMoatReportEndpoints();
 
         app.Run();
     }

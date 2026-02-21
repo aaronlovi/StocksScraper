@@ -201,10 +201,20 @@ public sealed class DbmInMemoryService : IDbmService {
         Task.FromResult(Result<IReadOnlyCollection<ScoringConceptValue>>.Success(
             _data.GetScoringDataPoints(companyId, conceptNames)));
 
+    public Task<Result<IReadOnlyCollection<ScoringConceptValue>>> GetScoringDataPoints(
+        ulong companyId, string[] conceptNames, int yearLimit, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<ScoringConceptValue>>.Success(
+            _data.GetScoringDataPoints(companyId, conceptNames, yearLimit)));
+
     public Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
         string[] conceptNames, CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<BatchScoringConceptValue>>.Success(
             _data.GetAllScoringDataPoints(conceptNames)));
+
+    public Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
+        string[] conceptNames, int yearLimit, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<BatchScoringConceptValue>>.Success(
+            _data.GetAllScoringDataPoints(conceptNames, yearLimit)));
 
     public Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<LatestPrice>>.Success(
@@ -225,5 +235,22 @@ public sealed class DbmInMemoryService : IDbmService {
         ScoresFilter? filter, CancellationToken ct) {
         PagedResults<CompanyScoreSummary> results = _data.GetCompanyScoresPaged(pagination, sortBy, sortDir, filter);
         return Task.FromResult(Result<PagedResults<CompanyScoreSummary>>.Success(results));
+    }
+
+    public Task<Result> TruncateCompanyMoatScores(CancellationToken ct) {
+        _data.TruncateCompanyMoatScores();
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result> BulkInsertCompanyMoatScores(List<CompanyMoatScoreSummary> scores, CancellationToken ct) {
+        _data.AddCompanyMoatScores(scores);
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result<PagedResults<CompanyMoatScoreSummary>>> GetCompanyMoatScores(
+        PaginationRequest pagination, MoatScoresSortBy sortBy, SortDirection sortDir,
+        ScoresFilter? filter, CancellationToken ct) {
+        PagedResults<CompanyMoatScoreSummary> results = _data.GetCompanyMoatScoresPaged(pagination, sortBy, sortDir, filter);
+        return Task.FromResult(Result<PagedResults<CompanyMoatScoreSummary>>.Success(results));
     }
 }

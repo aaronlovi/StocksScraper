@@ -158,6 +158,71 @@ export interface ScoringResponse {
   percentageUpside: number | null;
 }
 
+export interface MoatDerivedMetricsResponse {
+  averageGrossMargin: number | null;
+  averageOperatingMargin: number | null;
+  averageRoeCF: number | null;
+  averageRoeOE: number | null;
+  revenueCagr: number | null;
+  capexRatio: number | null;
+  interestCoverage: number | null;
+  debtToEquityRatio: number | null;
+  estimatedReturnOE: number | null;
+  currentDividendsPaid: number | null;
+  marketCap: number | null;
+  pricePerShare: number | null;
+  positiveOeYears: number;
+  totalOeYears: number;
+  capitalReturnYears: number;
+  totalCapitalReturnYears: number;
+}
+
+export interface MoatYearMetrics {
+  year: number;
+  grossMarginPct: number | null;
+  operatingMarginPct: number | null;
+  roeCfPct: number | null;
+  roeOePct: number | null;
+  revenue: number | null;
+}
+
+export interface MoatScoringResponse {
+  rawDataByYear: Record<string, Record<string, number>>;
+  metrics: MoatDerivedMetricsResponse;
+  scorecard: ScoringCheckResponse[];
+  trendData: MoatYearMetrics[];
+  overallScore: number;
+  computableChecks: number;
+  yearsOfData: number;
+  pricePerShare: number | null;
+  priceDate: string | null;
+  sharesOutstanding: number | null;
+}
+
+export interface CompanyMoatScoreSummary {
+  companyId: number;
+  cik: string;
+  companyName: string | null;
+  ticker: string | null;
+  exchange: string | null;
+  overallScore: number;
+  computableChecks: number;
+  yearsOfData: number;
+  averageGrossMargin: number | null;
+  averageOperatingMargin: number | null;
+  averageRoeCF: number | null;
+  averageRoeOE: number | null;
+  estimatedReturnOE: number | null;
+  revenueCagr: number | null;
+  capexRatio: number | null;
+  interestCoverage: number | null;
+  debtToEquityRatio: number | null;
+  pricePerShare: number | null;
+  priceDate: string | null;
+  sharesOutstanding: number | null;
+  computedAt: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   constructor(private http: HttpClient) {}
@@ -218,6 +283,24 @@ export class ApiService {
     if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
     return this.http.get<PaginatedResponse<CompanyScoreSummary>>(
       `/api/reports/scores?${parts.join('&')}`
+    );
+  }
+
+  getMoatScoring(cik: string): Observable<MoatScoringResponse> {
+    return this.http.get<MoatScoringResponse>(`/api/companies/${cik}/moat-scoring`);
+  }
+
+  getMoatScoresReport(params: ScoresReportParams): Observable<PaginatedResponse<CompanyMoatScoreSummary>> {
+    const parts: string[] = [
+      `page=${params.page}`,
+      `pageSize=${params.pageSize}`,
+      `sortBy=${params.sortBy}`,
+      `sortDir=${params.sortDir}`
+    ];
+    if (params.minScore != null) parts.push(`minScore=${params.minScore}`);
+    if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
+    return this.http.get<PaginatedResponse<CompanyMoatScoreSummary>>(
+      `/api/reports/moat-scores?${parts.join('&')}`
     );
   }
 }

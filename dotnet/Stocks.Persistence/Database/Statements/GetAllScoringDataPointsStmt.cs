@@ -35,7 +35,7 @@ latest_any_date AS (
     ORDER BY s.company_id, s.report_date DESC
 ),
 eligible_dates AS (
-    SELECT company_id, report_date FROM annual_ranked_dates WHERE rn <= 5
+    SELECT company_id, report_date FROM annual_ranked_dates WHERE rn <= @year_limit
     UNION
     SELECT company_id, report_date FROM latest_any_date
 )
@@ -52,6 +52,7 @@ WHERE s.filing_type IN (1, 2)
 ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_date ASC";
 
     private readonly string[] _conceptNames;
+    private readonly int _yearLimit;
     private readonly List<BatchScoringConceptValue> _results = [];
 
     private int _companyIdIndex = -1;
@@ -62,8 +63,12 @@ ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_dat
     private int _filingTypeIndex = -1;
 
     public GetAllScoringDataPointsStmt(string[] conceptNames)
+        : this(conceptNames, 5) { }
+
+    public GetAllScoringDataPointsStmt(string[] conceptNames, int yearLimit)
         : base(Sql, nameof(GetAllScoringDataPointsStmt)) {
         _conceptNames = conceptNames;
+        _yearLimit = yearLimit;
     }
 
     public IReadOnlyCollection<BatchScoringConceptValue> Results => _results;
@@ -84,7 +89,8 @@ ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_dat
 
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() =>
         [
-            new NpgsqlParameter("concept_names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = _conceptNames }
+            new NpgsqlParameter("concept_names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = _conceptNames },
+            new NpgsqlParameter<int>("year_limit", _yearLimit)
         ];
 
     protected override bool ProcessCurrentRow(NpgsqlDataReader reader) {

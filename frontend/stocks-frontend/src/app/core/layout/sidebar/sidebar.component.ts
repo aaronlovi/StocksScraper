@@ -15,6 +15,9 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
           <a routerLink="/scores" routerLinkActive="active" title="Rewards deep value metrics: high book value, low debt, and returning value to owners through dividends and share buybacks">Value Scores</a>
         </li>
         <li>
+          <a routerLink="/moat-scores" routerLinkActive="active" title="Rewards competitive moat: high margins, consistent returns, capital-light operations, and long track records">Moat Scores</a>
+        </li>
+        <li>
           <a routerLink="/search" routerLinkActive="active">Search</a>
         </li>
       </ul>

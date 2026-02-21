@@ -1,0 +1,23 @@
+CREATE TABLE company_moat_scores (
+    company_id bigint PRIMARY KEY,
+    cik bigint NOT NULL,
+    company_name varchar(200),
+    ticker varchar(20),
+    exchange varchar(50),
+    overall_score int NOT NULL,
+    computable_checks int NOT NULL,
+    years_of_data int NOT NULL,
+    average_gross_margin decimal,
+    average_operating_margin decimal,
+    average_roe_cf decimal,
+    average_roe_oe decimal,
+    estimated_return_oe decimal,
+    revenue_cagr decimal,
+    capex_ratio decimal,
+    interest_coverage decimal,
+    debt_to_equity_ratio decimal,
+    price_per_share decimal,
+    price_date date,
+    shares_outstanding bigint,
+    computed_at timestamptz NOT NULL DEFAULT NOW()
+);

@@ -405,7 +405,7 @@ public sealed class DbmInMemoryData {
 
     // Scoring data points
 
-    public IReadOnlyCollection<ScoringConceptValue> GetScoringDataPoints(ulong companyId, string[] conceptNames) {
+    public IReadOnlyCollection<ScoringConceptValue> GetScoringDataPoints(ulong companyId, string[] conceptNames, int yearLimit = 5) {
         var conceptSet = new HashSet<string>(conceptNames, StringComparer.Ordinal);
         var results = new List<ScoringConceptValue>();
 
@@ -447,7 +447,7 @@ public sealed class DbmInMemoryData {
             foreach (DateOnly date in sortedDates.Reverse()) {
                 topDates.Add(date);
                 count++;
-                if (count >= 5)
+                if (count >= yearLimit)
                     break;
             }
 
@@ -494,7 +494,7 @@ public sealed class DbmInMemoryData {
 
     // Batch scoring data points (all companies)
 
-    public IReadOnlyCollection<BatchScoringConceptValue> GetAllScoringDataPoints(string[] conceptNames) {
+    public IReadOnlyCollection<BatchScoringConceptValue> GetAllScoringDataPoints(string[] conceptNames, int yearLimit = 5) {
         var conceptSet = new HashSet<string>(conceptNames, StringComparer.Ordinal);
         var results = new List<BatchScoringConceptValue>();
 
@@ -536,7 +536,7 @@ public sealed class DbmInMemoryData {
                     latestAnyDateByCompany[dp.CompanyId] = sub.ReportDate;
             }
 
-            // Build eligible dates per company: 5 most recent 10-K dates UNION latest any date
+            // Build eligible dates per company: N most recent 10-K dates UNION latest any date
             var topDatesByCompany = new Dictionary<ulong, HashSet<DateOnly>>();
             foreach (var entry in tenKDatesByCompany) {
                 ulong companyId = entry.Key;
@@ -547,7 +547,7 @@ public sealed class DbmInMemoryData {
                 foreach (DateOnly date in sorted.Reverse()) {
                     top.Add(date);
                     count++;
-                    if (count >= 5)
+                    if (count >= yearLimit)
                         break;
                 }
                 topDatesByCompany[companyId] = top;
@@ -687,6 +687,81 @@ public sealed class DbmInMemoryData {
             var paginationResponse = new PaginationResponse(pagination.PageNumber, totalItems, totalPages);
             return new PagedResults<CompanyScoreSummary>(page, paginationResponse);
         }
+    }
+
+    // Company moat scores
+
+    private readonly List<CompanyMoatScoreSummary> _companyMoatScores = [];
+
+    public void TruncateCompanyMoatScores() {
+        lock (_mutex)
+            _companyMoatScores.Clear();
+    }
+
+    public void AddCompanyMoatScores(IReadOnlyCollection<CompanyMoatScoreSummary> scores) {
+        lock (_mutex)
+            _companyMoatScores.AddRange(scores);
+    }
+
+    public IReadOnlyCollection<CompanyMoatScoreSummary> GetCompanyMoatScores() {
+        lock (_mutex)
+            return [.. _companyMoatScores];
+    }
+
+    public PagedResults<CompanyMoatScoreSummary> GetCompanyMoatScoresPaged(
+        PaginationRequest pagination, MoatScoresSortBy sortBy, SortDirection sortDir,
+        ScoresFilter? filter) {
+        lock (_mutex) {
+            var filtered = new List<CompanyMoatScoreSummary>();
+            foreach (CompanyMoatScoreSummary s in _companyMoatScores) {
+                if (filter is not null) {
+                    if (filter.MinScore.HasValue && s.OverallScore < filter.MinScore.Value)
+                        continue;
+                    if (filter.MaxScore.HasValue && s.OverallScore > filter.MaxScore.Value)
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(filter.Exchange)
+                        && !string.Equals(s.Exchange, filter.Exchange, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
+                filtered.Add(s);
+            }
+
+            filtered.Sort((a, b) => {
+                int cmp = CompareByMoatField(a, b, sortBy);
+                if (sortDir == SortDirection.Descending)
+                    cmp = -cmp;
+                if (cmp != 0)
+                    return cmp;
+                return a.CompanyId.CompareTo(b.CompanyId);
+            });
+
+            uint totalItems = (uint)filtered.Count;
+            int offset = (int)((pagination.PageNumber - 1) * pagination.PageSize);
+            int limit = (int)pagination.PageSize;
+
+            var page = new List<CompanyMoatScoreSummary>();
+            for (int i = offset; i < filtered.Count && page.Count < limit; i++)
+                page.Add(filtered[i]);
+
+            uint totalPages = totalItems == 0 ? 0 : (uint)Math.Ceiling(totalItems / (double)pagination.PageSize);
+            var paginationResponse = new PaginationResponse(pagination.PageNumber, totalItems, totalPages);
+            return new PagedResults<CompanyMoatScoreSummary>(page, paginationResponse);
+        }
+    }
+
+    private static int CompareByMoatField(CompanyMoatScoreSummary a, CompanyMoatScoreSummary b, MoatScoresSortBy sortBy) {
+        return sortBy switch {
+            MoatScoresSortBy.AverageGrossMargin => CompareNullable(a.AverageGrossMargin, b.AverageGrossMargin),
+            MoatScoresSortBy.AverageOperatingMargin => CompareNullable(a.AverageOperatingMargin, b.AverageOperatingMargin),
+            MoatScoresSortBy.AverageRoeCF => CompareNullable(a.AverageRoeCF, b.AverageRoeCF),
+            MoatScoresSortBy.AverageRoeOE => CompareNullable(a.AverageRoeOE, b.AverageRoeOE),
+            MoatScoresSortBy.EstimatedReturnOE => CompareNullable(a.EstimatedReturnOE, b.EstimatedReturnOE),
+            MoatScoresSortBy.RevenueCagr => CompareNullable(a.RevenueCagr, b.RevenueCagr),
+            MoatScoresSortBy.CapexRatio => CompareNullable(a.CapexRatio, b.CapexRatio),
+            MoatScoresSortBy.InterestCoverage => CompareNullable(a.InterestCoverage, b.InterestCoverage),
+            MoatScoresSortBy.DebtToEquityRatio => CompareNullable(a.DebtToEquityRatio, b.DebtToEquityRatio),
+            _ => a.OverallScore.CompareTo(b.OverallScore),
+        };
     }
 
     private static int CompareByField(CompanyScoreSummary a, CompanyScoreSummary b, ScoresSortBy sortBy) {

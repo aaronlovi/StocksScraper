@@ -32,7 +32,7 @@ FROM (
                   AND tc2.name = ANY(@concept_names)
               )
             ORDER BY s2.report_date DESC
-            LIMIT 5
+            LIMIT @year_limit
         ) annual_dates
         UNION
         SELECT report_date FROM (
@@ -55,6 +55,7 @@ ORDER BY report_date DESC, concept_name";
 
     private readonly ulong _companyId;
     private readonly string[] _conceptNames;
+    private readonly int _yearLimit;
     private readonly List<ScoringConceptValue> _results = [];
 
     private static int _conceptNameIndex = -1;
@@ -64,9 +65,13 @@ ORDER BY report_date DESC, concept_name";
     private static int _filingTypeIndex = -1;
 
     public GetScoringDataPointsStmt(ulong companyId, string[] conceptNames)
+        : this(companyId, conceptNames, 5) { }
+
+    public GetScoringDataPointsStmt(ulong companyId, string[] conceptNames, int yearLimit)
         : base(Sql, nameof(GetScoringDataPointsStmt)) {
         _companyId = companyId;
         _conceptNames = conceptNames;
+        _yearLimit = yearLimit;
     }
 
     public IReadOnlyCollection<ScoringConceptValue> Results => _results;
@@ -87,7 +92,8 @@ ORDER BY report_date DESC, concept_name";
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() =>
         [
             new NpgsqlParameter<long>("company_id", unchecked((long)_companyId)),
-            new NpgsqlParameter("concept_names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = _conceptNames }
+            new NpgsqlParameter("concept_names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = _conceptNames },
+            new NpgsqlParameter<int>("year_limit", _yearLimit)
         ];
 
     protected override bool ProcessCurrentRow(NpgsqlDataReader reader) {

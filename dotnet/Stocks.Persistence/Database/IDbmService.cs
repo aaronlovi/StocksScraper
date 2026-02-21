@@ -69,9 +69,17 @@ public interface IDbmService {
     Task<Result<IReadOnlyCollection<ScoringConceptValue>>> GetScoringDataPoints(
         ulong companyId, string[] conceptNames, CancellationToken ct);
 
+    // Scoring data points with configurable year limit
+    Task<Result<IReadOnlyCollection<ScoringConceptValue>>> GetScoringDataPoints(
+        ulong companyId, string[] conceptNames, int yearLimit, CancellationToken ct);
+
     // Batch scoring data (all companies, 10-K filings, up to 5 most recent years per company)
     Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
         string[] conceptNames, CancellationToken ct);
+
+    // Batch scoring data with configurable year limit
+    Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
+        string[] conceptNames, int yearLimit, CancellationToken ct);
     Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct);
 
     // Company scores persistence
@@ -79,6 +87,13 @@ public interface IDbmService {
     Task<Result> BulkInsertCompanyScores(List<CompanyScoreSummary> scores, CancellationToken ct);
     Task<Result<PagedResults<CompanyScoreSummary>>> GetCompanyScores(
         PaginationRequest pagination, ScoresSortBy sortBy, SortDirection sortDir,
+        ScoresFilter? filter, CancellationToken ct);
+
+    // Company moat scores persistence
+    Task<Result> TruncateCompanyMoatScores(CancellationToken ct);
+    Task<Result> BulkInsertCompanyMoatScores(List<CompanyMoatScoreSummary> scores, CancellationToken ct);
+    Task<Result<PagedResults<CompanyMoatScoreSummary>>> GetCompanyMoatScores(
+        PaginationRequest pagination, MoatScoresSortBy sortBy, SortDirection sortDir,
         ScoresFilter? filter, CancellationToken ct);
 
     // Dashboard

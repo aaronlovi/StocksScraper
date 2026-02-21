@@ -186,6 +186,14 @@ internal partial class Program {
                 }
                 return 0;
             }
+            case "--compute-all-moat-scores": {
+                Result res = await ComputeAndStoreAllMoatScoresAsync();
+                if (res.IsFailure) {
+                    _logger.LogError("ComputeAllMoatScores failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
             default: {
                 _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
                 return 3;
@@ -991,6 +999,32 @@ internal partial class Program {
             return insertResult;
 
         _logger.LogInformation("Successfully computed and stored {NumScores} company scores", scores.Count);
+        return Result.Success;
+    }
+
+    private static async Task<Result> ComputeAndStoreAllMoatScoresAsync() {
+        var moatService = new Stocks.Persistence.Services.MoatScoringService(_dbm!, _logger);
+        CancellationToken ct = CancellationToken.None;
+
+        _logger.LogInformation("Computing moat scores for all companies...");
+        Result<IReadOnlyCollection<Stocks.DataModels.Scoring.CompanyMoatScoreSummary>> computeResult =
+            await moatService.ComputeAllMoatScores(ct);
+        if (computeResult.IsFailure || computeResult.Value is null)
+            return Result.Failure(ErrorCodes.GenericError, computeResult.ErrorMessage);
+
+        List<Stocks.DataModels.Scoring.CompanyMoatScoreSummary> scores = new(computeResult.Value);
+        _logger.LogInformation("Computed {NumScores} company moat scores, truncating old scores...", scores.Count);
+
+        Result truncateResult = await _dbm!.TruncateCompanyMoatScores(ct);
+        if (truncateResult.IsFailure)
+            return truncateResult;
+
+        _logger.LogInformation("Inserting {NumScores} company moat scores...", scores.Count);
+        Result insertResult = await _dbm.BulkInsertCompanyMoatScores(scores, ct);
+        if (insertResult.IsFailure)
+            return insertResult;
+
+        _logger.LogInformation("Successfully computed and stored {NumScores} company moat scores", scores.Count);
         return Result.Success;
     }
 

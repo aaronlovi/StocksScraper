@@ -12,7 +12,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
           <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
         </li>
         <li>
-          <a routerLink="/scores" routerLinkActive="active">Scores</a>
+          <a routerLink="/scores" routerLinkActive="active" title="Rewards deep value metrics: high book value, low debt, and returning value to owners through dividends and share buybacks">Value Scores</a>
         </li>
         <li>
           <a routerLink="/search" routerLinkActive="active">Search</a>

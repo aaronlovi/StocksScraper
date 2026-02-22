@@ -92,19 +92,6 @@ describe('ScoringComponent', () => {
 
     const arRevenueReq = httpMock.expectOne('/api/companies/320193/ar-revenue');
     arRevenueReq.flush([]);
-
-    const investmentReturnReq = httpMock.expectOne(req =>
-      req.url.startsWith('/api/companies/320193/investment-return'));
-    investmentReturnReq.flush({
-      ticker: 'AAPL',
-      startDate: '2025-02-21',
-      endDate: '2026-02-21',
-      startPrice: 174.0,
-      endPrice: 200.0,
-      totalReturnPct: 14.94,
-      annualizedReturnPct: 15.20,
-      currentValueOf1000: 1149.43,
-    });
   }
 
   it('should create', () => {
@@ -160,18 +147,6 @@ describe('ScoringComponent', () => {
     expect(naIndicators.length).toBe(3);
   });
 
-  it('should display investment return data', () => {
-    const fixture = TestBed.createComponent(ScoringComponent);
-    fixture.detectChanges();
-    flushRequests();
-    fixture.detectChanges();
-
-    const returnSection = fixture.nativeElement.querySelector('.investment-return-section');
-    expect(returnSection).toBeTruthy();
-    expect(returnSection.textContent).toContain('14.94');
-    expect(returnSection.textContent).toContain('15.20');
-  });
-
   it('should handle error state', () => {
     const fixture = TestBed.createComponent(ScoringComponent);
     fixture.detectChanges();
@@ -184,14 +159,6 @@ describe('ScoringComponent', () => {
 
     const arRevenueReq = httpMock.expectOne('/api/companies/320193/ar-revenue');
     arRevenueReq.flush([]);
-
-    const investmentReturnReq = httpMock.expectOne(req =>
-      req.url.startsWith('/api/companies/320193/investment-return'));
-    investmentReturnReq.flush({
-      ticker: 'AAPL', startDate: '2025-02-21', endDate: '2026-02-21',
-      startPrice: 174.0, endPrice: 200.0, totalReturnPct: 14.94,
-      annualizedReturnPct: 15.20, currentValueOf1000: 1149.43,
-    });
 
     fixture.detectChanges();
 

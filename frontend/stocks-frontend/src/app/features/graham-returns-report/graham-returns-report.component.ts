@@ -3,16 +3,22 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
   ApiService,
-  CompanyScoreSummary,
+  CompanyScoreReturnSummary,
   PaginationResponse
 } from '../../core/services/api.service';
 
+function defaultStartDate(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 @Component({
-  selector: 'app-scores-report',
+  selector: 'app-graham-returns-report',
   standalone: true,
   imports: [RouterLink, FormsModule],
   template: `
-    <h2>Company Graham Scores Report</h2>
+    <h2>Graham Returns</h2>
 
     <div class="filters">
       <label>
@@ -43,10 +49,14 @@ import {
           <option [ngValue]="100">100</option>
         </select>
       </label>
+      <label>
+        Start Date
+        <input type="date" [ngModel]="startDate" (ngModelChange)="onStartDateChange($event)" />
+      </label>
     </div>
 
     @if (loading()) {
-      <p>Loading scores...</p>
+      <p>Loading returns...</p>
     } @else if (error()) {
       <p class="error">{{ error() }}</p>
     } @else if (items().length === 0) {
@@ -62,26 +72,14 @@ import {
             <th>Ticker</th>
             <th>Exchange</th>
             <th class="num">Price</th>
-            <th class="num sortable" (click)="toggleSort('maxBuyPrice')">
-              Max Buy Price {{ sortIndicator('maxBuyPrice') }}
+            <th class="num sortable" (click)="toggleSort('totalReturnPct')">
+              Total Return % {{ sortIndicator('totalReturnPct') }}
             </th>
-            <th class="num sortable" (click)="toggleSort('percentageUpside')">
-              % Upside {{ sortIndicator('percentageUpside') }}
+            <th class="num sortable" (click)="toggleSort('annualizedReturnPct')">
+              Annualized % {{ sortIndicator('annualizedReturnPct') }}
             </th>
-            <th class="num sortable" (click)="toggleSort('marketCap')">
-              Market Cap {{ sortIndicator('marketCap') }}
-            </th>
-            <th class="num sortable" (click)="toggleSort('estimatedReturnCF')">
-              Est. Return (CF) {{ sortIndicator('estimatedReturnCF') }}
-            </th>
-            <th class="num sortable" (click)="toggleSort('estimatedReturnOE')">
-              Est. Return (OE) {{ sortIndicator('estimatedReturnOE') }}
-            </th>
-            <th class="num sortable" (click)="toggleSort('averageRoeCF')">
-              Avg ROE (CF) {{ sortIndicator('averageRoeCF') }}
-            </th>
-            <th class="num sortable" (click)="toggleSort('averageRoeOE')">
-              Avg ROE (OE) {{ sortIndicator('averageRoeOE') }}
+            <th class="num sortable" (click)="toggleSort('currentValueOf1000')">
+              $1,000 Invested {{ sortIndicator('currentValueOf1000') }}
             </th>
           </tr>
         </thead>
@@ -99,13 +97,9 @@ import {
               <td>{{ row.ticker ?? '' }}</td>
               <td>{{ row.exchange ?? '' }}</td>
               <td class="num">{{ fmtPrice(row.pricePerShare) }}</td>
-              <td class="num">{{ fmtPrice(row.maxBuyPrice) }}</td>
-              <td class="num">{{ fmtPct(row.percentageUpside) }}</td>
-              <td class="num">{{ fmtCurrency(row.marketCap) }}</td>
-              <td class="num">{{ fmtPct(row.estimatedReturnCF) }}</td>
-              <td class="num">{{ fmtPct(row.estimatedReturnOE) }}</td>
-              <td class="num">{{ fmtPct(row.averageRoeCF) }}</td>
-              <td class="num">{{ fmtPct(row.averageRoeOE) }}</td>
+              <td class="num" [class]="returnClass(row.totalReturnPct)">{{ fmtReturn(row.totalReturnPct) }}</td>
+              <td class="num" [class]="returnClass(row.annualizedReturnPct)">{{ fmtReturn(row.annualizedReturnPct) }}</td>
+              <td class="num">{{ fmtInvested(row.currentValueOf1000) }}</td>
             </tr>
           }
         </tbody>
@@ -139,7 +133,7 @@ import {
       font-weight: 500;
       color: #475569;
     }
-    .filters select {
+    .filters select, .filters input[type="date"] {
       padding: 4px 8px;
       border: 1px solid #cbd5e1;
       border-radius: 4px;
@@ -219,15 +213,16 @@ import {
     }
   `]
 })
-export class ScoresReportComponent implements OnInit {
+export class GrahamReturnsReportComponent implements OnInit {
   page = signal(1);
   pageSize = 50;
   sortBy = 'overallScore';
   sortDir = 'desc';
   minScore: number | null = null;
   exchange: string | null = null;
+  startDate: string = defaultStartDate();
 
-  items = signal<CompanyScoreSummary[]>([]);
+  items = signal<CompanyScoreReturnSummary[]>([]);
   pagination = signal<PaginationResponse | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
@@ -236,7 +231,7 @@ export class ScoresReportComponent implements OnInit {
   constructor(private api: ApiService) {}
 
   ngOnInit(): void {
-    this.fetchScores();
+    this.fetchReturns();
   }
 
   toggleSort(column: string): void {
@@ -247,7 +242,7 @@ export class ScoresReportComponent implements OnInit {
       this.sortDir = 'desc';
     }
     this.page.set(1);
-    this.fetchScores();
+    this.fetchReturns();
   }
 
   sortIndicator(column: string): string {
@@ -257,12 +252,18 @@ export class ScoresReportComponent implements OnInit {
 
   onFilterChange(): void {
     this.page.set(1);
-    this.fetchScores();
+    this.fetchReturns();
+  }
+
+  onStartDateChange(value: string): void {
+    this.startDate = value;
+    this.page.set(1);
+    this.fetchReturns();
   }
 
   goToPage(p: number): void {
     this.page.set(p);
-    this.fetchScores();
+    this.fetchReturns();
   }
 
   scoreBadgeClass(score: number): string {
@@ -282,31 +283,30 @@ export class ScoresReportComponent implements OnInit {
     return '$' + val.toFixed(2);
   }
 
-  fmtCurrency(val: number | null): string {
+  fmtReturn(val: number | null): string {
     if (val == null) return '';
-    const sign = val < 0 ? '-' : '';
-    const abs = Math.abs(val);
-    if (abs >= 1_000_000_000_000) return sign + '$' + (abs / 1_000_000_000_000).toFixed(2) + 'T';
-    if (abs >= 1_000_000_000) return sign + '$' + (abs / 1_000_000_000).toFixed(2) + 'B';
-    if (abs >= 1_000_000) return sign + '$' + (abs / 1_000_000).toFixed(2) + 'M';
-    return sign + '$' + abs.toFixed(2);
+    const sign = val > 0 ? '+' : '';
+    return sign + val.toFixed(2) + '%';
   }
 
-  fmtRatio(val: number | null): string {
+  returnClass(val: number | null): string {
     if (val == null) return '';
-    return val.toFixed(2);
+    if (val > 0) return 'positive';
+    if (val < 0) return 'negative';
+    return '';
   }
 
-  fmtPct(val: number | null): string {
+  fmtInvested(val: number | null): string {
     if (val == null) return '';
-    return val.toFixed(2) + '%';
+    return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  private fetchScores(): void {
+  private fetchReturns(): void {
     this.loading.set(true);
     this.error.set(null);
 
-    this.api.getScoresReport({
+    this.api.getGrahamReturns({
+      startDate: this.startDate,
       page: this.page(),
       pageSize: this.pageSize,
       sortBy: this.sortBy,
@@ -323,7 +323,7 @@ export class ScoresReportComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Failed to load scores report.');
+        this.error.set('Failed to load returns report.');
         this.loading.set(false);
       }
     });

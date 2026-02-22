@@ -324,39 +324,6 @@ public sealed class DbmInMemoryData {
             return [.. _prices];
     }
 
-    public PriceRow? GetPriceNearDate(string ticker, DateOnly targetDate) {
-        if (string.IsNullOrWhiteSpace(ticker))
-            return null;
-        string normalized = ticker.Trim().ToUpperInvariant();
-        PriceRow? best = null;
-        lock (_mutex) {
-            foreach (PriceRow price in _prices) {
-                if (!string.Equals(price.Ticker, normalized, StringComparison.OrdinalIgnoreCase))
-                    continue;
-                if (price.PriceDate > targetDate)
-                    continue;
-                if (best is null || price.PriceDate > best.PriceDate)
-                    best = price;
-            }
-        }
-        return best;
-    }
-
-    public PriceRow? GetLatestPriceByTicker(string ticker) {
-        if (string.IsNullOrWhiteSpace(ticker))
-            return null;
-        string normalized = ticker.Trim().ToUpperInvariant();
-        PriceRow? best = null;
-        lock (_mutex) {
-            foreach (PriceRow price in _prices) {
-                if (!string.Equals(price.Ticker, normalized, StringComparison.OrdinalIgnoreCase))
-                    continue;
-                if (best is null || price.PriceDate > best.PriceDate)
-                    best = price;
-            }
-        }
-        return best;
-    }
 
     public IReadOnlyCollection<PriceRow> GetPricesByTicker(string ticker) {
         var results = new List<PriceRow>();
@@ -810,7 +777,6 @@ public sealed class DbmInMemoryData {
             MoatScoresSortBy.CapexRatio => CompareNullable(a.CapexRatio, b.CapexRatio),
             MoatScoresSortBy.InterestCoverage => CompareNullable(a.InterestCoverage, b.InterestCoverage),
             MoatScoresSortBy.DebtToEquityRatio => CompareNullable(a.DebtToEquityRatio, b.DebtToEquityRatio),
-            MoatScoresSortBy.Return1y => CompareNullable(a.Return1y, b.Return1y),
             _ => a.OverallScore.CompareTo(b.OverallScore),
         };
     }
@@ -823,7 +789,6 @@ public sealed class DbmInMemoryData {
             ScoresSortBy.EstimatedReturnOE => CompareNullable(a.EstimatedReturnOE, b.EstimatedReturnOE),
             ScoresSortBy.DebtToEquityRatio => CompareNullable(a.DebtToEquityRatio, b.DebtToEquityRatio),
             ScoresSortBy.PriceToBookRatio => CompareNullable(a.PriceToBookRatio, b.PriceToBookRatio),
-            ScoresSortBy.Return1y => CompareNullable(a.Return1y, b.Return1y),
             _ => a.OverallScore.CompareTo(b.OverallScore),
         };
     }

@@ -81,9 +81,6 @@ import {
             <th class="num sortable" (click)="toggleSort('revenueCagr')">
               Revenue CAGR {{ sortIndicator('revenueCagr') }}
             </th>
-            <th class="num sortable" (click)="toggleSort('return1y')">
-              1Y Return {{ sortIndicator('return1y') }}
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -107,7 +104,6 @@ import {
               <td class="num">{{ fmtPct(row.averageRoeOE) }}</td>
               <td class="num">{{ fmtPct(row.estimatedReturnOE) }}</td>
               <td class="num">{{ fmtPct(row.revenueCagr) }}</td>
-              <td class="num" [class]="returnClass(row.return1y)">{{ fmtReturn(row.return1y) }}</td>
             </tr>
           }
         </tbody>
@@ -302,17 +298,6 @@ export class MoatScoresReportComponent implements OnInit {
   fmtPct(val: number | null): string {
     if (val == null) return '';
     return val.toFixed(2) + '%';
-  }
-
-  fmtReturn(val: number | null): string {
-    if (val == null) return 'N/A';
-    const sign = val >= 0 ? '+' : '';
-    return sign + val.toFixed(2) + '%';
-  }
-
-  returnClass(val: number | null): string {
-    if (val == null) return '';
-    return val >= 0 ? 'positive' : 'negative';
   }
 
   private fetchScores(): void {

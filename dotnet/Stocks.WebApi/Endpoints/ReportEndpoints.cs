@@ -66,8 +66,6 @@ public static class ReportEndpoints {
             return ScoresSortBy.AverageRoeCF;
         if (string.Equals(value, "averageRoeOE", StringComparison.OrdinalIgnoreCase))
             return ScoresSortBy.AverageRoeOE;
-        if (string.Equals(value, "return1y", StringComparison.OrdinalIgnoreCase))
-            return ScoresSortBy.Return1y;
 
         return ScoresSortBy.OverallScore;
     }

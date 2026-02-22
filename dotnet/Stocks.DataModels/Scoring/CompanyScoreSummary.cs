@@ -29,5 +29,4 @@ public record CompanyScoreSummary(
     decimal? CurrentDividendsPaid,
     decimal? MaxBuyPrice,
     decimal? PercentageUpside,
-    decimal? Return1y,
     DateTime ComputedAt);

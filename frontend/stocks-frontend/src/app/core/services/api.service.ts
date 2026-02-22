@@ -123,7 +123,6 @@ export interface CompanyScoreSummary {
   currentDividendsPaid: number | null;
   maxBuyPrice: number | null;
   percentageUpside: number | null;
-  return1y: number | null;
   computedAt: string;
 }
 
@@ -200,17 +199,6 @@ export interface MoatScoringResponse {
   sharesOutstanding: number | null;
 }
 
-export interface InvestmentReturnResponse {
-  ticker: string;
-  startDate: string;
-  endDate: string;
-  startPrice: number;
-  endPrice: number;
-  totalReturnPct: number;
-  annualizedReturnPct: number | null;
-  currentValueOf1000: number;
-}
-
 export interface CompanyMoatScoreSummary {
   companyId: number;
   cik: string;
@@ -232,8 +220,36 @@ export interface CompanyMoatScoreSummary {
   pricePerShare: number | null;
   priceDate: string | null;
   sharesOutstanding: number | null;
-  return1y: number | null;
   computedAt: string;
+}
+
+export interface CompanyScoreReturnSummary {
+  companyId: number;
+  cik: string;
+  companyName: string | null;
+  ticker: string | null;
+  exchange: string | null;
+  overallScore: number;
+  computableChecks: number;
+  pricePerShare: number | null;
+  totalReturnPct: number | null;
+  annualizedReturnPct: number | null;
+  currentValueOf1000: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  startPrice: number | null;
+  endPrice: number | null;
+  computedAt: string;
+}
+
+export interface ReturnsReportParams {
+  startDate: string;
+  page: number;
+  pageSize: number;
+  sortBy: string;
+  sortDir: string;
+  minScore: number | null;
+  exchange: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -299,13 +315,6 @@ export class ApiService {
     );
   }
 
-  getInvestmentReturn(cik: string, startDate?: string): Observable<InvestmentReturnResponse> {
-    const parts: string[] = [];
-    if (startDate) parts.push(`startDate=${startDate}`);
-    const qs = parts.length ? `?${parts.join('&')}` : '';
-    return this.http.get<InvestmentReturnResponse>(`/api/companies/${cik}/investment-return${qs}`);
-  }
-
   getMoatScoring(cik: string): Observable<MoatScoringResponse> {
     return this.http.get<MoatScoringResponse>(`/api/companies/${cik}/moat-scoring`);
   }
@@ -321,6 +330,36 @@ export class ApiService {
     if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
     return this.http.get<PaginatedResponse<CompanyMoatScoreSummary>>(
       `/api/reports/moat-scores?${parts.join('&')}`
+    );
+  }
+
+  getGrahamReturns(params: ReturnsReportParams): Observable<PaginatedResponse<CompanyScoreReturnSummary>> {
+    const parts: string[] = [
+      `startDate=${params.startDate}`,
+      `page=${params.page}`,
+      `pageSize=${params.pageSize}`,
+      `sortBy=${params.sortBy}`,
+      `sortDir=${params.sortDir}`
+    ];
+    if (params.minScore != null) parts.push(`minScore=${params.minScore}`);
+    if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
+    return this.http.get<PaginatedResponse<CompanyScoreReturnSummary>>(
+      `/api/reports/graham-returns?${parts.join('&')}`
+    );
+  }
+
+  getBuffettReturns(params: ReturnsReportParams): Observable<PaginatedResponse<CompanyScoreReturnSummary>> {
+    const parts: string[] = [
+      `startDate=${params.startDate}`,
+      `page=${params.page}`,
+      `pageSize=${params.pageSize}`,
+      `sortBy=${params.sortBy}`,
+      `sortDir=${params.sortDir}`
+    ];
+    if (params.minScore != null) parts.push(`minScore=${params.minScore}`);
+    if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
+    return this.http.get<PaginatedResponse<CompanyScoreReturnSummary>>(
+      `/api/reports/buffett-returns?${parts.join('&')}`
     );
   }
 }

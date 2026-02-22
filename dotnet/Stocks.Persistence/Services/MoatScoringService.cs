@@ -650,7 +650,7 @@ public class MoatScoringService {
                 metrics.EstimatedReturnOE, metrics.RevenueCagr,
                 metrics.CapexRatio, metrics.InterestCoverage,
                 metrics.DebtToEquityRatio, pricePerShare, priceDate,
-                sharesOutstanding, null, now));
+                sharesOutstanding, now));
 
             scored++;
             if (scored % logInterval == 0)

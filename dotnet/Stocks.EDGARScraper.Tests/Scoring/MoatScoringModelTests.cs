@@ -122,7 +122,6 @@ public class MoatScoringModelTests {
             PricePerShare: 230.0m,
             PriceDate: new DateOnly(2025, 6, 1),
             SharesOutstanding: 15_000_000_000,
-            Return1y: null,
             ComputedAt: new DateTime(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc));
 
         Assert.Equal(1UL, summary.CompanyId);

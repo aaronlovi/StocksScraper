@@ -34,7 +34,6 @@ internal sealed class GetCompanyMoatScoresStmt : QueryDbStmtBase {
     private int _pricePerShareIndex = -1;
     private int _priceDateIndex = -1;
     private int _sharesOutstandingIndex = -1;
-    private int _return1yIndex = -1;
     private int _computedAtIndex = -1;
     private int _totalCountIndex = -1;
 
@@ -63,7 +62,6 @@ internal sealed class GetCompanyMoatScoresStmt : QueryDbStmtBase {
             MoatScoresSortBy.CapexRatio => "capex_ratio",
             MoatScoresSortBy.InterestCoverage => "interest_coverage",
             MoatScoresSortBy.DebtToEquityRatio => "debt_to_equity_ratio",
-            MoatScoresSortBy.Return1y => "return_1y",
             _ => "overall_score",
         };
 
@@ -91,7 +89,7 @@ SELECT company_id, cik, company_name, ticker, exchange,
     average_roe_cf, average_roe_oe, estimated_return_oe,
     revenue_cagr, capex_ratio, interest_coverage,
     debt_to_equity_ratio, price_per_share, price_date,
-    shares_outstanding, return_1y, computed_at,
+    shares_outstanding, computed_at,
     COUNT(*) OVER() AS total_count
 FROM company_moat_scores
 {whereClause}
@@ -121,7 +119,6 @@ LIMIT @limit OFFSET @offset";
         _pricePerShareIndex = reader.GetOrdinal("price_per_share");
         _priceDateIndex = reader.GetOrdinal("price_date");
         _sharesOutstandingIndex = reader.GetOrdinal("shares_outstanding");
-        _return1yIndex = reader.GetOrdinal("return_1y");
         _computedAtIndex = reader.GetOrdinal("computed_at");
         _totalCountIndex = reader.GetOrdinal("total_count");
     }
@@ -177,7 +174,6 @@ LIMIT @limit OFFSET @offset";
             reader.IsDBNull(_pricePerShareIndex) ? null : reader.GetDecimal(_pricePerShareIndex),
             reader.IsDBNull(_priceDateIndex) ? null : DateOnly.FromDateTime(reader.GetDateTime(_priceDateIndex)),
             reader.IsDBNull(_sharesOutstandingIndex) ? null : reader.GetInt64(_sharesOutstandingIndex),
-            reader.IsDBNull(_return1yIndex) ? null : reader.GetDecimal(_return1yIndex),
             reader.GetDateTime(_computedAtIndex));
         _results.Add(result);
         return true;

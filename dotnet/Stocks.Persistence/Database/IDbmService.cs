@@ -109,8 +109,6 @@ public interface IDbmService {
     // Prices
 
     Task<Result<IReadOnlyCollection<PriceImportStatus>>> GetPriceImportStatuses(CancellationToken ct);
-    Task<Result<PriceRow?>> GetPriceNearDate(string ticker, DateOnly targetDate, CancellationToken ct);
-    Task<Result<PriceRow?>> GetLatestPriceByTicker(string ticker, CancellationToken ct);
     Task<Result<IReadOnlyCollection<PriceRow>>> GetPricesByTicker(string ticker, CancellationToken ct);
     Task<Result> UpsertPriceImport(PriceImportStatus status, CancellationToken ct);
     Task<Result> DeletePricesForTicker(string ticker, CancellationToken ct);

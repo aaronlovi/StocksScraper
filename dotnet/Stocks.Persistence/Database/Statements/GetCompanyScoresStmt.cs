@@ -40,7 +40,6 @@ internal sealed class GetCompanyScoresStmt : QueryDbStmtBase {
     private int _currentDividendsPaidIndex = -1;
     private int _maxBuyPriceIndex = -1;
     private int _percentageUpsideIndex = -1;
-    private int _return1yIndex = -1;
     private int _computedAtIndex = -1;
     private int _totalCountIndex = -1;
 
@@ -70,7 +69,6 @@ internal sealed class GetCompanyScoresStmt : QueryDbStmtBase {
             ScoresSortBy.PercentageUpside => "percentage_upside",
             ScoresSortBy.AverageRoeCF => "average_roe_cf",
             ScoresSortBy.AverageRoeOE => "average_roe_oe",
-            ScoresSortBy.Return1y => "return_1y",
             _ => "overall_score",
         };
 
@@ -100,7 +98,7 @@ SELECT company_id, cik, company_name, ticker, exchange,
     average_owner_earnings, average_roe_cf, average_roe_oe,
     estimated_return_cf, estimated_return_oe,
     price_per_share, price_date, shares_outstanding,
-    current_dividends_paid, max_buy_price, percentage_upside, return_1y, computed_at,
+    current_dividends_paid, max_buy_price, percentage_upside, computed_at,
     COUNT(*) OVER() AS total_count
 FROM company_scores
 {whereClause}
@@ -136,7 +134,6 @@ LIMIT @limit OFFSET @offset";
         _currentDividendsPaidIndex = reader.GetOrdinal("current_dividends_paid");
         _maxBuyPriceIndex = reader.GetOrdinal("max_buy_price");
         _percentageUpsideIndex = reader.GetOrdinal("percentage_upside");
-        _return1yIndex = reader.GetOrdinal("return_1y");
         _computedAtIndex = reader.GetOrdinal("computed_at");
         _totalCountIndex = reader.GetOrdinal("total_count");
     }
@@ -198,7 +195,6 @@ LIMIT @limit OFFSET @offset";
             reader.IsDBNull(_currentDividendsPaidIndex) ? null : reader.GetDecimal(_currentDividendsPaidIndex),
             reader.IsDBNull(_maxBuyPriceIndex) ? null : reader.GetDecimal(_maxBuyPriceIndex),
             reader.IsDBNull(_percentageUpsideIndex) ? null : reader.GetDecimal(_percentageUpsideIndex),
-            reader.IsDBNull(_return1yIndex) ? null : reader.GetDecimal(_return1yIndex),
             reader.GetDateTime(_computedAtIndex));
         _results.Add(result);
         return true;

@@ -27,6 +27,18 @@ export const routes: Routes = [
       import('./features/moat-scores-report/moat-scores-report.component').then(m => m.MoatScoresReportComponent)
   },
   {
+    path: 'graham-returns',
+    title: 'Stocks - Graham Returns',
+    loadComponent: () =>
+      import('./features/graham-returns-report/graham-returns-report.component').then(m => m.GrahamReturnsReportComponent)
+  },
+  {
+    path: 'buffett-returns',
+    title: 'Stocks - Buffett Returns',
+    loadComponent: () =>
+      import('./features/buffett-returns-report/buffett-returns-report.component').then(m => m.BuffettReturnsReportComponent)
+  },
+  {
     path: 'company/:cik',
     loadComponent: () =>
       import('./features/company/company.component').then(m => m.CompanyComponent)

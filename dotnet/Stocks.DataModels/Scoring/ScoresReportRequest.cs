@@ -11,8 +11,7 @@ public enum ScoresSortBy {
     MaxBuyPrice,
     PercentageUpside,
     AverageRoeCF,
-    AverageRoeOE,
-    Return1y
+    AverageRoeOE
 }
 
 public enum SortDirection {

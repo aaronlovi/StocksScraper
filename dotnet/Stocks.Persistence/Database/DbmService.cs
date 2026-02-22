@@ -705,32 +705,6 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
-    public async Task<Result<PriceRow?>> GetPriceNearDate(string ticker, DateOnly targetDate, CancellationToken ct) {
-        var stmt = new GetPriceNearDateStmt(ticker, targetDate);
-        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
-        if (res.IsSuccess) {
-            _logger.LogInformation("GetPriceNearDate success - Ticker: {Ticker}, TargetDate: {TargetDate}, Found: {Found}",
-                ticker, targetDate, stmt.Price is not null);
-            return Result<PriceRow?>.Success(stmt.Price);
-        } else {
-            _logger.LogWarning("GetPriceNearDate failed with error {Error}", res.ErrorMessage);
-            return Result<PriceRow?>.Failure(res);
-        }
-    }
-
-    public async Task<Result<PriceRow?>> GetLatestPriceByTicker(string ticker, CancellationToken ct) {
-        var stmt = new GetLatestPriceByTickerStmt(ticker);
-        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
-        if (res.IsSuccess) {
-            _logger.LogInformation("GetLatestPriceByTicker success - Ticker: {Ticker}, Found: {Found}",
-                ticker, stmt.Price is not null);
-            return Result<PriceRow?>.Success(stmt.Price);
-        } else {
-            _logger.LogWarning("GetLatestPriceByTicker failed with error {Error}", res.ErrorMessage);
-            return Result<PriceRow?>.Failure(res);
-        }
-    }
-
     public async Task<Result<IReadOnlyCollection<PriceRow>>> GetPricesByTicker(string ticker, CancellationToken ct) {
         var stmt = new GetPricesByTickerStmt(ticker);
         DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);

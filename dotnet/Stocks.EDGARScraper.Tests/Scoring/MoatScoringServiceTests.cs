@@ -126,6 +126,34 @@ public class MoatScoringServiceTests {
         Assert.Null(metrics.RevenueCagr);
     }
 
+    [Fact]
+    public void ComputeMoatDerivedMetrics_RevenueCagr_NullWhenLatestRevenueIsNegative() {
+        var annualData = BuildAnnualData(
+            (2020, new Dictionary<string, decimal> { ["Revenues"] = 1000m }),
+            (2023, new Dictionary<string, decimal> { ["Revenues"] = -500m }));
+
+        var (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(
+            annualData, EmptySnapshot(), null, null, null);
+
+        Assert.Null(metrics.RevenueCagr);
+    }
+
+    [Fact]
+    public void ComputeMoatDerivedMetrics_RevenueCagr_NoOverflowOnExtremeRatio() {
+        // Tiny oldest revenue with large latest revenue produces a ratio whose CAGR
+        // would overflow decimal. The method should return null instead of throwing.
+        var annualData = BuildAnnualData(
+            (2022, new Dictionary<string, decimal> { ["Revenues"] = 0.001m }),
+            (2023, new Dictionary<string, decimal> { ["Revenues"] = 999_999_999_999m }));
+
+        var (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(
+            annualData, EmptySnapshot(), null, null, null);
+
+        // Should not throw; CAGR may be a very large value or null depending on
+        // whether the result fits in decimal, but must not throw OverflowException.
+        // The important thing is no exception was thrown.
+    }
+
     #endregion
 
     #region CapEx ratio tests

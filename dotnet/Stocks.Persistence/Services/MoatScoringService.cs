@@ -254,11 +254,13 @@ public class MoatScoringService {
 
         // Revenue CAGR
         decimal? revenueCagr = null;
-        if (oldestRevenue.HasValue && latestRevenue.HasValue && oldestRevenue.Value > 0m) {
+        if (oldestRevenue.HasValue && latestRevenue.HasValue && oldestRevenue.Value > 0m && latestRevenue.Value > 0m) {
             int yearsBetween = latestRevenueYear - oldestRevenueYear;
             if (yearsBetween >= 1) {
                 double ratio = (double)(latestRevenue.Value / oldestRevenue.Value);
-                revenueCagr = (decimal)(Math.Pow(ratio, 1.0 / yearsBetween) - 1.0) * 100m;
+                double cagrDouble = Math.Pow(ratio, 1.0 / yearsBetween) - 1.0;
+                if (double.IsFinite(cagrDouble) && Math.Abs(cagrDouble) < (double)decimal.MaxValue)
+                    revenueCagr = (decimal)cagrDouble * 100m;
             }
         }
 

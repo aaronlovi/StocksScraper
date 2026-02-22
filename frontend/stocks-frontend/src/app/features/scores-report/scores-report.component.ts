@@ -7,11 +7,20 @@ import {
   PaginationResponse
 } from '../../core/services/api.service';
 import { LoadingOverlayComponent } from '../../shared/components/loading-overlay/loading-overlay.component';
+import { PaginationComponent } from '../../shared/components/pagination/pagination.component';
+import {
+  fmtCurrency as fmtCurrencyFn,
+  fmtPct as fmtPctFn,
+  fmtPrice as fmtPriceFn,
+  scoreBadgeClass as scoreBadgeClassFn,
+  rowHighlightClass as rowHighlightClassFn
+} from '../../shared/format.utils';
+import { SortState } from '../../shared/sort.utils';
 
 @Component({
   selector: 'app-scores-report',
   standalone: true,
-  imports: [RouterLink, FormsModule, LoadingOverlayComponent],
+  imports: [RouterLink, FormsModule, LoadingOverlayComponent, PaginationComponent],
   template: `
     <h2>Company Graham Scores Report</h2>
 
@@ -57,32 +66,32 @@ import { LoadingOverlayComponent } from '../../shared/components/loading-overlay
         <thead>
           <tr>
             <th class="sortable" (click)="toggleSort('overallScore')">
-              Score {{ sortIndicator('overallScore') }}
+              Score {{ sort.indicator('overallScore') }}
             </th>
             <th>Company</th>
             <th>Ticker</th>
             <th>Exchange</th>
             <th class="num">Price</th>
             <th class="num sortable" (click)="toggleSort('maxBuyPrice')">
-              Max Buy Price {{ sortIndicator('maxBuyPrice') }}
+              Max Buy Price {{ sort.indicator('maxBuyPrice') }}
             </th>
             <th class="num sortable" (click)="toggleSort('percentageUpside')">
-              % Upside {{ sortIndicator('percentageUpside') }}
+              % Upside {{ sort.indicator('percentageUpside') }}
             </th>
             <th class="num sortable" (click)="toggleSort('marketCap')">
-              Market Cap {{ sortIndicator('marketCap') }}
+              Market Cap {{ sort.indicator('marketCap') }}
             </th>
             <th class="num sortable" (click)="toggleSort('estimatedReturnCF')">
-              Est. Return (CF) {{ sortIndicator('estimatedReturnCF') }}
+              Est. Return (CF) {{ sort.indicator('estimatedReturnCF') }}
             </th>
             <th class="num sortable" (click)="toggleSort('estimatedReturnOE')">
-              Est. Return (OE) {{ sortIndicator('estimatedReturnOE') }}
+              Est. Return (OE) {{ sort.indicator('estimatedReturnOE') }}
             </th>
             <th class="num sortable" (click)="toggleSort('averageRoeCF')">
-              Avg ROE (CF) {{ sortIndicator('averageRoeCF') }}
+              Avg ROE (CF) {{ sort.indicator('averageRoeCF') }}
             </th>
             <th class="num sortable" (click)="toggleSort('averageRoeOE')">
-              Avg ROE (OE) {{ sortIndicator('averageRoeOE') }}
+              Avg ROE (OE) {{ sort.indicator('averageRoeOE') }}
             </th>
           </tr>
         </thead>
@@ -113,11 +122,7 @@ import { LoadingOverlayComponent } from '../../shared/components/loading-overlay
       </table>
 
       @if (pagination()) {
-        <div class="pagination">
-          <button [disabled]="page() <= 1" (click)="goToPage(page() - 1)">Previous</button>
-          <span>Page {{ page() }} of {{ pagination()!.totalPages }} ({{ pagination()!.totalItems }} companies)</span>
-          <button [disabled]="page() >= pagination()!.totalPages" (click)="goToPage(page() + 1)">Next</button>
-        </div>
+        <app-pagination [page]="page()" [totalPages]="pagination()!.totalPages" [totalItems]="pagination()!.totalItems" (pageChange)="goToPage($event)" />
       }
 
       @if (computedAt()) {
@@ -125,106 +130,12 @@ import { LoadingOverlayComponent } from '../../shared/components/loading-overlay
       }
     }
   `,
-  styles: [`
-    .filters {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 16px;
-      align-items: center;
-    }
-    .filters label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      font-weight: 500;
-      color: #475569;
-    }
-    .filters select {
-      padding: 4px 8px;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      background: #fff;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th, td {
-      text-align: left;
-      padding: 4px 12px;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    th {
-      background: #f1f5f9;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .sortable {
-      cursor: pointer;
-      user-select: none;
-    }
-    .sortable:hover {
-      background: #e2e8f0;
-    }
-    .num { text-align: right; }
-    a {
-      color: #3b82f6;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    .score-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 12px;
-      text-align: center;
-      min-width: 40px;
-    }
-    .score-green { background: #dcfce7; color: #166534; }
-    .score-yellow { background: #fef9c3; color: #854d0e; }
-    .score-red { background: #fee2e2; color: #991b1b; }
-    .pagination {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 16px;
-    }
-    .pagination button {
-      padding: 6px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      background: #fff;
-      cursor: pointer;
-    }
-    .pagination button:disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
-    .no-results {
-      color: #64748b;
-    }
-    .row-perfect { background: #dcfce7; }
-    .row-near-perfect { background: #fef9c3; }
-    .positive { color: #16a34a; }
-    .negative { color: #dc2626; }
-    .error { color: #dc2626; }
-    .computed-at {
-      font-size: 12px;
-      color: #94a3b8;
-      margin-top: 12px;
-    }
-  `]
+  styleUrls: ['../../shared/styles/report-table.css']
 })
 export class ScoresReportComponent implements OnInit {
   page = signal(1);
   pageSize = 50;
-  sortBy = 'overallScore';
-  sortDir = 'desc';
+  sort = new SortState('overallScore');
   minScore: number | null = null;
   exchange: string | null = null;
 
@@ -234,6 +145,12 @@ export class ScoresReportComponent implements OnInit {
   error = signal<string | null>(null);
   computedAt = signal<string | null>(null);
 
+  readonly fmtCurrency = (val: number | null | undefined) => fmtCurrencyFn(val, '');
+  readonly fmtPct = (val: number | null | undefined) => fmtPctFn(val, '');
+  readonly fmtPrice = (val: number | null | undefined) => fmtPriceFn(val, '');
+  readonly scoreBadgeClass = scoreBadgeClassFn;
+  readonly rowHighlightClass = (score: number, computableChecks: number) => rowHighlightClassFn(score, computableChecks, 15);
+
   constructor(private api: ApiService) {}
 
   ngOnInit(): void {
@@ -241,19 +158,9 @@ export class ScoresReportComponent implements OnInit {
   }
 
   toggleSort(column: string): void {
-    if (this.sortBy === column) {
-      this.sortDir = this.sortDir === 'desc' ? 'asc' : 'desc';
-    } else {
-      this.sortBy = column;
-      this.sortDir = 'desc';
-    }
+    this.sort.toggle(column);
     this.page.set(1);
     this.fetchScores();
-  }
-
-  sortIndicator(column: string): string {
-    if (this.sortBy !== column) return '';
-    return this.sortDir === 'desc' ? '\u25BC' : '\u25B2';
   }
 
   onFilterChange(): void {
@@ -266,43 +173,6 @@ export class ScoresReportComponent implements OnInit {
     this.fetchScores();
   }
 
-  scoreBadgeClass(score: number): string {
-    if (score >= 10) return 'score-green';
-    if (score >= 7) return 'score-yellow';
-    return 'score-red';
-  }
-
-  rowHighlightClass(score: number, computableChecks: number): string {
-    if (score === computableChecks && computableChecks === 15) return 'row-perfect';
-    if (score === computableChecks - 1 && computableChecks === 15) return 'row-near-perfect';
-    return '';
-  }
-
-  fmtPrice(val: number | null): string {
-    if (val == null) return '';
-    return '$' + val.toFixed(2);
-  }
-
-  fmtCurrency(val: number | null): string {
-    if (val == null) return '';
-    const sign = val < 0 ? '-' : '';
-    const abs = Math.abs(val);
-    if (abs >= 1_000_000_000_000) return sign + '$' + (abs / 1_000_000_000_000).toFixed(2) + 'T';
-    if (abs >= 1_000_000_000) return sign + '$' + (abs / 1_000_000_000).toFixed(2) + 'B';
-    if (abs >= 1_000_000) return sign + '$' + (abs / 1_000_000).toFixed(2) + 'M';
-    return sign + '$' + abs.toFixed(2);
-  }
-
-  fmtRatio(val: number | null): string {
-    if (val == null) return '';
-    return val.toFixed(2);
-  }
-
-  fmtPct(val: number | null): string {
-    if (val == null) return '';
-    return val.toFixed(2) + '%';
-  }
-
   private fetchScores(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -310,8 +180,8 @@ export class ScoresReportComponent implements OnInit {
     this.api.getScoresReport({
       page: this.page(),
       pageSize: this.pageSize,
-      sortBy: this.sortBy,
-      sortDir: this.sortDir,
+      sortBy: this.sort.sortBy,
+      sortDir: this.sort.sortDir,
       minScore: this.minScore,
       exchange: this.exchange
     }).subscribe({

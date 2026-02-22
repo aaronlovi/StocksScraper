@@ -7,29 +7,28 @@ import {
   PaginationResponse
 } from '../../core/services/api.service';
 import { LoadingOverlayComponent } from '../../shared/components/loading-overlay/loading-overlay.component';
-
-interface ReturnsSummary {
-  count: number;
-  avgTotalReturn: number;
-  medianTotalReturn: number;
-  avgAnnualizedReturn: number | null;
-  avgValueOf1000: number;
-  bestTicker: string;
-  bestReturn: number;
-  worstTicker: string;
-  worstReturn: number;
-}
-
-function defaultStartDate(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 6);
-  return d.toISOString().slice(0, 10);
-}
+import { PaginationComponent } from '../../shared/components/pagination/pagination.component';
+import {
+  ReturnsSummary,
+  computeReturnsSummary,
+  defaultStartDate,
+  yahooFinanceSP500Url,
+  googleFinanceSP500Url
+} from '../../shared/returns-summary.utils';
+import {
+  fmtPrice as fmtPriceFn,
+  fmtReturn as fmtReturnFn,
+  fmtInvested as fmtInvestedFn,
+  returnClass as returnClassFn,
+  scoreBadgeClass as scoreBadgeClassFn,
+  rowHighlightClass as rowHighlightClassFn
+} from '../../shared/format.utils';
+import { SortState } from '../../shared/sort.utils';
 
 @Component({
   selector: 'app-graham-returns-report',
   standalone: true,
-  imports: [RouterLink, FormsModule, LoadingOverlayComponent],
+  imports: [RouterLink, FormsModule, LoadingOverlayComponent, PaginationComponent],
   template: `
     <h2>Graham Returns</h2>
 
@@ -80,20 +79,20 @@ function defaultStartDate(): string {
         <thead>
           <tr>
             <th class="sortable" (click)="toggleSort('overallScore')">
-              Score {{ sortIndicator('overallScore') }}
+              Score {{ sort.indicator('overallScore') }}
             </th>
             <th>Company</th>
             <th>Ticker</th>
             <th>Exchange</th>
             <th class="num">Price</th>
             <th class="num sortable" (click)="toggleSort('totalReturnPct')">
-              Total Return % {{ sortIndicator('totalReturnPct') }}
+              Total Return % {{ sort.indicator('totalReturnPct') }}
             </th>
             <th class="num sortable" (click)="toggleSort('annualizedReturnPct')">
-              Annualized % {{ sortIndicator('annualizedReturnPct') }}
+              Annualized % {{ sort.indicator('annualizedReturnPct') }}
             </th>
             <th class="num sortable" (click)="toggleSort('currentValueOf1000')">
-              $1,000 Invested {{ sortIndicator('currentValueOf1000') }}
+              $1,000 Invested {{ sort.indicator('currentValueOf1000') }}
             </th>
           </tr>
         </thead>
@@ -163,11 +162,7 @@ function defaultStartDate(): string {
       }
 
       @if (pagination()) {
-        <div class="pagination">
-          <button [disabled]="page() <= 1" (click)="goToPage(page() - 1)">Previous</button>
-          <span>Page {{ page() }} of {{ pagination()!.totalPages }} ({{ pagination()!.totalItems }} companies)</span>
-          <button [disabled]="page() >= pagination()!.totalPages" (click)="goToPage(page() + 1)">Next</button>
-        </div>
+        <app-pagination [page]="page()" [totalPages]="pagination()!.totalPages" [totalItems]="pagination()!.totalItems" (pageChange)="goToPage($event)" />
       }
 
       @if (computedAt()) {
@@ -176,155 +171,25 @@ function defaultStartDate(): string {
     }
   `,
   styles: [`
-    .filters {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 16px;
-      align-items: center;
-    }
-    .filters label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      font-weight: 500;
-      color: #475569;
-    }
-    .filters select, .filters input[type="date"] {
+    .filters input[type="date"] {
       padding: 4px 8px;
       border: 1px solid #cbd5e1;
       border-radius: 4px;
       background: #fff;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th, td {
-      text-align: left;
-      padding: 4px 12px;
-      border-bottom: 1px solid #e2e8f0;
-    }
     tbody tr:hover {
       background: #f8fafc;
     }
-    th {
-      background: #f1f5f9;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .sortable {
-      cursor: pointer;
-      user-select: none;
-    }
-    .sortable:hover {
-      background: #e2e8f0;
-    }
-    .num { text-align: right; }
-    a {
-      color: #3b82f6;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    .score-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 12px;
-      text-align: center;
-      min-width: 40px;
-    }
-    .score-green { background: #dcfce7; color: #166534; }
-    .score-yellow { background: #fef9c3; color: #854d0e; }
-    .score-red { background: #fee2e2; color: #991b1b; }
-    .pagination {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 16px;
-    }
-    .pagination button {
-      padding: 6px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      background: #fff;
-      cursor: pointer;
-    }
-    .pagination button:disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
-    .no-results {
-      color: #64748b;
-    }
-    .row-perfect { background: #dcfce7; }
-    .row-near-perfect { background: #fef9c3; }
-    .positive { color: #16a34a; }
-    .negative { color: #dc2626; }
-    .error { color: #dc2626; }
-    .summary {
-      margin-top: 20px;
-      padding: 16px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-    }
-    .summary h3 {
-      margin: 0 0 12px 0;
-      font-size: 14px;
-      color: #334155;
-    }
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 12px;
-    }
-    .summary-item {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .summary-label {
-      font-size: 11px;
-      font-weight: 500;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .summary-value {
-      font-size: 16px;
-      font-weight: 600;
-      color: #1e293b;
-    }
-    .benchmark-links {
-      display: flex;
-      gap: 12px;
-      font-size: 14px;
-    }
-    .benchmark-links a {
-      color: #3b82f6;
-      text-decoration: none;
-      font-weight: 500;
-    }
-    .benchmark-links a:hover {
-      text-decoration: underline;
-    }
-    .computed-at {
-      font-size: 12px;
-      color: #94a3b8;
-      margin-top: 12px;
-    }
-  `]
+  `],
+  styleUrls: [
+    '../../shared/styles/report-table.css',
+    '../../shared/styles/summary-section.css'
+  ]
 })
 export class GrahamReturnsReportComponent implements OnInit {
   page = signal(1);
   pageSize = 50;
-  sortBy = 'overallScore';
-  sortDir = 'desc';
+  sort = new SortState('overallScore');
   minScore: number | null = 15;
   exchange: string | null = null;
   startDate: string = defaultStartDate();
@@ -335,56 +200,14 @@ export class GrahamReturnsReportComponent implements OnInit {
   error = signal<string | null>(null);
   computedAt = signal<string | null>(null);
 
-  summary = computed<ReturnsSummary | null>(() => {
-    const rows = this.items();
-    const withData: CompanyScoreReturnSummary[] = [];
-    for (const r of rows) {
-      if (r.totalReturnPct != null && r.currentValueOf1000 != null && r.startDate && r.endDate) {
-        withData.push(r);
-      }
-    }
-    if (withData.length === 0) return null;
+  summary = computed<ReturnsSummary | null>(() => computeReturnsSummary(this.items()));
 
-    let sumTotal = 0;
-    let sumValue = 0;
-    let sumDays = 0;
-    let best = withData[0];
-    let worst = withData[0];
-    for (const r of withData) {
-      sumTotal += r.totalReturnPct!;
-      sumValue += r.currentValueOf1000!;
-      const days = (new Date(r.endDate!).getTime() - new Date(r.startDate!).getTime()) / 86_400_000;
-      sumDays += days;
-      if (r.totalReturnPct! > best.totalReturnPct!) best = r;
-      if (r.totalReturnPct! < worst.totalReturnPct!) worst = r;
-    }
-
-    const avgTotalReturn = sumTotal / withData.length;
-    const avgDays = sumDays / withData.length;
-    let avgAnnualizedReturn: number | null = null;
-    if (avgDays > 0) {
-      avgAnnualizedReturn = (Math.pow(1 + avgTotalReturn / 100, 365.25 / avgDays) - 1) * 100;
-      avgAnnualizedReturn = Math.round(avgAnnualizedReturn * 100) / 100;
-    }
-
-    const sorted = withData.map(r => r.totalReturnPct!).sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    const median = sorted.length % 2 === 0
-      ? (sorted[mid - 1] + sorted[mid]) / 2
-      : sorted[mid];
-
-    return {
-      count: withData.length,
-      avgTotalReturn: Math.round(avgTotalReturn * 100) / 100,
-      medianTotalReturn: Math.round(median * 100) / 100,
-      avgAnnualizedReturn: avgAnnualizedReturn,
-      avgValueOf1000: Math.round(sumValue / withData.length * 100) / 100,
-      bestTicker: best.ticker ?? best.cik,
-      bestReturn: best.totalReturnPct!,
-      worstTicker: worst.ticker ?? worst.cik,
-      worstReturn: worst.totalReturnPct!,
-    };
-  });
+  readonly fmtPrice = (val: number | null | undefined) => fmtPriceFn(val, '');
+  readonly fmtReturn = (val: number | null | undefined) => fmtReturnFn(val, '');
+  readonly fmtInvested = (val: number | null | undefined) => fmtInvestedFn(val, '');
+  readonly returnClass = returnClassFn;
+  readonly scoreBadgeClass = scoreBadgeClassFn;
+  readonly rowHighlightClass = (score: number, computableChecks: number) => rowHighlightClassFn(score, computableChecks, 15);
 
   constructor(private api: ApiService) {}
 
@@ -393,19 +216,9 @@ export class GrahamReturnsReportComponent implements OnInit {
   }
 
   toggleSort(column: string): void {
-    if (this.sortBy === column) {
-      this.sortDir = this.sortDir === 'desc' ? 'asc' : 'desc';
-    } else {
-      this.sortBy = column;
-      this.sortDir = 'desc';
-    }
+    this.sort.toggle(column);
     this.page.set(1);
     this.fetchReturns();
-  }
-
-  sortIndicator(column: string): string {
-    if (this.sortBy !== column) return '';
-    return this.sortDir === 'desc' ? '\u25BC' : '\u25B2';
   }
 
   onFilterChange(): void {
@@ -424,49 +237,12 @@ export class GrahamReturnsReportComponent implements OnInit {
     this.fetchReturns();
   }
 
-  scoreBadgeClass(score: number): string {
-    if (score >= 10) return 'score-green';
-    if (score >= 7) return 'score-yellow';
-    return 'score-red';
-  }
-
-  rowHighlightClass(score: number, computableChecks: number): string {
-    if (score === computableChecks && computableChecks === 15) return 'row-perfect';
-    if (score === computableChecks - 1 && computableChecks === 15) return 'row-near-perfect';
-    return '';
-  }
-
-  fmtPrice(val: number | null): string {
-    if (val == null) return '';
-    return '$' + val.toFixed(2);
-  }
-
-  fmtReturn(val: number | null): string {
-    if (val == null) return '';
-    const sign = val > 0 ? '+' : '';
-    return sign + val.toFixed(2) + '%';
-  }
-
-  returnClass(val: number | null): string {
-    if (val == null) return '';
-    if (val > 0) return 'positive';
-    if (val < 0) return 'negative';
-    return '';
-  }
-
-  fmtInvested(val: number | null): string {
-    if (val == null) return '';
-    return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
   yahooFinanceUrl(): string {
-    const period1 = Math.floor(new Date(this.startDate + 'T00:00:00').getTime() / 1000);
-    const period2 = Math.floor(Date.now() / 1000);
-    return `https://finance.yahoo.com/quote/%5EGSPC/chart/?period1=${period1}&period2=${period2}`;
+    return yahooFinanceSP500Url(this.startDate);
   }
 
   googleFinanceUrl(): string {
-    return `https://www.google.com/finance/quote/.INX:INDEXSP`;
+    return googleFinanceSP500Url();
   }
 
   private fetchReturns(): void {
@@ -477,8 +253,8 @@ export class GrahamReturnsReportComponent implements OnInit {
       startDate: this.startDate,
       page: this.page(),
       pageSize: this.pageSize,
-      sortBy: this.sortBy,
-      sortDir: this.sortDir,
+      sortBy: this.sort.sortBy,
+      sortDir: this.sort.sortDir,
       minScore: this.minScore,
       minChecks: null,
       exchange: this.exchange

@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
@@ -7,40 +7,18 @@ import {
   SubmissionItem,
   StatementListItem
 } from '../../core/services/api.service';
+import { CompanyHeaderComponent, CompanyHeaderLink } from '../../shared/components/company-header/company-header.component';
 
 @Component({
   selector: 'app-company',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, CompanyHeaderComponent],
   template: `
     @if (company()) {
-      <div class="company-header">
-        <h2>{{ company()!.companyName ?? ('CIK ' + company()!.cik) }} — Filings</h2>
-        <div class="company-subtitle">
-          <span class="cik-label">CIK {{ company()!.cik }}</span>
-          @if (company()!.latestPrice != null) {
-            <span class="price-label">\${{ company()!.latestPrice!.toFixed(2) }}</span>
-            @if (company()!.latestPriceDate) {
-              <span class="price-date">as of {{ company()!.latestPriceDate }}</span>
-            }
-          }
-        </div>
-        @if (company()!.tickers.length > 0) {
-          <div class="tickers">
-            @for (t of company()!.tickers; track (t.ticker + t.exchange)) {
-              <span class="badge">{{ t.ticker }}<span class="exchange">{{ t.exchange }}</span></span>
-            }
-          </div>
-        }
-        <div class="company-links">
-          <a [routerLink]="['/company', cik, 'scoring']" class="external-link">Graham Score</a>
-          <a [routerLink]="['/company', cik, 'moat-scoring']" class="external-link">Buffett Score</a>
-          @if (company()!.tickers.length > 0) {
-            <a class="external-link" [href]="'https://finance.yahoo.com/quote/' + company()!.tickers[0].ticker" target="_blank" rel="noopener">Yahoo Finance</a>
-            <a class="external-link" [href]="'https://www.google.com/finance/quote/' + company()!.tickers[0].ticker + ':' + company()!.tickers[0].exchange" target="_blank" rel="noopener">Google Finance</a>
-          }
-        </div>
-      </div>
+      <app-company-header
+        [company]="company()!"
+        titleSuffix=" — Filings"
+        [links]="headerLinks()" />
 
       @if (submissions().length > 0) {
         <table>
@@ -106,46 +84,6 @@ import {
     }
   `,
   styles: [`
-    .company-header {
-      margin-bottom: 16px;
-    }
-    .company-subtitle {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 4px;
-      font-size: 14px;
-      color: #64748b;
-    }
-    .cik-label {
-      font-weight: 500;
-    }
-    .price-label {
-      font-weight: 600;
-      color: #059669;
-    }
-    .price-date {
-      font-weight: 400;
-      color: #94a3b8;
-    }
-    .tickers {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .badge {
-      background: #3b82f6;
-      color: #fff;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .badge .exchange {
-      margin-left: 4px;
-      font-weight: 400;
-      opacity: 0.8;
-    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -206,20 +144,6 @@ import {
       color: #64748b;
       margin: 0;
     }
-    .company-links {
-      margin-top: 10px;
-      display: flex;
-      gap: 16px;
-    }
-    .external-link {
-      color: #3b82f6;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 14px;
-    }
-    .external-link:hover {
-      text-decoration: underline;
-    }
     .error {
       color: #dc2626;
     }
@@ -233,6 +157,20 @@ export class CompanyComponent implements OnInit {
   statements = signal<StatementListItem[]>([]);
   statementsLoading = signal(false);
   error = signal<string | null>(null);
+
+  headerLinks = computed<CompanyHeaderLink[]>(() => {
+    const c = this.company();
+    if (!c) return [];
+    const links: CompanyHeaderLink[] = [
+      { label: 'Graham Score', routerLink: '/company/' + this.cik + '/scoring' },
+      { label: 'Buffett Score', routerLink: '/company/' + this.cik + '/moat-scoring' },
+    ];
+    if (c.tickers.length > 0) {
+      links.push({ label: 'Yahoo Finance', href: 'https://finance.yahoo.com/quote/' + c.tickers[0].ticker });
+      links.push({ label: 'Google Finance', href: 'https://www.google.com/finance/quote/' + c.tickers[0].ticker + ':' + c.tickers[0].exchange });
+    }
+    return links;
+  });
 
   constructor(
     private route: ActivatedRoute,

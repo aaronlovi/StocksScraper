@@ -1,0 +1,29 @@
+.info-icon {
+  position: relative;
+  cursor: help;
+  font-size: 14px;
+  color: #94a3b8;
+  margin-left: 4px;
+}
+.info-icon:hover {
+  color: #64748b;
+}
+.info-icon:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 100%;
+  margin-top: 6px;
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: normal;
+  width: 260px;
+  z-index: 10;
+  line-height: 1.4;
+  pointer-events: none;
+}

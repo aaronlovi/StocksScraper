@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import {
   ApiService,
@@ -10,48 +10,23 @@ import {
   MoatYearMetrics
 } from '../../core/services/api.service';
 import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
+import { SparklineChartComponent } from '../../shared/components/sparkline-chart/sparkline-chart.component';
+import { fmtCurrency, fmtPct, fmtRatio, formatAbbrev } from '../../shared/format.utils';
+import { BreadcrumbComponent, BreadcrumbSegment } from '../../shared/components/breadcrumb/breadcrumb.component';
+import { CompanyHeaderComponent, CompanyHeaderLink } from '../../shared/components/company-header/company-header.component';
 
 @Component({
   selector: 'app-moat-scoring',
   standalone: true,
-  imports: [RouterLink, DecimalPipe],
+  imports: [DecimalPipe, SparklineChartComponent, BreadcrumbComponent, CompanyHeaderComponent],
   template: `
-    <nav class="breadcrumb">
-      <a routerLink="/dashboard">Home</a>
-      <span class="sep">/</span>
-      <a [routerLink]="['/company', cik]">{{ cik }}</a>
-      <span class="sep">/</span>
-      <span>Buffett Score</span>
-    </nav>
+    <app-breadcrumb [segments]="breadcrumbSegments" />
 
     @if (company()) {
-      <div class="company-header">
-        <h2>{{ company()!.companyName ?? ('CIK ' + company()!.cik) }} — Buffett Score</h2>
-        <div class="company-subtitle">
-          <span class="cik-label">CIK {{ company()!.cik }}</span>
-          @if (company()!.latestPrice != null) {
-            <span class="price-label">\${{ company()!.latestPrice!.toFixed(2) }}</span>
-            @if (company()!.latestPriceDate) {
-              <span class="price-date">as of {{ company()!.latestPriceDate }}</span>
-            }
-          }
-        </div>
-        @if (company()!.tickers.length > 0) {
-          <div class="tickers">
-            @for (t of company()!.tickers; track (t.ticker + t.exchange)) {
-              <span class="badge">{{ t.ticker }}<span class="exchange">{{ t.exchange }}</span></span>
-            }
-          </div>
-        }
-        <div class="company-links">
-          <a [routerLink]="['/company', cik]" class="external-link">Filings</a>
-          <a [routerLink]="['/company', cik, 'scoring']" class="external-link">Graham Score</a>
-          @if (company()!.tickers.length > 0) {
-            <a class="external-link" [href]="'https://finance.yahoo.com/quote/' + company()!.tickers[0].ticker" target="_blank" rel="noopener">Yahoo Finance</a>
-            <a class="external-link" [href]="'https://www.google.com/finance/quote/' + company()!.tickers[0].ticker + ':' + company()!.tickers[0].exchange" target="_blank" rel="noopener">Google Finance</a>
-          }
-        </div>
-      </div>
+      <app-company-header
+        [company]="company()!"
+        titleSuffix=" — Buffett Score"
+        [links]="headerLinks()" />
     }
 
     @if (loading()) {
@@ -141,41 +116,7 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
               }
             </tbody>
           </table>
-          @if (chart.sparkline) {
-            <div class="sparkline-container">
-              <svg viewBox="0 0 240 120" class="sparkline-svg">
-                @for (tick of chart.sparkline.yTicks; track tick.label) {
-                  <line [attr.x1]="chart.sparkline.axisLeft" [attr.y1]="tick.y"
-                        [attr.x2]="chart.sparkline.axisRight" [attr.y2]="tick.y"
-                        class="grid-line" />
-                  <text [attr.x]="chart.sparkline.axisLeft - 4" [attr.y]="tick.y + 2.5"
-                        text-anchor="end" class="axis-label">{{ tick.label }}</text>
-                }
-                <line [attr.x1]="chart.sparkline.axisLeft" [attr.y1]="chart.sparkline.axisTop"
-                      [attr.x2]="chart.sparkline.axisLeft" [attr.y2]="chart.sparkline.axisBottom"
-                      class="axis-line" />
-                <line [attr.x1]="chart.sparkline.axisLeft" [attr.y1]="chart.sparkline.axisBottom"
-                      [attr.x2]="chart.sparkline.axisRight" [attr.y2]="chart.sparkline.axisBottom"
-                      class="axis-line" />
-                <polyline
-                  [attr.points]="chart.sparkline.polyline"
-                  fill="none"
-                  stroke="#3b82f6"
-                  stroke-width="2"
-                  stroke-linejoin="round"
-                  stroke-linecap="round" />
-                @for (pt of chart.sparkline.points; track pt.label) {
-                  <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="3" fill="#3b82f6">
-                    <title>{{ pt.label }}: {{ chart.formatTooltip(pt.value) }}</title>
-                  </circle>
-                  <text [attr.x]="pt.x" [attr.y]="chart.sparkline.axisBottom + 12"
-                        text-anchor="middle" class="axis-label">{{ pt.label }}</text>
-                }
-              </svg>
-            </div>
-          } @else {
-            <div class="sparkline-empty">Not enough data</div>
-          }
+          <app-sparkline-chart [data]="chart.sparkline" [formatTooltip]="chart.formatTooltip" />
         </div>
       }
 
@@ -205,67 +146,6 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
     }
   `,
   styles: [`
-    .breadcrumb {
-      font-size: 13px;
-      margin-bottom: 12px;
-      color: #64748b;
-    }
-    .breadcrumb a {
-      color: #3b82f6;
-      text-decoration: none;
-    }
-    .breadcrumb a:hover {
-      text-decoration: underline;
-    }
-    .sep {
-      margin: 0 6px;
-    }
-    .company-header {
-      margin-bottom: 16px;
-    }
-    .company-subtitle {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 4px;
-      font-size: 14px;
-      color: #64748b;
-    }
-    .cik-label { font-weight: 500; }
-    .price-label { font-weight: 600; color: #059669; }
-    .price-date { font-weight: 400; color: #94a3b8; }
-    .tickers {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .badge {
-      background: #3b82f6;
-      color: #fff;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .badge .exchange {
-      margin-left: 4px;
-      font-weight: 400;
-      opacity: 0.8;
-    }
-    .company-links {
-      margin-top: 10px;
-      display: flex;
-      gap: 16px;
-    }
-    .external-link {
-      color: #3b82f6;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 14px;
-    }
-    .external-link:hover {
-      text-decoration: underline;
-    }
     .score-summary {
       display: inline-flex;
       align-items: baseline;
@@ -330,79 +210,34 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
       text-align: right;
       font-variant-numeric: tabular-nums;
     }
-    .sparkline-container {
-      flex-shrink: 0;
-      width: 300px;
-      padding-top: 8px;
-    }
-    .sparkline-svg {
-      width: 100%;
-      height: auto;
-    }
-    .sparkline-empty {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 300px;
-      height: 120px;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      color: #94a3b8;
-      font-size: 13px;
-    }
-    .axis-line {
-      stroke: #94a3b8;
-      stroke-width: 1;
-    }
-    .grid-line {
-      stroke: #e2e8f0;
-      stroke-width: 0.5;
-    }
-    .axis-label {
-      font-size: 6.5px;
-      fill: #64748b;
-    }
     .raw-table tbody tr:hover {
       background: #f1f5f9;
     }
-    .info-icon {
-      position: relative;
-      cursor: help;
-      font-size: 14px;
-      color: #94a3b8;
-      margin-left: 4px;
-    }
-    .info-icon:hover {
-      color: #64748b;
-    }
-    .info-icon:hover::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      top: 100%;
-      margin-top: 6px;
-      background: #1e293b;
-      color: #f8fafc;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 400;
-      white-space: normal;
-      width: 260px;
-      z-index: 10;
-      line-height: 1.4;
-      pointer-events: none;
-    }
-  `]
+  `],
+  styleUrls: ['../../shared/styles/info-tooltip.css']
 })
 export class MoatScoringComponent implements OnInit {
   cik = '';
+  breadcrumbSegments: BreadcrumbSegment[] = [];
   company = signal<CompanyDetail | null>(null);
   scoring = signal<MoatScoringResponse | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
   arRevenueRows = signal<ArRevenueRow[]>([]);
+
+  headerLinks = computed<CompanyHeaderLink[]>(() => {
+    const c = this.company();
+    if (!c) return [];
+    const links: CompanyHeaderLink[] = [
+      { label: 'Filings', routerLink: '/company/' + this.cik },
+      { label: 'Graham Score', routerLink: '/company/' + this.cik + '/scoring' },
+    ];
+    if (c.tickers.length > 0) {
+      links.push({ label: 'Yahoo Finance', href: 'https://finance.yahoo.com/quote/' + c.tickers[0].ticker });
+      links.push({ label: 'Google Finance', href: 'https://www.google.com/finance/quote/' + c.tickers[0].ticker + ':' + c.tickers[0].exchange });
+    }
+    return links;
+  });
 
   trendCharts = computed(() => {
     const s = this.scoring();
@@ -465,7 +300,7 @@ export class MoatScoringComponent implements OnInit {
     for (const m of s.trendData) {
       revDisplayRows.push({
         label: '' + m.year,
-        display: m.revenue != null ? formatAbbrevStatic(m.revenue) : '\u2014'
+        display: m.revenue != null ? formatAbbrev(m.revenue) : '\u2014'
       });
       if (m.revenue != null) {
         revData.push({ label: '' + m.year, value: m.revenue });
@@ -477,7 +312,7 @@ export class MoatScoringComponent implements OnInit {
       columnHeader: 'Revenue',
       rows: revDisplayRows,
       sparkline: computeSparkline(revData, { yAxisFormat: 'currency' }),
-      formatTooltip: (v: number) => formatAbbrevStatic(v)
+      formatTooltip: (v: number) => formatAbbrev(v)
     });
 
     // Net Current Assets (Working Capital)
@@ -491,7 +326,7 @@ export class MoatScoringComponent implements OnInit {
         const liabilities = raw[yr]['LiabilitiesCurrent'] ?? null;
         if (assets != null && liabilities != null) {
           const wc = assets - liabilities;
-          wcDisplayRows.push({ label: yr, display: formatAbbrevStatic(wc) });
+          wcDisplayRows.push({ label: yr, display: formatAbbrev(wc) });
           wcData.push({ label: yr, value: wc });
         } else {
           wcDisplayRows.push({ label: yr, display: '\u2014' });
@@ -504,7 +339,7 @@ export class MoatScoringComponent implements OnInit {
           columnHeader: 'Net Current Assets',
           rows: wcDisplayRows,
           sparkline: computeSparkline(wcData, { yAxisFormat: 'currency' }),
-          formatTooltip: (v: number) => formatAbbrevStatic(v)
+          formatTooltip: (v: number) => formatAbbrev(v)
         });
       }
     }
@@ -525,6 +360,11 @@ export class MoatScoringComponent implements OnInit {
 
   ngOnInit(): void {
     this.cik = this.route.snapshot.paramMap.get('cik') ?? '';
+    this.breadcrumbSegments = [
+      { label: 'Home', route: '/dashboard' },
+      { label: this.cik, route: ['/company', this.cik] },
+      { label: 'Buffett Score' }
+    ];
     if (!this.cik) {
       this.loading.set(false);
       this.error.set('No CIK provided.');
@@ -582,17 +422,17 @@ export class MoatScoringComponent implements OnInit {
     const m = this.scoring()?.metrics;
     if (!m) return [];
     return [
-      { label: 'Avg Gross Margin', display: this.fmtPct(m.averageGrossMargin) },
-      { label: 'Avg Operating Margin', display: this.fmtPct(m.averageOperatingMargin) },
-      { label: 'Avg ROE (CF)', display: this.fmtPct(m.averageRoeCF) },
-      { label: 'Avg ROE (OE)', display: this.fmtPct(m.averageRoeOE) },
-      { label: 'Revenue CAGR', display: this.fmtPct(m.revenueCagr) },
-      { label: 'CapEx Ratio', display: this.fmtPct(m.capexRatio) },
+      { label: 'Avg Gross Margin', display: fmtPct(m.averageGrossMargin) },
+      { label: 'Avg Operating Margin', display: fmtPct(m.averageOperatingMargin) },
+      { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF) },
+      { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE) },
+      { label: 'Revenue CAGR', display: fmtPct(m.revenueCagr) },
+      { label: 'CapEx Ratio', display: fmtPct(m.capexRatio) },
       { label: 'Interest Coverage', display: m.interestCoverage != null ? m.interestCoverage.toFixed(2) + 'x' : 'N/A' },
-      { label: 'Debt / Equity', display: this.fmtRatio(m.debtToEquityRatio) },
-      { label: 'Est. Return (OE)', display: this.fmtPct(m.estimatedReturnOE) },
-      { label: 'Market Cap', display: this.fmtCurrency(m.marketCap) },
-      { label: 'Current Dividends Paid', display: this.fmtCurrency(m.currentDividendsPaid) },
+      { label: 'Debt / Equity', display: fmtRatio(m.debtToEquityRatio) },
+      { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE) },
+      { label: 'Market Cap', display: fmtCurrency(m.marketCap) },
+      { label: 'Current Dividends Paid', display: fmtCurrency(m.currentDividendsPaid) },
       { label: 'Positive OE Years', display: m.positiveOeYears + ' / ' + m.totalOeYears },
       { label: 'Capital Return Years', display: m.capitalReturnYears + ' / ' + m.totalCapitalReturnYears },
     ];
@@ -624,25 +464,6 @@ export class MoatScoringComponent implements OnInit {
     });
   }
 
-  private fmtCurrency(val: number | null | undefined): string {
-    if (val == null) return 'N/A';
-    const sign = val < 0 ? '-' : '';
-    const abs = Math.abs(val);
-    if (abs >= 1_000_000_000_000) return sign + '$' + (abs / 1_000_000_000_000).toFixed(2) + 'T';
-    if (abs >= 1_000_000_000) return sign + '$' + (abs / 1_000_000_000).toFixed(2) + 'B';
-    if (abs >= 1_000_000) return sign + '$' + (abs / 1_000_000).toFixed(2) + 'M';
-    return sign + '$' + abs.toFixed(2);
-  }
-
-  private fmtRatio(val: number | null | undefined): string {
-    if (val == null) return 'N/A';
-    return val.toFixed(2);
-  }
-
-  private fmtPct(val: number | null | undefined): string {
-    if (val == null) return 'N/A';
-    return val.toFixed(2) + '%';
-  }
 }
 
 interface TrendChart {
@@ -683,12 +504,3 @@ function buildPctChart(
   };
 }
 
-function formatAbbrevStatic(value: number): string {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
-  if (abs >= 1e12) return sign + '$' + (abs / 1e12).toFixed(2) + 'T';
-  if (abs >= 1e9) return sign + '$' + (abs / 1e9).toFixed(2) + 'B';
-  if (abs >= 1e6) return sign + '$' + (abs / 1e6).toFixed(2) + 'M';
-  if (abs >= 1e3) return sign + '$' + (abs / 1e3).toFixed(1) + 'K';
-  return sign + '$' + abs.toFixed(0);
-}

@@ -2,11 +2,12 @@ import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApiService, CompanySearchResult, PaginationResponse } from '../../core/services/api.service';
+import { PaginationComponent } from '../../shared/components/pagination/pagination.component';
 
 @Component({
   selector: 'app-search',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PaginationComponent],
   template: `
     <h2>Search Companies</h2>
     <div class="search-bar">
@@ -46,11 +47,7 @@ import { ApiService, CompanySearchResult, PaginationResponse } from '../../core/
       </table>
 
       @if (pagination()) {
-        <div class="pagination">
-          <button [disabled]="page() <= 1" (click)="goToPage(page() - 1)">Previous</button>
-          <span>Page {{ page() }} of {{ pagination()!.totalPages }}</span>
-          <button [disabled]="page() >= pagination()!.totalPages" (click)="goToPage(page() + 1)">Next</button>
-        </div>
+        <app-pagination [page]="page()" [totalPages]="pagination()!.totalPages" (pageChange)="goToPage($event)" />
       }
     } @else if (searched() && results().length === 0) {
       <p class="no-results">No results found.</p>
@@ -95,23 +92,6 @@ import { ApiService, CompanySearchResult, PaginationResponse } from '../../core/
     }
     a:hover {
       text-decoration: underline;
-    }
-    .pagination {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 16px;
-    }
-    .pagination button {
-      padding: 6px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      background: #fff;
-      cursor: pointer;
-    }
-    .pagination button:disabled {
-      opacity: 0.5;
-      cursor: default;
     }
     .right {
       text-align: right;

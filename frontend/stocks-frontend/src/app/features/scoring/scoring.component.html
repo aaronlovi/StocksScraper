@@ -47,7 +47,7 @@
           @for (check of scoring()!.scorecard; track check.checkNumber) {
             <tr [class]="'check-' + check.result">
               <td>{{ check.checkNumber }}</td>
-              <td>{{ check.name }}</td>
+              <td>{{ check.name }} <span class="info-icon" [attr.data-tooltip]="checkTooltip(check)">&#9432;</span></td>
               <td class="num">{{ formatValue(check.computedValue, check.threshold) }}</td>
               <td>{{ check.threshold }}</td>
               <td class="result-cell">
@@ -76,7 +76,7 @@
         <tbody>
           @for (m of metricRows(); track m.label) {
             <tr>
-              <td>{{ m.label }}</td>
+              <td>{{ m.label }} <span class="info-icon" [attr.data-tooltip]="m.tooltip">&#9432;</span></td>
               <td class="num">{{ m.display }}</td>
             </tr>
           }

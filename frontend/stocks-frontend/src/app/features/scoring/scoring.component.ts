@@ -160,26 +160,57 @@ export class ScoringComponent implements OnInit {
     return val.toFixed(4);
   }
 
-  metricRows(): { label: string; display: string }[] {
+  checkTooltip(check: ScoringCheckResponse): string {
+    const s = this.scoring()!;
+    const m = s.metrics;
+    const n = s.yearsOfData;
+    switch (check.checkNumber) {
+      case 1: return 'Debt / Equity = ' + fmtRatio(m.debtToEquityRatio);
+      case 2: return 'Equity − Goodwill − Intangibles = ' + fmtCurrency(m.bookValue);
+      case 3: return 'Market Cap / Book Value = ' + fmtCurrency(m.marketCap) + ' / ' + fmtCurrency(m.bookValue);
+      case 4: return 'Avg annual: Gross CF − Net Debt − Net Stock Issuance (' + n + ' yrs) = ' + fmtCurrency(m.averageNetCashFlow);
+      case 5: return 'Avg annual: Net Income + D&A + Deferred Tax + Non-Cash − CapEx + WC Change (' + n + ' yrs) = ' + fmtCurrency(m.averageOwnerEarnings);
+      case 6: return '(Avg NCF − Dividends) / Market Cap = (' + fmtCurrency(m.averageNetCashFlow) + ' − ' + fmtCurrency(m.currentDividendsPaid) + ') / ' + fmtCurrency(m.marketCap);
+      case 7: return '(Avg OE − Dividends) / Market Cap = (' + fmtCurrency(m.averageOwnerEarnings) + ' − ' + fmtCurrency(m.currentDividendsPaid) + ') / ' + fmtCurrency(m.marketCap);
+      case 8: return 'Same as #6 — checks return isn\'t unrealistically high';
+      case 9: return 'Same as #7 — checks return isn\'t unrealistically high';
+      case 10: return 'Debt / Book Value = ' + fmtRatio(m.debtToBookRatio);
+      case 11: return 'Adjusted RE = RE + Dividends − Stock − Preferred Issuance = ' + fmtCurrency(m.adjustedRetainedEarnings);
+      case 12: return n + ' years of annual financial data available';
+      case 13: {
+        const diff = (m.adjustedRetainedEarnings != null && m.oldestRetainedEarnings != null)
+          ? fmtCurrency(m.adjustedRetainedEarnings - m.oldestRetainedEarnings) : 'N/A';
+        return 'Adjusted RE − Oldest RE = ' + fmtCurrency(m.adjustedRetainedEarnings) + ' − ' + fmtCurrency(m.oldestRetainedEarnings) + ' = ' + diff;
+      }
+      case 14: return 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeCF);
+      case 15: return 'Avg annual: Owner Earnings / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeOE);
+      default: return '';
+    }
+  }
+
+  metricRows(): { label: string; display: string; tooltip: string }[] {
     const m = this.scoring()?.metrics;
-    if (!m) return [];
+    const s = this.scoring();
+    if (!m || !s) return [];
+    const n = s.yearsOfData;
+    const shares = formatAbbrev(s.sharesOutstanding).replace('$', '');
     return [
-      { label: 'Book Value', display: fmtCurrency(m.bookValue) },
-      { label: 'Market Cap', display: fmtCurrency(m.marketCap) },
-      { label: 'Debt / Equity', display: fmtRatio(m.debtToEquityRatio) },
-      { label: 'Price / Book', display: fmtRatio(m.priceToBookRatio) },
-      { label: 'Debt / Book', display: fmtRatio(m.debtToBookRatio) },
-      { label: 'Adjusted Retained Earnings', display: fmtCurrency(m.adjustedRetainedEarnings) },
-      { label: 'Oldest Retained Earnings', display: fmtCurrency(m.oldestRetainedEarnings) },
-      { label: 'Avg Net Cash Flow', display: fmtCurrency(m.averageNetCashFlow) },
-      { label: 'Avg Owner Earnings', display: fmtCurrency(m.averageOwnerEarnings) },
-      { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF) },
-      { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE) },
-      { label: 'Est. Return (CF)', display: fmtPct(m.estimatedReturnCF) },
-      { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE) },
-      { label: 'Current Dividends Paid', display: fmtCurrency(m.currentDividendsPaid) },
-      { label: 'Max Buy Price', display: fmtPrice(this.scoring()!.maxBuyPrice) },
-      { label: '% Upside', display: fmtPct(this.scoring()!.percentageUpside) },
+      { label: 'Book Value', display: fmtCurrency(m.bookValue), tooltip: 'Equity − Goodwill − Intangibles' },
+      { label: 'Market Cap', display: fmtCurrency(m.marketCap), tooltip: 'Price × Shares = ' + fmtPrice(s.pricePerShare) + ' × ' + shares },
+      { label: 'Debt / Equity', display: fmtRatio(m.debtToEquityRatio), tooltip: 'Total Debt / Stockholders\' Equity' },
+      { label: 'Price / Book', display: fmtRatio(m.priceToBookRatio), tooltip: 'Market Cap / Book Value' },
+      { label: 'Debt / Book', display: fmtRatio(m.debtToBookRatio), tooltip: 'Total Debt / Book Value' },
+      { label: 'Adjusted Retained Earnings', display: fmtCurrency(m.adjustedRetainedEarnings), tooltip: 'RE + Total Dividends − Stock Issuance − Preferred Issuance' },
+      { label: 'Oldest Retained Earnings', display: fmtCurrency(m.oldestRetainedEarnings), tooltip: 'Retained Earnings from oldest year in dataset' },
+      { label: 'Avg Net Cash Flow', display: fmtCurrency(m.averageNetCashFlow), tooltip: 'Avg annual: Gross CF − Net Debt − Net Stock Issuance (' + n + ' yrs)' },
+      { label: 'Avg Owner Earnings', display: fmtCurrency(m.averageOwnerEarnings), tooltip: 'Avg annual: Net Income + D&A + Deferred Tax + Non-Cash − CapEx + WC Change (' + n + ' yrs)' },
+      { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF), tooltip: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs)' },
+      { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE), tooltip: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs)' },
+      { label: 'Est. Return (CF)', display: fmtPct(m.estimatedReturnCF), tooltip: '(Avg NCF − Dividends) / Market Cap' },
+      { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE), tooltip: '(Avg OE − Dividends) / Market Cap' },
+      { label: 'Current Dividends Paid', display: fmtCurrency(m.currentDividendsPaid), tooltip: 'Dividends from most recent fiscal year' },
+      { label: 'Max Buy Price', display: fmtPrice(s.maxBuyPrice), tooltip: 'min(3 × Book, 20 × (NCF − Div), 20 × (OE − Div)) / Shares' },
+      { label: '% Upside', display: fmtPct(s.percentageUpside), tooltip: '(Max Buy Price − Current Price) / Current Price' },
     ];
   }
 

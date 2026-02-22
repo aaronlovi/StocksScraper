@@ -456,6 +456,18 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
+    public async Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllPricesNearDate(DateOnly targetDate, CancellationToken ct) {
+        var stmt = new GetAllPricesNearDateStmt(targetDate);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetAllPricesNearDate success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<IReadOnlyCollection<LatestPrice>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetAllPricesNearDate failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<LatestPrice>>.Failure(res);
+        }
+    }
+
     public async Task<Result> TruncateCompanyScores(CancellationToken ct) {
         var stmt = new TruncateCompanyScoresStmt();
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
@@ -690,6 +702,32 @@ public sealed class DbmService : IDisposable, IDbmService {
         } else {
             _logger.LogWarning("GetPriceImportStatuses failed with error {Error}", res.ErrorMessage);
             return Result<IReadOnlyCollection<PriceImportStatus>>.Failure(res);
+        }
+    }
+
+    public async Task<Result<PriceRow?>> GetPriceNearDate(string ticker, DateOnly targetDate, CancellationToken ct) {
+        var stmt = new GetPriceNearDateStmt(ticker, targetDate);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetPriceNearDate success - Ticker: {Ticker}, TargetDate: {TargetDate}, Found: {Found}",
+                ticker, targetDate, stmt.Price is not null);
+            return Result<PriceRow?>.Success(stmt.Price);
+        } else {
+            _logger.LogWarning("GetPriceNearDate failed with error {Error}", res.ErrorMessage);
+            return Result<PriceRow?>.Failure(res);
+        }
+    }
+
+    public async Task<Result<PriceRow?>> GetLatestPriceByTicker(string ticker, CancellationToken ct) {
+        var stmt = new GetLatestPriceByTickerStmt(ticker);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetLatestPriceByTicker success - Ticker: {Ticker}, Found: {Found}",
+                ticker, stmt.Price is not null);
+            return Result<PriceRow?>.Success(stmt.Price);
+        } else {
+            _logger.LogWarning("GetLatestPriceByTicker failed with error {Error}", res.ErrorMessage);
+            return Result<PriceRow?>.Failure(res);
         }
     }
 

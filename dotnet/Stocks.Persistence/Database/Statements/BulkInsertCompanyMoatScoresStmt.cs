@@ -18,7 +18,7 @@ internal sealed class BulkInsertCompanyMoatScoresStmt : BulkInsertDbStmtBase<Com
         + " average_roe_cf, average_roe_oe, estimated_return_oe,"
         + " revenue_cagr, capex_ratio, interest_coverage,"
         + " debt_to_equity_ratio, price_per_share, price_date,"
-        + " shares_outstanding, computed_at)"
+        + " shares_outstanding, return_1y, computed_at)"
         + " FROM STDIN (FORMAT BINARY)";
 
     protected override async Task WriteItemAsync(NpgsqlBinaryImporter writer, CompanyMoatScoreSummary s) {
@@ -45,6 +45,7 @@ internal sealed class BulkInsertCompanyMoatScoresStmt : BulkInsertDbStmtBase<Com
         else
             await writer.WriteNullAsync();
         await writer.WriteNullableAsync(s.SharesOutstanding, NpgsqlDbType.Bigint);
+        await writer.WriteNullableAsync(s.Return1y, NpgsqlDbType.Numeric);
         await writer.WriteAsync(s.ComputedAt, NpgsqlDbType.TimestampTz);
     }
 }

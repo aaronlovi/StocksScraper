@@ -23,4 +23,5 @@ public record CompanyMoatScoreSummary(
     decimal? PricePerShare,
     DateOnly? PriceDate,
     long? SharesOutstanding,
+    decimal? Return1y,
     DateTime ComputedAt);

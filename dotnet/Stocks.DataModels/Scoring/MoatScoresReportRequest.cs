@@ -10,5 +10,6 @@ public enum MoatScoresSortBy {
     RevenueCagr,
     CapexRatio,
     InterestCoverage,
-    DebtToEquityRatio
+    DebtToEquityRatio,
+    Return1y
 }

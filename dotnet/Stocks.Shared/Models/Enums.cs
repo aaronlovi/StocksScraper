@@ -12,4 +12,5 @@ public enum ErrorCodes : int {
     [JsonPropertyName("CONCURRENCY_CONFLICT")] ConcurrencyConflict = 6,
     [JsonPropertyName("SERIALIZATION_ERROR")] SerializationError = 7,
     [JsonPropertyName("PARSING_ERROR")] ParsingError = 8,
+    [JsonPropertyName("NO_PRICE_DATA")] NoPriceData = 9,
 }

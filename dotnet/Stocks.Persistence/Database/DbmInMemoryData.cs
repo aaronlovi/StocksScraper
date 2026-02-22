@@ -324,6 +324,40 @@ public sealed class DbmInMemoryData {
             return [.. _prices];
     }
 
+    public PriceRow? GetPriceNearDate(string ticker, DateOnly targetDate) {
+        if (string.IsNullOrWhiteSpace(ticker))
+            return null;
+        string normalized = ticker.Trim().ToUpperInvariant();
+        PriceRow? best = null;
+        lock (_mutex) {
+            foreach (PriceRow price in _prices) {
+                if (!string.Equals(price.Ticker, normalized, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (price.PriceDate > targetDate)
+                    continue;
+                if (best is null || price.PriceDate > best.PriceDate)
+                    best = price;
+            }
+        }
+        return best;
+    }
+
+    public PriceRow? GetLatestPriceByTicker(string ticker) {
+        if (string.IsNullOrWhiteSpace(ticker))
+            return null;
+        string normalized = ticker.Trim().ToUpperInvariant();
+        PriceRow? best = null;
+        lock (_mutex) {
+            foreach (PriceRow price in _prices) {
+                if (!string.Equals(price.Ticker, normalized, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (best is null || price.PriceDate > best.PriceDate)
+                    best = price;
+            }
+        }
+        return best;
+    }
+
     public IReadOnlyCollection<PriceRow> GetPricesByTicker(string ticker) {
         var results = new List<PriceRow>();
         if (string.IsNullOrWhiteSpace(ticker))
@@ -613,6 +647,22 @@ public sealed class DbmInMemoryData {
         return results;
     }
 
+    public IReadOnlyCollection<LatestPrice> GetAllPricesNearDate(DateOnly targetDate) {
+        var results = new List<LatestPrice>();
+        lock (_mutex) {
+            var nearestByTicker = new Dictionary<string, LatestPrice>(StringComparer.OrdinalIgnoreCase);
+            foreach (PriceRow price in _prices) {
+                if (price.PriceDate > targetDate)
+                    continue;
+                if (!nearestByTicker.TryGetValue(price.Ticker, out LatestPrice? existing) || price.PriceDate > existing.PriceDate)
+                    nearestByTicker[price.Ticker] = new LatestPrice(price.Ticker, price.Close, price.PriceDate);
+            }
+            foreach (var entry in nearestByTicker)
+                results.Add(entry.Value);
+        }
+        return results;
+    }
+
     // Data points by submission
 
     public IReadOnlyCollection<DataPoint> GetDataPointsForSubmission(ulong companyId, ulong submissionId) {
@@ -760,6 +810,7 @@ public sealed class DbmInMemoryData {
             MoatScoresSortBy.CapexRatio => CompareNullable(a.CapexRatio, b.CapexRatio),
             MoatScoresSortBy.InterestCoverage => CompareNullable(a.InterestCoverage, b.InterestCoverage),
             MoatScoresSortBy.DebtToEquityRatio => CompareNullable(a.DebtToEquityRatio, b.DebtToEquityRatio),
+            MoatScoresSortBy.Return1y => CompareNullable(a.Return1y, b.Return1y),
             _ => a.OverallScore.CompareTo(b.OverallScore),
         };
     }
@@ -772,6 +823,7 @@ public sealed class DbmInMemoryData {
             ScoresSortBy.EstimatedReturnOE => CompareNullable(a.EstimatedReturnOE, b.EstimatedReturnOE),
             ScoresSortBy.DebtToEquityRatio => CompareNullable(a.DebtToEquityRatio, b.DebtToEquityRatio),
             ScoresSortBy.PriceToBookRatio => CompareNullable(a.PriceToBookRatio, b.PriceToBookRatio),
+            ScoresSortBy.Return1y => CompareNullable(a.Return1y, b.Return1y),
             _ => a.OverallScore.CompareTo(b.OverallScore),
         };
     }

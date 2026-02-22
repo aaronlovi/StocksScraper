@@ -112,6 +112,12 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<IReadOnlyCollection<PriceImportStatus>>> GetPriceImportStatuses(CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<PriceImportStatus>>.Success(_data.GetPriceImports()));
 
+    public Task<Result<PriceRow?>> GetPriceNearDate(string ticker, DateOnly targetDate, CancellationToken ct) =>
+        Task.FromResult(Result<PriceRow?>.Success(_data.GetPriceNearDate(ticker, targetDate)));
+
+    public Task<Result<PriceRow?>> GetLatestPriceByTicker(string ticker, CancellationToken ct) =>
+        Task.FromResult(Result<PriceRow?>.Success(_data.GetLatestPriceByTicker(ticker)));
+
     public Task<Result<IReadOnlyCollection<PriceRow>>> GetPricesByTicker(string ticker, CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<PriceRow>>.Success(_data.GetPricesByTicker(ticker)));
 
@@ -219,6 +225,10 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<LatestPrice>>.Success(
             _data.GetAllLatestPrices()));
+
+    public Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllPricesNearDate(DateOnly targetDate, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<LatestPrice>>.Success(
+            _data.GetAllPricesNearDate(targetDate)));
 
     public Task<Result> TruncateCompanyScores(CancellationToken ct) {
         _data.TruncateCompanyScores();

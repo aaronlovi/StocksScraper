@@ -64,6 +64,8 @@ public static class MoatReportEndpoints {
             return MoatScoresSortBy.InterestCoverage;
         if (string.Equals(value, "debtToEquityRatio", StringComparison.OrdinalIgnoreCase))
             return MoatScoresSortBy.DebtToEquityRatio;
+        if (string.Equals(value, "return1y", StringComparison.OrdinalIgnoreCase))
+            return MoatScoresSortBy.Return1y;
 
         return MoatScoresSortBy.OverallScore;
     }

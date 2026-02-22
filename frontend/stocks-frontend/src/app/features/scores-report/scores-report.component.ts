@@ -83,6 +83,9 @@ import {
             <th class="num sortable" (click)="toggleSort('averageRoeOE')">
               Avg ROE (OE) {{ sortIndicator('averageRoeOE') }}
             </th>
+            <th class="num sortable" (click)="toggleSort('return1y')">
+              1Y Return {{ sortIndicator('return1y') }}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -106,6 +109,7 @@ import {
               <td class="num">{{ fmtPct(row.estimatedReturnOE) }}</td>
               <td class="num">{{ fmtPct(row.averageRoeCF) }}</td>
               <td class="num">{{ fmtPct(row.averageRoeOE) }}</td>
+              <td class="num" [class]="returnClass(row.return1y)">{{ fmtReturn(row.return1y) }}</td>
             </tr>
           }
         </tbody>
@@ -209,6 +213,8 @@ import {
     }
     .row-perfect { background: #dcfce7; }
     .row-near-perfect { background: #fef9c3; }
+    .positive { color: #16a34a; }
+    .negative { color: #dc2626; }
     .error { color: #dc2626; }
     .computed-at {
       font-size: 12px;
@@ -298,6 +304,17 @@ export class ScoresReportComponent implements OnInit {
   fmtPct(val: number | null): string {
     if (val == null) return '';
     return val.toFixed(2) + '%';
+  }
+
+  fmtReturn(val: number | null): string {
+    if (val == null) return 'N/A';
+    const sign = val >= 0 ? '+' : '';
+    return sign + val.toFixed(2) + '%';
+  }
+
+  returnClass(val: number | null): string {
+    if (val == null) return '';
+    return val >= 0 ? 'positive' : 'negative';
   }
 
   private fetchScores(): void {

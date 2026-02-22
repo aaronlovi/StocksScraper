@@ -987,8 +987,11 @@ internal partial class Program {
             return Result.Failure(ErrorCodes.GenericError, computeResult.ErrorMessage);
 
         List<Stocks.DataModels.Scoring.CompanyScoreSummary> scores = new(computeResult.Value);
-        _logger.LogInformation("Computed {NumScores} company scores, truncating old scores...", scores.Count);
+        _logger.LogInformation("Computed {NumScores} company scores, enriching with 1-year return...", scores.Count);
 
+        scores = await EnrichScoresWithReturn1y(scores, ct);
+
+        _logger.LogInformation("Truncating old scores...");
         Result truncateResult = await _dbm!.TruncateCompanyScores(ct);
         if (truncateResult.IsFailure)
             return truncateResult;
@@ -1013,8 +1016,11 @@ internal partial class Program {
             return Result.Failure(ErrorCodes.GenericError, computeResult.ErrorMessage);
 
         List<Stocks.DataModels.Scoring.CompanyMoatScoreSummary> scores = new(computeResult.Value);
-        _logger.LogInformation("Computed {NumScores} company moat scores, truncating old scores...", scores.Count);
+        _logger.LogInformation("Computed {NumScores} company moat scores, enriching with 1-year return...", scores.Count);
 
+        scores = await EnrichMoatScoresWithReturn1y(scores, ct);
+
+        _logger.LogInformation("Truncating old moat scores...");
         Result truncateResult = await _dbm!.TruncateCompanyMoatScores(ct);
         if (truncateResult.IsFailure)
             return truncateResult;
@@ -1026,6 +1032,72 @@ internal partial class Program {
 
         _logger.LogInformation("Successfully computed and stored {NumScores} company moat scores", scores.Count);
         return Result.Success;
+    }
+
+    private static async Task<Dictionary<string, decimal>> ComputeReturn1yByTicker(CancellationToken ct) {
+        DateOnly oneYearAgo = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-1);
+
+        Task<Result<IReadOnlyCollection<Stocks.DataModels.Scoring.LatestPrice>>> latestTask = _dbm!.GetAllLatestPrices(ct);
+        Task<Result<IReadOnlyCollection<Stocks.DataModels.Scoring.LatestPrice>>> yearAgoTask = _dbm.GetAllPricesNearDate(oneYearAgo, ct);
+        await Task.WhenAll(latestTask, yearAgoTask);
+
+        Result<IReadOnlyCollection<Stocks.DataModels.Scoring.LatestPrice>> latestResult = latestTask.Result;
+        Result<IReadOnlyCollection<Stocks.DataModels.Scoring.LatestPrice>> yearAgoResult = yearAgoTask.Result;
+
+        if (latestResult.IsFailure || latestResult.Value is null
+            || yearAgoResult.IsFailure || yearAgoResult.Value is null) {
+            _logger.LogWarning("Could not fetch prices for 1-year return enrichment, skipping");
+            return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var latestByTicker = new Dictionary<string, Stocks.DataModels.Scoring.LatestPrice>(StringComparer.OrdinalIgnoreCase);
+        foreach (Stocks.DataModels.Scoring.LatestPrice lp in latestResult.Value)
+            latestByTicker[lp.Ticker] = lp;
+
+        var yearAgoByTicker = new Dictionary<string, Stocks.DataModels.Scoring.LatestPrice>(StringComparer.OrdinalIgnoreCase);
+        foreach (Stocks.DataModels.Scoring.LatestPrice lp in yearAgoResult.Value)
+            yearAgoByTicker[lp.Ticker] = lp;
+
+        var returns = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        foreach ((string ticker, Stocks.DataModels.Scoring.LatestPrice latest) in latestByTicker) {
+            if (yearAgoByTicker.TryGetValue(ticker, out Stocks.DataModels.Scoring.LatestPrice? yearAgo)
+                && yearAgo.Close > 0) {
+                returns[ticker] = Math.Round(((latest.Close / yearAgo.Close) - 1m) * 100m, 4);
+            }
+        }
+        return returns;
+    }
+
+    private static async Task<List<Stocks.DataModels.Scoring.CompanyScoreSummary>> EnrichScoresWithReturn1y(
+        List<Stocks.DataModels.Scoring.CompanyScoreSummary> scores, CancellationToken ct) {
+        Dictionary<string, decimal> returnsByTicker = await ComputeReturn1yByTicker(ct);
+        if (returnsByTicker.Count == 0)
+            return scores;
+
+        var enriched = new List<Stocks.DataModels.Scoring.CompanyScoreSummary>(scores.Count);
+        foreach (Stocks.DataModels.Scoring.CompanyScoreSummary s in scores) {
+            decimal? return1y = null;
+            if (s.Ticker is not null && returnsByTicker.TryGetValue(s.Ticker, out decimal ret))
+                return1y = ret;
+            enriched.Add(s with { Return1y = return1y });
+        }
+        return enriched;
+    }
+
+    private static async Task<List<Stocks.DataModels.Scoring.CompanyMoatScoreSummary>> EnrichMoatScoresWithReturn1y(
+        List<Stocks.DataModels.Scoring.CompanyMoatScoreSummary> scores, CancellationToken ct) {
+        Dictionary<string, decimal> returnsByTicker = await ComputeReturn1yByTicker(ct);
+        if (returnsByTicker.Count == 0)
+            return scores;
+
+        var enriched = new List<Stocks.DataModels.Scoring.CompanyMoatScoreSummary>(scores.Count);
+        foreach (Stocks.DataModels.Scoring.CompanyMoatScoreSummary s in scores) {
+            decimal? return1y = null;
+            if (s.Ticker is not null && returnsByTicker.TryGetValue(s.Ticker, out decimal ret))
+                return1y = ret;
+            enriched.Add(s with { Return1y = return1y });
+        }
+        return enriched;
     }
 
     private static string GetConfigValue(string key) {

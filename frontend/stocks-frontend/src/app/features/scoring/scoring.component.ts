@@ -1,11 +1,15 @@
-import { Component, OnInit, computed, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
+import { Subject, EMPTY } from 'rxjs';
+import { switchMap, catchError } from 'rxjs/operators';
 import {
   ApiService,
   ArRevenueRow,
   CompanyDetail,
+  InvestmentReturnResponse,
   ScoringResponse,
   ScoringCheckResponse
 } from '../../core/services/api.service';
@@ -115,6 +119,55 @@ import {
           }
         </tbody>
       </table>
+
+      <h3>Investment Return</h3>
+      <div class="investment-return-section">
+        <label class="date-label">
+          Start date
+          <input type="date" [value]="investmentStartDate()"
+                 (change)="onStartDateChange($event)" class="date-input" />
+        </label>
+        @if (investmentReturnLoading()) {
+          <p class="ir-loading">Loading...</p>
+        } @else if (investmentReturnError()) {
+          <p class="ir-error">{{ investmentReturnError() }}</p>
+        } @else if (investmentReturn()) {
+          <table class="metrics-table ir-table">
+            <tbody>
+              <tr>
+                <td class="metric-label">Start Price</td>
+                <td class="num">\${{ investmentReturn()!.startPrice.toFixed(2) }} on {{ investmentReturn()!.startDate }}</td>
+              </tr>
+              <tr>
+                <td class="metric-label">Current Price</td>
+                <td class="num">\${{ investmentReturn()!.endPrice.toFixed(2) }} on {{ investmentReturn()!.endDate }}</td>
+              </tr>
+              <tr>
+                <td class="metric-label">Total Return</td>
+                <td class="num" [class.positive]="investmentReturn()!.totalReturnPct >= 0"
+                    [class.negative]="investmentReturn()!.totalReturnPct < 0">
+                  {{ investmentReturn()!.totalReturnPct >= 0 ? '+' : '' }}{{ investmentReturn()!.totalReturnPct.toFixed(2) }}%
+                </td>
+              </tr>
+              <tr>
+                <td class="metric-label">Annualized Return</td>
+                <td class="num" [class.positive]="investmentReturn()!.annualizedReturnPct != null && investmentReturn()!.annualizedReturnPct! >= 0"
+                    [class.negative]="investmentReturn()!.annualizedReturnPct != null && investmentReturn()!.annualizedReturnPct! < 0">
+                  @if (investmentReturn()!.annualizedReturnPct != null) {
+                    {{ investmentReturn()!.annualizedReturnPct! >= 0 ? '+' : '' }}{{ investmentReturn()!.annualizedReturnPct!.toFixed(2) }}%
+                  } @else {
+                    N/A
+                  }
+                </td>
+              </tr>
+              <tr>
+                <td class="metric-label">$1,000 Invested</td>
+                <td class="num">\${{ investmentReturn()!.currentValueOf1000 | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        }
+      </div>
 
       @if (arRevenueRows().length > 0) {
         <h3>AR / Revenue Trend</h3>
@@ -359,6 +412,28 @@ import {
       font-size: 6.5px;
       fill: #64748b;
     }
+    .investment-return-section {
+      max-width: 500px;
+    }
+    .date-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .date-input {
+      padding: 4px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .ir-table { margin-top: 4px; }
+    .ir-loading { font-size: 13px; color: #64748b; }
+    .ir-error { font-size: 13px; color: #dc2626; }
+    .positive { color: #16a34a; font-weight: 600; }
+    .negative { color: #dc2626; font-weight: 600; }
   `]
 })
 export class ScoringComponent implements OnInit {
@@ -368,6 +443,13 @@ export class ScoringComponent implements OnInit {
   loading = signal(true);
   error = signal<string | null>(null);
   arRevenueRows = signal<ArRevenueRow[]>([]);
+  investmentReturn = signal<InvestmentReturnResponse | null>(null);
+  investmentReturnLoading = signal(false);
+  investmentReturnError = signal<string | null>(null);
+  investmentStartDate = signal<string>(defaultStartDate());
+
+  private investmentReturnDate$ = new Subject<string>();
+  private destroyRef = inject(DestroyRef);
 
   sparklineData = computed(() => {
     const rows = this.arRevenueRows();
@@ -475,6 +557,37 @@ export class ScoringComponent implements OnInit {
       next: data => this.arRevenueRows.set(data),
       error: () => {}
     });
+
+    this.investmentReturnDate$.pipe(
+      switchMap(startDate => {
+        this.investmentReturnLoading.set(true);
+        this.investmentReturnError.set(null);
+        this.investmentReturn.set(null);
+        return this.api.getInvestmentReturn(this.cik, startDate).pipe(
+          catchError(() => {
+            this.investmentReturnError.set('Failed to load investment return data.');
+            this.investmentReturnLoading.set(false);
+            return EMPTY;
+          })
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(data => {
+      this.investmentReturn.set(data);
+      this.investmentReturnLoading.set(false);
+    });
+
+    this.loadInvestmentReturn(this.investmentStartDate());
+  }
+
+  onStartDateChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.investmentStartDate.set(input.value);
+    this.loadInvestmentReturn(input.value);
+  }
+
+  private loadInvestmentReturn(startDate: string): void {
+    this.investmentReturnDate$.next(startDate);
   }
 
   scoreBadgeClass(): string {
@@ -582,4 +695,13 @@ export class ScoringComponent implements OnInit {
     if (val == null) return 'N/A';
     return val.toFixed(2) + '%';
   }
+}
+
+function defaultStartDate(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 1);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }

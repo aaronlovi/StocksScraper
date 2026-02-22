@@ -123,6 +123,7 @@ export interface CompanyScoreSummary {
   currentDividendsPaid: number | null;
   maxBuyPrice: number | null;
   percentageUpside: number | null;
+  return1y: number | null;
   computedAt: string;
 }
 
@@ -199,6 +200,17 @@ export interface MoatScoringResponse {
   sharesOutstanding: number | null;
 }
 
+export interface InvestmentReturnResponse {
+  ticker: string;
+  startDate: string;
+  endDate: string;
+  startPrice: number;
+  endPrice: number;
+  totalReturnPct: number;
+  annualizedReturnPct: number | null;
+  currentValueOf1000: number;
+}
+
 export interface CompanyMoatScoreSummary {
   companyId: number;
   cik: string;
@@ -220,6 +232,7 @@ export interface CompanyMoatScoreSummary {
   pricePerShare: number | null;
   priceDate: string | null;
   sharesOutstanding: number | null;
+  return1y: number | null;
   computedAt: string;
 }
 
@@ -284,6 +297,13 @@ export class ApiService {
     return this.http.get<PaginatedResponse<CompanyScoreSummary>>(
       `/api/reports/scores?${parts.join('&')}`
     );
+  }
+
+  getInvestmentReturn(cik: string, startDate?: string): Observable<InvestmentReturnResponse> {
+    const parts: string[] = [];
+    if (startDate) parts.push(`startDate=${startDate}`);
+    const qs = parts.length ? `?${parts.join('&')}` : '';
+    return this.http.get<InvestmentReturnResponse>(`/api/companies/${cik}/investment-return${qs}`);
   }
 
   getMoatScoring(cik: string): Observable<MoatScoringResponse> {

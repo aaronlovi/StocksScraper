@@ -1,9 +1,15 @@
 export interface SparklinePoint { x: number; y: number; label: string; value: number; }
 export interface SparklineTick { y: number; label: string; }
+export interface SparklineTrend {
+  trendLine: string;
+  fitStart: number;
+  fitEnd: number;
+}
 export interface SparklineData {
   points: SparklinePoint[];
   yTicks: SparklineTick[];
   polyline: string;
+  trend: SparklineTrend;
   axisLeft: number;
   axisRight: number;
   axisTop: number;
@@ -12,7 +18,7 @@ export interface SparklineData {
 
 export function computeSparkline(
   data: { label: string; value: number }[],
-  options?: { yAxisFormat?: 'percent' | 'currency'; viewBoxWidth?: number; viewBoxHeight?: number }
+  options?: { yAxisFormat?: 'percent' | 'currency'; forceZero?: boolean; viewBoxWidth?: number; viewBoxHeight?: number }
 ): SparklineData | null {
   if (data.length < 2) return null;
 
@@ -53,6 +59,7 @@ export function computeSparkline(
     niceMin = Math.floor(minV / tickStep) * tickStep;
     niceMax = Math.ceil(maxV / tickStep) * tickStep;
     if (niceMin === niceMax) niceMax = niceMin + tickStep;
+    if (options?.forceZero && niceMin > 0) niceMin = 0;
   } else {
     // For percent values, floor/ceil to integers
     const rawMin = Math.floor(minV);
@@ -69,7 +76,9 @@ export function computeSparkline(
     if (niceMin >= 0) {
       niceMin = 0;
     } else {
-      niceMin = -100;
+      const padded = minV * 1.2; // 20% beyond most negative value
+      const paddedNice = Math.floor(padded / tickStep) * tickStep;
+      niceMin = Math.max(-100, paddedNice);
     }
   }
 
@@ -108,10 +117,32 @@ export function computeSparkline(
     polyline += pt.x + ',' + pt.y;
   }
 
+  // Linear regression (least squares)
+  const n = data.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += data[i].value;
+    sumXY += i * data[i].value;
+    sumX2 += i * i;
+  }
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  const fitStart = intercept;
+  const fitEnd = intercept + slope * (n - 1);
+
+  const trendX1 = padLeft;
+  const trendY1 = padTop + plotH - ((fitStart - niceMin) / rangeV) * plotH;
+  const trendX2 = padLeft + plotW;
+  const trendY2 = padTop + plotH - ((fitEnd - niceMin) / rangeV) * plotH;
+  const trendLine = Math.round(trendX1 * 10) / 10 + ',' + Math.round(trendY1 * 10) / 10 +
+    ' ' + Math.round(trendX2 * 10) / 10 + ',' + Math.round(trendY2 * 10) / 10;
+
   return {
     points,
     yTicks,
     polyline,
+    trend: { trendLine, fitStart, fitEnd },
     axisLeft: padLeft,
     axisRight: width - padRight,
     axisTop: padTop,

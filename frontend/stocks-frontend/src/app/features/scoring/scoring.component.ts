@@ -124,13 +124,13 @@ import { CompanyHeaderComponent, CompanyHeaderLink } from '../../shared/componen
       }
 
       @if (workingCapital()) {
-        <h3>Net Current Assets Trend <span class="info-icon" data-tooltip="Current Assets minus Current Liabilities (working capital). Positive values mean the company can cover short-term obligations.">&#9432;</span></h3>
+        <h3>{{ workingCapital()!.label }} Trend <span class="info-icon" [attr.data-tooltip]="workingCapital()!.tooltip">&#9432;</span></h3>
         <div class="ar-revenue-content">
           <table class="ar-revenue-table">
             <thead>
               <tr>
                 <th>Year</th>
-                <th class="num">Net Current Assets</th>
+                <th class="num">{{ workingCapital()!.label }}</th>
               </tr>
             </thead>
             <tbody>
@@ -277,9 +277,12 @@ export class ScoringComponent implements OnInit {
     const years = Object.keys(raw).sort();
     const sparkData: { label: string; value: number }[] = [];
     const rows: { year: string; display: string }[] = [];
+    const hasCurrent = years.some(yr => raw[yr]['AssetsCurrent'] != null && raw[yr]['LiabilitiesCurrent'] != null);
+    const assetsKey = hasCurrent ? 'AssetsCurrent' : 'Assets';
+    const liabilitiesKey = hasCurrent ? 'LiabilitiesCurrent' : 'Liabilities';
     for (const yr of years) {
-      const assets = raw[yr]['AssetsCurrent'] ?? null;
-      const liabilities = raw[yr]['LiabilitiesCurrent'] ?? null;
+      const assets = raw[yr][assetsKey] ?? null;
+      const liabilities = raw[yr][liabilitiesKey] ?? null;
       if (assets != null && liabilities != null) {
         const wc = assets - liabilities;
         rows.push({ year: yr, display: formatAbbrev(wc) });
@@ -290,9 +293,15 @@ export class ScoringComponent implements OnInit {
     }
     rows.reverse();
     if (rows.length === 0) return null;
+    const label = hasCurrent ? 'Net Assets (Current)' : 'Net Assets (Non-Current)';
+    const tooltip = hasCurrent
+      ? 'Current Assets minus Current Liabilities (working capital). Positive values mean the company can cover short-term obligations.'
+      : 'Total Assets minus Total Liabilities (net assets). Falls back to totals when current/non-current breakdown is not reported.';
     return {
+      label,
+      tooltip,
       rows,
-      sparkline: computeSparkline(sparkData, { yAxisFormat: 'currency' })
+      sparkline: computeSparkline(sparkData, { yAxisFormat: 'currency', forceZero: !hasCurrent })
     };
   });
 

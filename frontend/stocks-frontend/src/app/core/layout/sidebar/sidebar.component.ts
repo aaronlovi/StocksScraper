@@ -12,19 +12,21 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
           <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
         </li>
         <li>
-          <a routerLink="/scores" routerLinkActive="active" title="Rewards deep value metrics: high book value, low debt, and returning value to owners through dividends and share buybacks">Graham Scores</a>
+          <a routerLink="/search" routerLinkActive="active">Search</a>
         </li>
+        <li class="separator"></li>
         <li>
-          <a routerLink="/graham-returns" routerLinkActive="active">Graham Returns</a>
+          <a routerLink="/scores" routerLinkActive="active" title="Rewards deep value metrics: high book value, low debt, and returning value to owners through dividends and share buybacks">Graham Scores</a>
         </li>
         <li>
           <a routerLink="/moat-scores" routerLinkActive="active" title="Rewards competitive moat: high margins, consistent returns, capital-light operations, and long track records">Buffett Scores</a>
         </li>
+        <li class="separator"></li>
         <li>
-          <a routerLink="/buffett-returns" routerLinkActive="active">Buffett Returns</a>
+          <a routerLink="/graham-returns" routerLinkActive="active">Graham Returns</a>
         </li>
         <li>
-          <a routerLink="/search" routerLinkActive="active">Search</a>
+          <a routerLink="/buffett-returns" routerLinkActive="active">Buffett Returns</a>
         </li>
       </ul>
     </nav>
@@ -54,6 +56,10 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     li a.active {
       background: #3b82f6;
       color: #fff;
+    }
+    li.separator {
+      margin: 8px 16px;
+      border-bottom: 1px solid #334155;
     }
   `]
 })

@@ -24,6 +24,10 @@ import { ApiService, TypeaheadResult } from '../../services/api.service';
           (keydown.enter)="onSearch()"
           (blur)="hideDropdown()"
         />
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
         @if (suggestions().length > 0) {
           <ul class="dropdown">
             @for (item of suggestions(); track item.text + item.cik) {
@@ -64,12 +68,25 @@ import { ApiService, TypeaheadResult } from '../../services/api.service';
       position: relative;
     }
     input {
-      padding: 6px 12px;
+      padding: 6px 32px 6px 12px;
       border: 1px solid #475569;
       border-radius: 4px;
       background: #1e293b;
       color: #e2e8f0;
       width: 280px;
+    }
+    input::placeholder {
+      color: #94a3b8;
+    }
+    .search-icon {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: #94a3b8;
+      pointer-events: none;
     }
     .dropdown {
       position: absolute;

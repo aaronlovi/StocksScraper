@@ -321,9 +321,12 @@ export class MoatScoringComponent implements OnInit {
       const years = Object.keys(raw).sort();
       const wcData: { label: string; value: number }[] = [];
       const wcDisplayRows: { label: string; display: string }[] = [];
+      const hasCurrent = years.some(yr => raw[yr]['AssetsCurrent'] != null && raw[yr]['LiabilitiesCurrent'] != null);
+      const assetsKey = hasCurrent ? 'AssetsCurrent' : 'Assets';
+      const liabilitiesKey = hasCurrent ? 'LiabilitiesCurrent' : 'Liabilities';
       for (const yr of years) {
-        const assets = raw[yr]['AssetsCurrent'] ?? null;
-        const liabilities = raw[yr]['LiabilitiesCurrent'] ?? null;
+        const assets = raw[yr][assetsKey] ?? null;
+        const liabilities = raw[yr][liabilitiesKey] ?? null;
         if (assets != null && liabilities != null) {
           const wc = assets - liabilities;
           wcDisplayRows.push({ label: yr, display: formatAbbrev(wc) });
@@ -333,12 +336,16 @@ export class MoatScoringComponent implements OnInit {
         }
       }
       if (wcDisplayRows.length > 0) {
+        const wcLabel = hasCurrent ? 'Net Assets (Current)' : 'Net Assets (Non-Current)';
+        const wcTooltip = hasCurrent
+          ? 'Current Assets minus Current Liabilities (working capital). Positive values mean the company can cover short-term obligations.'
+          : 'Total Assets minus Total Liabilities (net assets). Falls back to totals when current/non-current breakdown is not reported.';
         charts.push({
-          title: 'Net Current Assets Trend',
-          tooltip: 'Current Assets minus Current Liabilities (working capital). Positive values mean the company can cover short-term obligations.',
-          columnHeader: 'Net Current Assets',
+          title: wcLabel + ' Trend',
+          tooltip: wcTooltip,
+          columnHeader: wcLabel,
           rows: wcDisplayRows,
-          sparkline: computeSparkline(wcData, { yAxisFormat: 'currency' }),
+          sparkline: computeSparkline(wcData, { yAxisFormat: 'currency', forceZero: !hasCurrent }),
           formatTooltip: (v: number) => formatAbbrev(v)
         });
       }

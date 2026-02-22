@@ -1,0 +1,15 @@
+.breadcrumb {
+  font-size: 13px;
+  margin-bottom: 12px;
+  color: #64748b;
+}
+.breadcrumb a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+.sep {
+  margin: 0 6px;
+}

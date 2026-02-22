@@ -1,0 +1,38 @@
+.controls {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.controls select {
+  margin-left: 8px;
+}
+.role-label {
+  font-size: 13px;
+  color: #64748b;
+}
+.role-picker p {
+  margin-bottom: 8px;
+}
+.role-picker ul {
+  list-style: none;
+  padding: 0;
+}
+.role-picker li {
+  margin-bottom: 6px;
+}
+.role-picker button {
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+.role-picker button:hover {
+  background: #e2e8f0;
+}
+.no-data {
+  color: #64748b;
+  font-style: italic;
+}

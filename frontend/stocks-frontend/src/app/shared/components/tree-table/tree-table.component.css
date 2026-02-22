@@ -1,0 +1,35 @@
+th, td {
+  padding: 3px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+th {
+  background: #e2e8f0;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #475569;
+  border-bottom: 3px double #94a3b8;
+}
+.value-col {
+  text-align: right;
+  width: 200px;
+}
+.tree-row:nth-child(even) td {
+  background: #f1f5f9;
+}
+.section-header td {
+  font-weight: 600;
+}
+.indent {
+  display: inline-block;
+}
+.info-icon {
+  margin-left: 4px;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 12px;
+}
+.info-icon:hover {
+  color: #3b82f6;
+}

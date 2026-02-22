@@ -1,0 +1,47 @@
+.submission-row {
+  cursor: pointer;
+}
+.submission-row:hover {
+  background: #f8fafc;
+}
+.expand-cell {
+  width: 24px;
+  text-align: center;
+  color: #94a3b8;
+}
+.detail-row td {
+  background: #f8fafc;
+  padding: 6px 24px;
+}
+.statement-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+.statement-table th {
+  background: #e2e8f0;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #475569;
+}
+.statement-table th, .statement-table td {
+  padding: 2px 12px;
+}
+.statement-table td {
+  border-bottom: 1px solid #e2e8f0;
+}
+.statement-table a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+.statement-table a:hover {
+  text-decoration: underline;
+}
+.role-detail {
+  font-size: 13px;
+  color: #64748b;
+}
+.loading-statements, .no-statements {
+  color: #64748b;
+  margin: 0;
+}

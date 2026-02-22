@@ -1,0 +1,30 @@
+<div class="company-header">
+  <h2>{{ company().companyName ?? ('CIK ' + company().cik) }}{{ titleSuffix() }}</h2>
+  <div class="company-subtitle">
+    <span class="cik-label">CIK {{ company().cik }}</span>
+    @if (company().latestPrice != null) {
+      <span class="price-label">${{ company().latestPrice!.toFixed(2) }}</span>
+      @if (company().latestPriceDate) {
+        <span class="price-date">as of {{ company().latestPriceDate }}</span>
+      }
+    }
+  </div>
+  @if (company().tickers.length > 0) {
+    <div class="tickers">
+      @for (t of company().tickers; track (t.ticker + t.exchange)) {
+        <span class="badge">{{ t.ticker }}<span class="exchange">{{ t.exchange }}</span></span>
+      }
+    </div>
+  }
+  @if (links().length > 0) {
+    <div class="company-links">
+      @for (link of links(); track link.label) {
+        @if (link.routerLink) {
+          <a [routerLink]="link.routerLink" class="external-link">{{ link.label }}</a>
+        } @else if (link.href) {
+          <a class="external-link" [href]="link.href" target="_blank" rel="noopener">{{ link.label }}</a>
+        }
+      }
+    </div>
+  }
+</div>

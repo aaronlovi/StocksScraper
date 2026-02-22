@@ -1,0 +1,43 @@
+<h2>Search Companies</h2>
+<div class="search-bar">
+  <input
+    type="text"
+    placeholder="Search by name, ticker, or CIK..."
+    [(ngModel)]="query"
+    (keydown.enter)="doSearch()"
+  />
+  <button (click)="doSearch()">Search</button>
+</div>
+
+@if (results().length > 0) {
+  <table>
+    <thead>
+      <tr>
+        <th>Company Name</th>
+        <th class="right">CIK</th>
+        <th>Ticker</th>
+        <th>Exchange</th>
+        <th class="right">Latest Price ($)</th>
+        <th>Price Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (r of results(); track r.companyId) {
+        <tr>
+          <td><a [routerLink]="['/company', r.cik]">{{ r.companyName }}</a></td>
+          <td class="right">{{ r.cik }}</td>
+          <td>{{ r.ticker ?? '' }}</td>
+          <td>{{ r.exchange ?? '' }}</td>
+          <td class="right">{{ r.latestPrice != null ? r.latestPrice.toFixed(2) : '—' }}</td>
+          <td>{{ r.latestPriceDate ?? '—' }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  @if (pagination()) {
+    <app-pagination [page]="page()" [totalPages]="pagination()!.totalPages" (pageChange)="goToPage($event)" />
+  }
+} @else if (searched() && results().length === 0) {
+  <p class="no-results">No results found.</p>
+}

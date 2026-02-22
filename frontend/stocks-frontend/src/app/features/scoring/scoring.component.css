@@ -1,0 +1,64 @@
+.score-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  margin: 16px 0 4px;
+}
+.score-summary.score-green { background: #dcfce7; color: #166534; }
+.score-summary.score-yellow { background: #fef9c3; color: #854d0e; }
+.score-summary.score-red { background: #fee2e2; color: #991b1b; }
+.score-value { font-size: 36px; font-weight: 700; }
+.score-sep { font-size: 24px; font-weight: 400; opacity: 0.5; }
+.score-total { font-size: 24px; font-weight: 400; }
+.score-caption {
+  font-size: 13px;
+  color: #64748b;
+  margin: 4px 0 20px;
+}
+h3 {
+  margin: 24px 0 8px;
+  font-size: 16px;
+}
+.scorecard-table .check-pass { background: #f0fdf4; }
+.scorecard-table .check-fail { background: #fef2f2; }
+.scorecard-table .check-na { background: #f8fafc; }
+.scorecard-table tbody tr:hover { filter: brightness(0.95); }
+.result-cell { text-align: center; }
+.indicator.pass { color: #16a34a; font-weight: 700; }
+.indicator.fail { color: #dc2626; font-weight: 700; }
+.indicator.na { color: #94a3b8; }
+.scorecard-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 72px;
+}
+.scorecard-table { width: auto; }
+.metrics-table { width: auto; }
+.metrics-table tbody tr:hover { background: #f1f5f9; }
+.raw-table { font-size: 12px; }
+.raw-table th { font-size: 11px; text-transform: uppercase; }
+.trends-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 48px;
+}
+.ar-revenue-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+.ar-revenue-table {
+  width: auto;
+}
+.ar-revenue-table td, .ar-revenue-table th {
+  padding: 4px 8px;
+}
+.ar-revenue-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.raw-table tbody tr:hover {
+  background: #f1f5f9;
+}

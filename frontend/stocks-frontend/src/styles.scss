@@ -2,13 +2,52 @@
   box-sizing: border-box;
 }
 
-th, td {
-  padding: 4px 12px;
-}
-
 html, body {
   margin: 0;
   padding: 0;
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+// Base table styling
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: 4px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+tbody tr:hover {
+  background: #f1f5f9;
+}
+
+// Utility classes
+.num { text-align: right; }
+.error { color: #dc2626; }
+.no-results { color: #64748b; }
+.positive { color: #16a34a; }
+.negative { color: #dc2626; }
+
+// Link styling
+a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+// Form inputs
+select, input[type="date"] {
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
 }

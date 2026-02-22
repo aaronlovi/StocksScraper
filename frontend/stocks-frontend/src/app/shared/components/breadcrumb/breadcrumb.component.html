@@ -1,0 +1,12 @@
+<nav class="breadcrumb">
+  @for (segment of segments(); track $index; let last = $last) {
+    @if (!last && segment.route) {
+      <a [routerLink]="segment.route">{{ segment.label }}</a>
+    } @else {
+      <span>{{ segment.label }}</span>
+    }
+    @if (!last) {
+      <span class="sep">/</span>
+    }
+  }
+</nav>

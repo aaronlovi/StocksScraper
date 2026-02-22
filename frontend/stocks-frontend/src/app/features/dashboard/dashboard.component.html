@@ -1,0 +1,29 @@
+@if (stats()) {
+  <h2>Dashboard</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Total Companies</div>
+      <div class="card-value">{{ stats()!.totalCompanies | number }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Filings</div>
+      <div class="card-value">{{ stats()!.totalSubmissions | number }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Data Points</div>
+      <div class="card-value">{{ stats()!.totalDataPoints | number }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Filing Date Range</div>
+      <div class="card-value">{{ stats()!.earliestFilingDate ?? 'N/A' }} — {{ stats()!.latestFilingDate ?? 'N/A' }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Companies with Price Data</div>
+      <div class="card-value">{{ stats()!.companiesWithPriceData | number }}</div>
+    </div>
+  </div>
+} @else if (error()) {
+  <p class="error">{{ error() }}</p>
+} @else {
+  <p>Loading...</p>
+}

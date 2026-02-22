@@ -1,0 +1,27 @@
+<table>
+  <thead>
+    <tr>
+      <th>Label</th>
+      <th class="value-col">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    @for (row of flatRows(); track row.node.conceptName + row.depth) {
+      <tr class="tree-row" [class.section-header]="row.hasChildren && !row.node.value">
+        <td>
+          <span class="indent" [style.padding-left.px]="row.depth * 16">
+            {{ row.node.label }}
+            @if (row.node.documentation) {
+              <span class="info-icon" [title]="row.node.documentation">&#9432;</span>
+            }
+          </span>
+        </td>
+        <td class="value-col">
+          @if (row.node.value !== null && row.node.value !== undefined) {
+            {{ formatValue(row.node.value) }}
+          }
+        </td>
+      </tr>
+    }
+  </tbody>
+</table>

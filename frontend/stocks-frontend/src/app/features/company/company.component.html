@@ -1,0 +1,68 @@
+@if (company()) {
+  <app-company-header
+    [company]="company()!"
+    titleSuffix=" — Filings"
+    [links]="headerLinks()" />
+
+  @if (submissions().length > 0) {
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Report Date</th>
+          <th>Filing Type</th>
+          <th>Filing Category</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (sub of submissions(); track sub.submissionId) {
+          <tr class="submission-row" (click)="toggleRow(sub.submissionId)">
+            <td class="expand-cell">{{ expandedRow() === sub.submissionId ? '▾' : '▸' }}</td>
+            <td>{{ sub.reportDate }}</td>
+            <td>{{ sub.filingType }}</td>
+            <td>{{ sub.filingCategory }}</td>
+          </tr>
+          @if (expandedRow() === sub.submissionId) {
+            <tr class="detail-row">
+              <td colspan="4">
+                @if (statementsLoading()) {
+                  <p class="loading-statements">Loading statements...</p>
+                } @else if (statements().length > 0) {
+                  <table class="statement-table">
+                    <thead>
+                      <tr>
+                        <th>Statement</th>
+                        <th>Variant</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (st of statements(); track st.roleName) {
+                        <tr>
+                          <td>
+                            <a [routerLink]="['/company', cik, 'report', sub.submissionId, st.rootConceptName]"
+                               [queryParams]="{ roleName: st.roleName }">
+                              {{ st.rootLabel }}
+                            </a>
+                          </td>
+                          <td class="role-detail">{{ formatRoleName(st.roleName) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                } @else {
+                  <p class="no-statements">No statements available.</p>
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  } @else {
+    <p>No submissions found.</p>
+  }
+} @else if (error()) {
+  <p class="error">{{ error() }}</p>
+} @else {
+  <p>Loading...</p>
+}

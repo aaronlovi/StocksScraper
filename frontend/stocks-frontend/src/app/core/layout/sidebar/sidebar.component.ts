@@ -5,62 +5,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   selector: 'app-sidebar',
   standalone: true,
   imports: [RouterLink, RouterLinkActive],
-  template: `
-    <nav class="sidebar">
-      <ul>
-        <li>
-          <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-        </li>
-        <li>
-          <a routerLink="/search" routerLinkActive="active">Search</a>
-        </li>
-        <li class="separator"></li>
-        <li>
-          <a routerLink="/scores" routerLinkActive="active" title="Rewards deep value metrics: high book value, low debt, and returning value to owners through dividends and share buybacks">Graham Scores</a>
-        </li>
-        <li>
-          <a routerLink="/moat-scores" routerLinkActive="active" title="Rewards competitive moat: high margins, consistent returns, capital-light operations, and long track records">Buffett Scores</a>
-        </li>
-        <li class="separator"></li>
-        <li>
-          <a routerLink="/graham-returns" routerLinkActive="active">Graham Returns</a>
-        </li>
-        <li>
-          <a routerLink="/buffett-returns" routerLinkActive="active">Buffett Returns</a>
-        </li>
-      </ul>
-    </nav>
-  `,
-  styles: [`
-    .sidebar {
-      width: 200px;
-      background: #1e293b;
-      color: #e2e8f0;
-      height: 100%;
-      padding: 16px 0;
-    }
-    ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-    li a {
-      display: block;
-      padding: 10px 20px;
-      color: #e2e8f0;
-      text-decoration: none;
-    }
-    li a:hover {
-      background: #334155;
-    }
-    li a.active {
-      background: #3b82f6;
-      color: #fff;
-    }
-    li.separator {
-      margin: 8px 16px;
-      border-bottom: 1px solid #334155;
-    }
-  `]
+  templateUrl: './sidebar.component.html',
+  styleUrls: ['./sidebar.component.css']
 })
 export class SidebarComponent {}

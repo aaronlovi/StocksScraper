@@ -1,0 +1,41 @@
+<app-breadcrumb [segments]="breadcrumbSegments" />
+
+@if (company()) {
+  <app-company-header [company]="company()!" />
+}
+
+@if (availableRoles().length > 0) {
+  <div class="role-picker">
+    <p>Multiple presentation roles found. Please select one:</p>
+    <ul>
+      @for (role of availableRoles(); track role.roleName) {
+        <li>
+          <button (click)="selectRole(role.roleName)">{{ role.roleName }}</button>
+        </li>
+      }
+    </ul>
+  </div>
+} @else if (treeData()) {
+  <div class="controls">
+    <label>
+      Taxonomy Year:
+      <select [(ngModel)]="selectedYear" (ngModelChange)="onYearChange()">
+        <option [ngValue]="null">Auto (from filing)</option>
+        @for (y of yearOptions; track y) {
+          <option [ngValue]="y">{{ y }}</option>
+        }
+      </select>
+    </label>
+    @if (selectedRole) {
+      <span class="role-label">Role: {{ selectedRole }}</span>
+    }
+  </div>
+
+  <app-tree-table [nodes]="treeNodes()" />
+} @else if (noData()) {
+  <p class="no-data">No data reported for this statement in this filing.</p>
+} @else if (error()) {
+  <p class="error">{{ error() }}</p>
+} @else {
+  <p>Loading statement...</p>
+}

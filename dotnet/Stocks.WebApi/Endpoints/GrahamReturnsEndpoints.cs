@@ -35,7 +35,7 @@ public static class GrahamReturnsEndpoints {
 
                 ReturnsReportFilter? filter = null;
                 if (minScore.HasValue || !string.IsNullOrWhiteSpace(exchange))
-                    filter = new ReturnsReportFilter(minScore, null, exchange);
+                    filter = new ReturnsReportFilter(minScore, null, exchange, null);
 
                 var pagination = new PaginationRequest(pageNum, size);
 

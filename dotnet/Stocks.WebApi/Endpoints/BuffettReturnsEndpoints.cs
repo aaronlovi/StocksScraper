@@ -17,7 +17,7 @@ public static class BuffettReturnsEndpoints {
             async (string? startDate,
                    uint? page, uint? pageSize,
                    string? sortBy, string? sortDir,
-                   int? minScore, string? exchange,
+                   int? minScore, int? minChecks, string? exchange,
                    InvestmentReturnReportService service,
                    CancellationToken ct) => {
 
@@ -34,8 +34,8 @@ public static class BuffettReturnsEndpoints {
                 SortDirection direction = ParseSortDirection(sortDir);
 
                 ReturnsReportFilter? filter = null;
-                if (minScore.HasValue || !string.IsNullOrWhiteSpace(exchange))
-                    filter = new ReturnsReportFilter(minScore, null, exchange);
+                if (minScore.HasValue || minChecks.HasValue || !string.IsNullOrWhiteSpace(exchange))
+                    filter = new ReturnsReportFilter(minScore, null, exchange, minChecks);
 
                 var pagination = new PaginationRequest(pageNum, size);
 

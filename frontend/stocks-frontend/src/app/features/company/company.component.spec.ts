@@ -121,7 +121,7 @@ describe('CompanyComponent', () => {
     flushInitialRequests();
     fixture.detectChanges();
 
-    const link = fixture.nativeElement.querySelector('.scoring-link');
+    const link = fixture.nativeElement.querySelector('.company-links .external-link');
     expect(link).toBeTruthy();
     expect(link.textContent).toContain('Graham Score');
   });

@@ -15,7 +15,7 @@ import {
   template: `
     @if (company()) {
       <div class="company-header">
-        <h2>{{ company()!.companyName ?? ('CIK ' + company()!.cik) }}</h2>
+        <h2>{{ company()!.companyName ?? ('CIK ' + company()!.cik) }} — Filings</h2>
         <div class="company-subtitle">
           <span class="cik-label">CIK {{ company()!.cik }}</span>
           @if (company()!.latestPrice != null) {
@@ -33,7 +33,8 @@ import {
           </div>
         }
         <div class="company-links">
-          <a [routerLink]="['/company', cik, 'scoring']" class="scoring-link">Graham Score</a>
+          <a [routerLink]="['/company', cik, 'scoring']" class="external-link">Graham Score</a>
+          <a [routerLink]="['/company', cik, 'moat-scoring']" class="external-link">Buffett Score</a>
           @if (company()!.tickers.length > 0) {
             <a class="external-link" [href]="'https://finance.yahoo.com/quote/' + company()!.tickers[0].ticker" target="_blank" rel="noopener">Yahoo Finance</a>
             <a class="external-link" [href]="'https://www.google.com/finance/quote/' + company()!.tickers[0].ticker + ':' + company()!.tickers[0].exchange" target="_blank" rel="noopener">Google Finance</a>
@@ -210,20 +211,14 @@ import {
       display: flex;
       gap: 16px;
     }
-    .scoring-link {
-      color: #3b82f6;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 14px;
-    }
-    .scoring-link:hover, .external-link:hover {
-      text-decoration: underline;
-    }
     .external-link {
       color: #3b82f6;
       text-decoration: none;
       font-weight: 500;
       font-size: 14px;
+    }
+    .external-link:hover {
+      text-decoration: underline;
     }
     .error {
       color: #dc2626;

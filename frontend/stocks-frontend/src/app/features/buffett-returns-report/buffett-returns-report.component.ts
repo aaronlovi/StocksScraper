@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
@@ -6,30 +6,53 @@ import {
   CompanyScoreReturnSummary,
   PaginationResponse
 } from '../../core/services/api.service';
+import { LoadingOverlayComponent } from '../../shared/components/loading-overlay/loading-overlay.component';
 
 function defaultStartDate(): string {
   const d = new Date();
-  d.setFullYear(d.getFullYear() - 1);
+  d.setMonth(d.getMonth() - 6);
   return d.toISOString().slice(0, 10);
+}
+
+interface ScorePreset {
+  label: string;
+  minScore: number | null;
+  minChecks: number | null;
+}
+
+const SCORE_PRESETS: ScorePreset[] = [
+  { label: 'All', minScore: null, minChecks: null },
+  { label: '12/12+', minScore: 12, minChecks: null },
+  { label: '12/13+', minScore: 12, minChecks: 13 },
+  { label: '13/13', minScore: 13, minChecks: 13 },
+];
+
+interface ReturnsSummary {
+  count: number;
+  avgTotalReturn: number;
+  medianTotalReturn: number;
+  avgAnnualizedReturn: number | null;
+  avgValueOf1000: number;
+  bestTicker: string;
+  bestReturn: number;
+  worstTicker: string;
+  worstReturn: number;
 }
 
 @Component({
   selector: 'app-buffett-returns-report',
   standalone: true,
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, LoadingOverlayComponent],
   template: `
     <h2>Buffett Returns</h2>
 
     <div class="filters">
       <label>
-        Min Score
-        <select [(ngModel)]="minScore" (ngModelChange)="onFilterChange()">
-          <option [ngValue]="null">Any</option>
-          <option [ngValue]="10">10+</option>
-          <option [ngValue]="9">9+</option>
-          <option [ngValue]="8">8+</option>
-          <option [ngValue]="7">7+</option>
-          <option [ngValue]="5">5+</option>
+        Score Filter
+        <select [(ngModel)]="selectedPresetIndex" (ngModelChange)="onFilterChange()">
+          @for (preset of presets; track preset.label; let i = $index) {
+            <option [ngValue]="i">{{ preset.label }}</option>
+          }
         </select>
       </label>
       <label>
@@ -56,7 +79,7 @@ function defaultStartDate(): string {
     </div>
 
     @if (loading()) {
-      <p>Loading returns...</p>
+      <app-loading-overlay />
     } @else if (error()) {
       <p class="error">{{ error() }}</p>
     } @else if (items().length === 0) {
@@ -105,6 +128,49 @@ function defaultStartDate(): string {
         </tbody>
       </table>
 
+      @if (summary()) {
+        <div class="summary">
+          <h3>Summary</h3>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="summary-label">Companies with return data</span>
+              <span class="summary-value">{{ summary()!.count }} of {{ items().length }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Avg Total Return</span>
+              <span class="summary-value" [class]="returnClass(summary()!.avgTotalReturn)">{{ fmtReturn(summary()!.avgTotalReturn) }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Median Total Return</span>
+              <span class="summary-value" [class]="returnClass(summary()!.medianTotalReturn)">{{ fmtReturn(summary()!.medianTotalReturn) }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Avg Annualized Return</span>
+              <span class="summary-value" [class]="returnClass(summary()!.avgAnnualizedReturn)">{{ fmtReturn(summary()!.avgAnnualizedReturn) }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Avg $1,000 Invested</span>
+              <span class="summary-value">{{ fmtInvested(summary()!.avgValueOf1000) }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Best Performer</span>
+              <span class="summary-value positive">{{ summary()!.bestTicker }} ({{ fmtReturn(summary()!.bestReturn) }})</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Worst Performer</span>
+              <span class="summary-value negative">{{ summary()!.worstTicker }} ({{ fmtReturn(summary()!.worstReturn) }})</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">S&amp;P 500 Benchmark</span>
+              <span class="summary-value benchmark-links">
+                <a [href]="yahooFinanceUrl()" target="_blank" rel="noopener">Yahoo Finance</a>
+                <a [href]="googleFinanceUrl()" target="_blank" rel="noopener">Google Finance</a>
+              </span>
+            </div>
+          </div>
+        </div>
+      }
+
       @if (pagination()) {
         <div class="pagination">
           <button [disabled]="page() <= 1" (click)="goToPage(page() - 1)">Previous</button>
@@ -148,6 +214,9 @@ function defaultStartDate(): string {
       text-align: left;
       padding: 4px 12px;
       border-bottom: 1px solid #e2e8f0;
+    }
+    tbody tr:hover {
+      background: #f8fafc;
     }
     th {
       background: #f1f5f9;
@@ -206,6 +275,53 @@ function defaultStartDate(): string {
     .positive { color: #16a34a; }
     .negative { color: #dc2626; }
     .error { color: #dc2626; }
+    .summary {
+      margin-top: 20px;
+      padding: 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    .summary h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: #334155;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .summary-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .summary-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .summary-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+    .benchmark-links {
+      display: flex;
+      gap: 12px;
+      font-size: 14px;
+    }
+    .benchmark-links a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .benchmark-links a:hover {
+      text-decoration: underline;
+    }
     .computed-at {
       font-size: 12px;
       color: #94a3b8;
@@ -214,11 +330,13 @@ function defaultStartDate(): string {
   `]
 })
 export class BuffettReturnsReportComponent implements OnInit {
+  presets = SCORE_PRESETS;
+  selectedPresetIndex = 1; // default: 12/12+
+
   page = signal(1);
   pageSize = 50;
   sortBy = 'overallScore';
   sortDir = 'desc';
-  minScore: number | null = null;
   exchange: string | null = null;
   startDate: string = defaultStartDate();
 
@@ -227,6 +345,57 @@ export class BuffettReturnsReportComponent implements OnInit {
   loading = signal(true);
   error = signal<string | null>(null);
   computedAt = signal<string | null>(null);
+
+  summary = computed<ReturnsSummary | null>(() => {
+    const rows = this.items();
+    const withData: CompanyScoreReturnSummary[] = [];
+    for (const r of rows) {
+      if (r.totalReturnPct != null && r.currentValueOf1000 != null && r.startDate && r.endDate) {
+        withData.push(r);
+      }
+    }
+    if (withData.length === 0) return null;
+
+    let sumTotal = 0;
+    let sumValue = 0;
+    let sumDays = 0;
+    let best = withData[0];
+    let worst = withData[0];
+    for (const r of withData) {
+      sumTotal += r.totalReturnPct!;
+      sumValue += r.currentValueOf1000!;
+      const days = (new Date(r.endDate!).getTime() - new Date(r.startDate!).getTime()) / 86_400_000;
+      sumDays += days;
+      if (r.totalReturnPct! > best.totalReturnPct!) best = r;
+      if (r.totalReturnPct! < worst.totalReturnPct!) worst = r;
+    }
+
+    const avgTotalReturn = sumTotal / withData.length;
+    const avgDays = sumDays / withData.length;
+    let avgAnnualizedReturn: number | null = null;
+    if (avgDays > 0) {
+      avgAnnualizedReturn = (Math.pow(1 + avgTotalReturn / 100, 365.25 / avgDays) - 1) * 100;
+      avgAnnualizedReturn = Math.round(avgAnnualizedReturn * 100) / 100;
+    }
+
+    const sorted = withData.map(r => r.totalReturnPct!).sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+
+    return {
+      count: withData.length,
+      avgTotalReturn: Math.round(avgTotalReturn * 100) / 100,
+      medianTotalReturn: Math.round(median * 100) / 100,
+      avgAnnualizedReturn: avgAnnualizedReturn,
+      avgValueOf1000: Math.round(sumValue / withData.length * 100) / 100,
+      bestTicker: best.ticker ?? best.cik,
+      bestReturn: best.totalReturnPct!,
+      worstTicker: worst.ticker ?? worst.cik,
+      worstReturn: worst.totalReturnPct!,
+    };
+  });
 
   constructor(private api: ApiService) {}
 
@@ -301,17 +470,29 @@ export class BuffettReturnsReportComponent implements OnInit {
     return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  yahooFinanceUrl(): string {
+    const period1 = Math.floor(new Date(this.startDate + 'T00:00:00').getTime() / 1000);
+    const period2 = Math.floor(Date.now() / 1000);
+    return `https://finance.yahoo.com/quote/%5EGSPC/chart/?period1=${period1}&period2=${period2}`;
+  }
+
+  googleFinanceUrl(): string {
+    return `https://www.google.com/finance/quote/.INX:INDEXSP`;
+  }
+
   private fetchReturns(): void {
     this.loading.set(true);
     this.error.set(null);
 
+    const preset = this.presets[this.selectedPresetIndex];
     this.api.getBuffettReturns({
       startDate: this.startDate,
       page: this.page(),
       pageSize: this.pageSize,
       sortBy: this.sortBy,
       sortDir: this.sortDir,
-      minScore: this.minScore,
+      minScore: preset.minScore,
+      minChecks: preset.minChecks,
       exchange: this.exchange
     }).subscribe({
       next: data => {

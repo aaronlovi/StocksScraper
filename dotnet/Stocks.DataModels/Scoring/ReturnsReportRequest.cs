@@ -8,4 +8,4 @@ public enum ReturnsReportSortBy
     CurrentValueOf1000
 }
 
-public record ReturnsReportFilter(int? MinScore, int? MaxScore, string? Exchange);
+public record ReturnsReportFilter(int? MinScore, int? MaxScore, string? Exchange, int? MinComputableChecks);

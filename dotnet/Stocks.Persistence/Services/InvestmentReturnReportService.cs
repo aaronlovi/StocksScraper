@@ -48,7 +48,17 @@ public sealed class InvestmentReturnReportService {
         if (scoresResult.IsFailure || scoresResult.Value is null)
             return Result<PagedResults<CompanyScoreReturnSummary>>.Failure(ErrorCodes.GenericError, scoresResult.ErrorMessage);
 
-        return await BuildReturnResults(scoresResult.Value.Items, startDate, pagination, sortBy, sortDir, ct);
+        IReadOnlyCollection<CompanyMoatScoreSummary> scores = scoresResult.Value.Items;
+        if (filter?.MinComputableChecks is int minChecks) {
+            var filtered = new List<CompanyMoatScoreSummary>(scores.Count);
+            foreach (CompanyMoatScoreSummary s in scores) {
+                if (s.ComputableChecks >= minChecks)
+                    filtered.Add(s);
+            }
+            scores = filtered;
+        }
+
+        return await BuildReturnResults(scores, startDate, pagination, sortBy, sortDir, ct);
     }
 
     private async Task<Result<PagedResults<CompanyScoreReturnSummary>>> BuildReturnResults(
@@ -216,6 +226,8 @@ public sealed class InvestmentReturnReportService {
             if (sortDir == SortDirection.Descending)
                 cmp = -cmp;
 
+            if (cmp == 0)
+                cmp = b.ComputableChecks.CompareTo(a.ComputableChecks);
             if (cmp == 0)
                 cmp = a.CompanyId.CompareTo(b.CompanyId);
 

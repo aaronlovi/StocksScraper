@@ -6,11 +6,12 @@ import {
   CompanyMoatScoreSummary,
   PaginationResponse
 } from '../../core/services/api.service';
+import { LoadingOverlayComponent } from '../../shared/components/loading-overlay/loading-overlay.component';
 
 @Component({
   selector: 'app-moat-scores-report',
   standalone: true,
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, LoadingOverlayComponent],
   template: `
     <h2>Company Buffett Scores Report</h2>
 
@@ -46,7 +47,7 @@ import {
     </div>
 
     @if (loading()) {
-      <p>Loading Buffett scores...</p>
+      <app-loading-overlay />
     } @else if (error()) {
       <p class="error">{{ error() }}</p>
     } @else if (items().length === 0) {

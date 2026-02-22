@@ -249,6 +249,7 @@ export interface ReturnsReportParams {
   sortBy: string;
   sortDir: string;
   minScore: number | null;
+  minChecks: number | null;
   exchange: string | null;
 }
 
@@ -357,6 +358,7 @@ export class ApiService {
       `sortDir=${params.sortDir}`
     ];
     if (params.minScore != null) parts.push(`minScore=${params.minScore}`);
+    if (params.minChecks != null) parts.push(`minChecks=${params.minChecks}`);
     if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
     return this.http.get<PaginatedResponse<CompanyScoreReturnSummary>>(
       `/api/reports/buffett-returns?${parts.join('&')}`

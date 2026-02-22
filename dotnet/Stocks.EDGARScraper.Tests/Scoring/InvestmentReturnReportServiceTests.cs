@@ -299,7 +299,7 @@ public class InvestmentReturnReportServiceTests {
             MakeGrahamScore(3, "300", "GOOG", "NASDAQ", 12)
         });
 
-        var filter = new ReturnsReportFilter(10, null, null);
+        var filter = new ReturnsReportFilter(10, null, null, null);
         Result<PagedResults<CompanyScoreReturnSummary>> result =
             await _service.GetGrahamReturns(StartDate, new PaginationRequest(1, 50), ReturnsReportSortBy.OverallScore, SortDirection.Descending, filter, _ct);
 
@@ -321,7 +321,7 @@ public class InvestmentReturnReportServiceTests {
             MakeGrahamScore(3, "300", "GOOG", "NASDAQ", 12)
         });
 
-        var filter = new ReturnsReportFilter(null, null, "NYSE");
+        var filter = new ReturnsReportFilter(null, null, "NYSE", null);
         Result<PagedResults<CompanyScoreReturnSummary>> result =
             await _service.GetGrahamReturns(StartDate, new PaginationRequest(1, 50), ReturnsReportSortBy.OverallScore, SortDirection.Descending, filter, _ct);
 
@@ -364,7 +364,7 @@ public class InvestmentReturnReportServiceTests {
             MakeMoatScore(3, "300", "GOOG", "NASDAQ", 9)
         });
 
-        var filter = new ReturnsReportFilter(8, null, null);
+        var filter = new ReturnsReportFilter(8, null, null, null);
         Result<PagedResults<CompanyScoreReturnSummary>> result =
             await _service.GetBuffettReturns(StartDate, new PaginationRequest(1, 50), ReturnsReportSortBy.OverallScore, SortDirection.Descending, filter, _ct);
 

@@ -83,36 +83,37 @@
   </table>
 
   @if (summary()) {
+    @let sum = summary()!;
     <div class="summary">
       <h3>Summary</h3>
       <div class="summary-grid">
         <div class="summary-item">
           <span class="summary-label">Companies with return data</span>
-          <span class="summary-value">{{ summary()!.count }} of {{ items().length }}</span>
+          <span class="summary-value">{{ sum.count }} of {{ items().length }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Avg Total Return</span>
-          <span class="summary-value" [class]="returnClass(summary()!.avgTotalReturn)">{{ fmtReturn(summary()!.avgTotalReturn) }}</span>
+          <span class="summary-value" [class]="returnClass(sum.avgTotalReturn)">{{ fmtReturn(sum.avgTotalReturn) }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Median Total Return</span>
-          <span class="summary-value" [class]="returnClass(summary()!.medianTotalReturn)">{{ fmtReturn(summary()!.medianTotalReturn) }}</span>
+          <span class="summary-value" [class]="returnClass(sum.medianTotalReturn)">{{ fmtReturn(sum.medianTotalReturn) }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Avg Annualized Return</span>
-          <span class="summary-value" [class]="returnClass(summary()!.avgAnnualizedReturn)">{{ fmtReturn(summary()!.avgAnnualizedReturn) }}</span>
+          <span class="summary-value" [class]="returnClass(sum.avgAnnualizedReturn)">{{ fmtReturn(sum.avgAnnualizedReturn) }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Avg $1,000 Invested</span>
-          <span class="summary-value">{{ fmtInvested(summary()!.avgValueOf1000) }}</span>
+          <span class="summary-value">{{ fmtInvested(sum.avgValueOf1000) }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Best Performer</span>
-          <span class="summary-value positive">{{ summary()!.bestTicker }} ({{ fmtReturn(summary()!.bestReturn) }})</span>
+          <span class="summary-value positive">{{ sum.bestTicker }} ({{ fmtReturn(sum.bestReturn) }})</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Worst Performer</span>
-          <span class="summary-value negative">{{ summary()!.worstTicker }} ({{ fmtReturn(summary()!.worstReturn) }})</span>
+          <span class="summary-value negative">{{ sum.worstTicker }} ({{ fmtReturn(sum.worstReturn) }})</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">S&amp;P 500 Benchmark</span>
@@ -125,8 +126,9 @@
     </div>
   }
 
-  @if (pagination()) {
-    <app-pagination [page]="page()" [totalPages]="pagination()!.totalPages" [totalItems]="pagination()!.totalItems" (pageChange)="goToPage($event)" />
+  @let pg = pagination();
+  @if (pg) {
+    <app-pagination [page]="page()" [totalPages]="pg.totalPages" [totalItems]="pg.totalItems" (pageChange)="goToPage($event)" />
   }
 
   @if (computedAt()) {

@@ -3,8 +3,8 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute } from '@angular/router';
-import { ScoringComponent } from './scoring.component';
-import { ScoringResponse } from '../../core/services/api.service';
+import { MoatScoringComponent } from './moat-scoring.component';
+import { MoatScoringResponse } from '../../core/services/api.service';
 
 const mockActivatedRoute = {
   snapshot: {
@@ -14,53 +14,60 @@ const mockActivatedRoute = {
   }
 };
 
-function makeScoringResponse(): ScoringResponse {
+function makeMoatScoringResponse(): MoatScoringResponse {
   const scorecard = [];
   for (let i = 1; i <= 13; i++) {
     scorecard.push({
       checkNumber: i,
       name: `Check ${i}`,
       computedValue: i <= 10 ? 1.5 : null,
-      threshold: '> 1.0',
-      result: (i <= 8 ? 'pass' : i <= 10 ? 'fail' : 'na') as 'pass' | 'fail' | 'na'
+      threshold: i <= 4 ? '> 10%' : i <= 8 ? '> 1.0' : '< 1.5x',
+      result: (i <= 9 ? 'pass' : i <= 11 ? 'fail' : 'na') as 'pass' | 'fail' | 'na'
     });
   }
   return {
-    rawDataByYear: { '2024': { StockholdersEquity: 200000000000 } },
+    rawDataByYear: {
+      '2023': { StockholdersEquity: 180000000000, Revenue: 380000000000 },
+      '2024': { StockholdersEquity: 200000000000, Revenue: 400000000000 }
+    },
     metrics: {
-      bookValue: 193000000000,
-      marketCap: 2610000000000,
-      debtToEquityRatio: 0.15,
-      priceToBookRatio: 13.52,
-      debtToBookRatio: 0.16,
-      adjustedRetainedEarnings: 50000000000,
-      oldestRetainedEarnings: 50000000000,
-      averageNetCashFlow: 10000000000,
-      averageOwnerEarnings: 12000000000,
+      averageGrossMargin: 45.2,
+      averageOperatingMargin: 30.1,
       averageRoeCF: 15.5,
       averageRoeOE: 12.3,
-      estimatedReturnCF: 0.0038,
-      estimatedReturnOE: 0.0046,
+      revenueCagr: 8.5,
+      capexRatio: 22.0,
+      interestCoverage: 29.5,
+      debtToEquityRatio: 0.15,
+      estimatedReturnOE: 4.6,
       currentDividendsPaid: 3000000000,
+      marketCap: 2610000000000,
+      pricePerShare: 174.0,
+      positiveOeYears: 9,
+      totalOeYears: 10,
+      capitalReturnYears: 10,
+      totalCapitalReturnYears: 10,
     },
     scorecard,
-    overallScore: 8,
-    computableChecks: 10,
-    yearsOfData: 1,
+    trendData: [
+      { year: 2023, grossMarginPct: 44.0, operatingMarginPct: 29.5, roeCfPct: 14.0, roeOePct: 11.0, revenue: 380000000000 },
+      { year: 2024, grossMarginPct: 46.0, operatingMarginPct: 31.0, roeCfPct: 17.0, roeOePct: 13.0, revenue: 400000000000 },
+    ],
+    overallScore: 10,
+    computableChecks: 13,
+    yearsOfData: 10,
     pricePerShare: 174.0,
     priceDate: '2024-12-20',
     sharesOutstanding: 15000000000,
-    maxBuyPrice: 12.50,
-    percentageUpside: -92.82,
   };
 }
 
-describe('ScoringComponent', () => {
+describe('MoatScoringComponent', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ScoringComponent],
+      imports: [MoatScoringComponent],
       providers: [
         provideRouter([]),
         provideHttpClient(),
@@ -75,7 +82,7 @@ describe('ScoringComponent', () => {
     httpMock.verify();
   });
 
-  function flushRequests(scoringData?: ScoringResponse) {
+  function flushRequests(scoringData?: MoatScoringResponse) {
     const companyReq = httpMock.expectOne('/api/companies/320193');
     companyReq.flush({
       companyId: 1,
@@ -87,44 +94,44 @@ describe('ScoringComponent', () => {
       tickers: [{ ticker: 'AAPL', exchange: 'NASDAQ' }]
     });
 
-    const scoringReq = httpMock.expectOne('/api/companies/320193/scoring');
-    scoringReq.flush(scoringData ?? makeScoringResponse());
+    const scoringReq = httpMock.expectOne('/api/companies/320193/moat-scoring');
+    scoringReq.flush(scoringData ?? makeMoatScoringResponse());
 
     const arRevenueReq = httpMock.expectOne('/api/companies/320193/ar-revenue');
     arRevenueReq.flush([]);
   }
 
   it('should create', () => {
-    const fixture = TestBed.createComponent(ScoringComponent);
+    const fixture = TestBed.createComponent(MoatScoringComponent);
     fixture.detectChanges();
     flushRequests();
     fixture.detectChanges();
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should fetch scoring data on init', () => {
-    const fixture = TestBed.createComponent(ScoringComponent);
+  it('should fetch moat scoring data on init', () => {
+    const fixture = TestBed.createComponent(MoatScoringComponent);
     fixture.detectChanges();
     flushRequests();
     fixture.detectChanges();
     expect(fixture.componentInstance.scoring()).toBeTruthy();
-    expect(fixture.componentInstance.scoring()!.overallScore).toBe(8);
+    expect(fixture.componentInstance.scoring()!.overallScore).toBe(10);
   });
 
   it('should display score summary', () => {
-    const fixture = TestBed.createComponent(ScoringComponent);
+    const fixture = TestBed.createComponent(MoatScoringComponent);
     fixture.detectChanges();
     flushRequests();
     fixture.detectChanges();
 
     const scoreValue = fixture.nativeElement.querySelector('.score-value');
-    expect(scoreValue.textContent).toContain('8');
+    expect(scoreValue.textContent).toContain('10');
     const scoreTotal = fixture.nativeElement.querySelector('.score-total');
-    expect(scoreTotal.textContent).toContain('10');
+    expect(scoreTotal.textContent).toContain('13');
   });
 
   it('should display scorecard table with 13 rows', () => {
-    const fixture = TestBed.createComponent(ScoringComponent);
+    const fixture = TestBed.createComponent(MoatScoringComponent);
     fixture.detectChanges();
     flushRequests();
     fixture.detectChanges();
@@ -134,7 +141,7 @@ describe('ScoringComponent', () => {
   });
 
   it('should show pass/fail/na indicators', () => {
-    const fixture = TestBed.createComponent(ScoringComponent);
+    const fixture = TestBed.createComponent(MoatScoringComponent);
     fixture.detectChanges();
     flushRequests();
     fixture.detectChanges();
@@ -142,19 +149,19 @@ describe('ScoringComponent', () => {
     const passIndicators = fixture.nativeElement.querySelectorAll('.indicator.pass');
     const failIndicators = fixture.nativeElement.querySelectorAll('.indicator.fail');
     const naIndicators = fixture.nativeElement.querySelectorAll('.indicator.na');
-    expect(passIndicators.length).toBe(8);
+    expect(passIndicators.length).toBe(9);
     expect(failIndicators.length).toBe(2);
-    expect(naIndicators.length).toBe(3);
+    expect(naIndicators.length).toBe(2);
   });
 
   it('should handle error state', () => {
-    const fixture = TestBed.createComponent(ScoringComponent);
+    const fixture = TestBed.createComponent(MoatScoringComponent);
     fixture.detectChanges();
 
     const companyReq = httpMock.expectOne('/api/companies/320193');
     companyReq.flush({ companyId: 1, cik: 320193, dataSource: 'SEC', companyName: 'Apple', latestPrice: null, latestPriceDate: null, tickers: [] });
 
-    const scoringReq = httpMock.expectOne('/api/companies/320193/scoring');
+    const scoringReq = httpMock.expectOne('/api/companies/320193/moat-scoring');
     scoringReq.error(new ProgressEvent('error'));
 
     const arRevenueReq = httpMock.expectOne('/api/companies/320193/ar-revenue');
@@ -163,34 +170,34 @@ describe('ScoringComponent', () => {
     fixture.detectChanges();
 
     const error = fixture.nativeElement.querySelector('.error');
-    expect(error?.textContent).toContain('Failed to load scoring data');
+    expect(error?.textContent).toContain('Failed to load Buffett scoring data');
   });
 
   describe('scoreBadge computed', () => {
-    it('should return score-yellow for score 8', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+    it('should return score-green for score >= 10', () => {
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
       flushRequests();
-      fixture.detectChanges();
-
-      expect(fixture.componentInstance.scoreBadge()).toBe('score-yellow');
-    });
-
-    it('should return score-green for score >= 10', () => {
-      const data = makeScoringResponse();
-      data.overallScore = 10;
-      const fixture = TestBed.createComponent(ScoringComponent);
-      fixture.detectChanges();
-      flushRequests(data);
       fixture.detectChanges();
 
       expect(fixture.componentInstance.scoreBadge()).toBe('score-green');
     });
 
+    it('should return score-yellow for score 7-9', () => {
+      const data = makeMoatScoringResponse();
+      data.overallScore = 8;
+      const fixture = TestBed.createComponent(MoatScoringComponent);
+      fixture.detectChanges();
+      flushRequests(data);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.scoreBadge()).toBe('score-yellow');
+    });
+
     it('should return score-red for score < 7', () => {
-      const data = makeScoringResponse();
-      data.overallScore = 3;
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const data = makeMoatScoringResponse();
+      data.overallScore = 4;
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
       flushRequests(data);
       fixture.detectChanges();
@@ -199,83 +206,59 @@ describe('ScoringComponent', () => {
     });
 
     it('should return empty string when no scoring data', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       expect(fixture.componentInstance.scoreBadge()).toBe('');
-    });
-
-    it('should apply badge class to score-summary element', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
-      fixture.detectChanges();
-      flushRequests();
-      fixture.detectChanges();
-
-      const summary = fixture.nativeElement.querySelector('.score-summary');
-      expect(summary.classList.contains('score-yellow')).toBe(true);
     });
   });
 
   describe('checkTooltips computed', () => {
     it('should return empty record when no scoring data', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       expect(fixture.componentInstance.checkTooltips()).toEqual({});
     });
 
-    it('should return tooltips for all 15 checks', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+    it('should return tooltips for all 13 checks', () => {
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
       flushRequests();
       fixture.detectChanges();
 
       const tooltips = fixture.componentInstance.checkTooltips();
-      for (let i = 1; i <= 15; i++) {
+      for (let i = 1; i <= 13; i++) {
         expect(tooltips[i]).toBeTruthy();
         expect(tooltips[i].length).toBeGreaterThan(0);
       }
     });
 
-    it('should include years of data in relevant tooltip text', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+    it('should include years of data in tooltip text', () => {
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
       flushRequests();
       fixture.detectChanges();
 
       const tooltips = fixture.componentInstance.checkTooltips();
-      expect(tooltips[4]).toContain('1 yrs');
-      expect(tooltips[12]).toContain('1 years');
-    });
-
-    it('should render tooltip attributes in scorecard DOM', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
-      fixture.detectChanges();
-      flushRequests();
-      fixture.detectChanges();
-
-      const tooltipSpans = fixture.nativeElement.querySelectorAll('.scorecard-table .info-icon[data-tooltip]');
-      expect(tooltipSpans.length).toBe(13);
-      for (const span of tooltipSpans) {
-        expect(span.getAttribute('data-tooltip')!.length).toBeGreaterThan(0);
-      }
+      expect(tooltips[1]).toContain('10 yrs');
     });
   });
 
   describe('metricRows computed', () => {
     it('should return empty array when no scoring data', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       expect(fixture.componentInstance.metricRows()).toEqual([]);
     });
 
-    it('should return 16 metric rows', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+    it('should return 13 metric rows', () => {
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
       flushRequests();
       fixture.detectChanges();
 
       const rows = fixture.componentInstance.metricRows();
-      expect(rows.length).toBe(16);
+      expect(rows.length).toBe(13);
     });
 
     it('should have label, display, and tooltip on each row', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
       flushRequests();
       fixture.detectChanges();
@@ -288,92 +271,71 @@ describe('ScoringComponent', () => {
     });
 
     it('should render metrics table in DOM', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
       flushRequests();
       fixture.detectChanges();
 
       const tableRows = fixture.nativeElement.querySelectorAll('.metrics-table tbody tr');
-      expect(tableRows.length).toBe(16);
+      expect(tableRows.length).toBe(13);
     });
   });
 
   describe('yearKeys computed', () => {
     it('should return empty array when no scoring data', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       expect(fixture.componentInstance.yearKeys()).toEqual([]);
     });
 
     it('should return years in reverse order', () => {
-      const data = makeScoringResponse();
-      data.rawDataByYear = {
-        '2022': { Revenue: 100 },
-        '2024': { Revenue: 300 },
-        '2023': { Revenue: 200 }
-      };
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
-      flushRequests(data);
+      flushRequests();
       fixture.detectChanges();
 
-      expect(fixture.componentInstance.yearKeys()).toEqual(['2024', '2023', '2022']);
+      const keys = fixture.componentInstance.yearKeys();
+      expect(keys).toEqual(['2024', '2023']);
     });
   });
 
   describe('rawRows computed', () => {
     it('should return empty array when no scoring data', () => {
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       expect(fixture.componentInstance.rawRows()).toEqual([]);
     });
 
-    it('should return one row per unique concept sorted alphabetically', () => {
-      const data = makeScoringResponse();
-      data.rawDataByYear = {
-        '2023': { Revenue: 380000000000, StockholdersEquity: 180000000000 },
-        '2024': { Revenue: 400000000000, StockholdersEquity: 200000000000, Debt: 50000000000 }
-      };
-      const fixture = TestBed.createComponent(ScoringComponent);
+    it('should return one row per concept', () => {
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
-      flushRequests(data);
+      flushRequests();
       fixture.detectChanges();
 
       const rows = fixture.componentInstance.rawRows();
-      expect(rows.length).toBe(3);
-      expect(rows[0].concept).toBe('Debt');
-      expect(rows[1].concept).toBe('Revenue');
-      expect(rows[2].concept).toBe('StockholdersEquity');
+      expect(rows.length).toBe(2);
+      expect(rows[0].concept).toBe('Revenue');
+      expect(rows[1].concept).toBe('StockholdersEquity');
     });
 
-    it('should fill null for missing year-concept combinations', () => {
-      const data = makeScoringResponse();
-      data.rawDataByYear = {
-        '2023': { Revenue: 380000000000 },
-        '2024': { Revenue: 400000000000, Debt: 50000000000 }
-      };
-      const fixture = TestBed.createComponent(ScoringComponent);
+    it('should map values by year', () => {
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
-      flushRequests(data);
+      flushRequests();
       fixture.detectChanges();
 
       const rows = fixture.componentInstance.rawRows();
-      const debtRow = rows.find(r => r.concept === 'Debt')!;
-      expect(debtRow.values['2024']).toBe(50000000000);
-      expect(debtRow.values['2023']).toBeNull();
+      const revenueRow = rows.find(r => r.concept === 'Revenue')!;
+      expect(revenueRow.values['2024']).toBe(400000000000);
+      expect(revenueRow.values['2023']).toBe(380000000000);
     });
 
     it('should render raw data table in DOM', () => {
-      const data = makeScoringResponse();
-      data.rawDataByYear = {
-        '2023': { Revenue: 380000000000 },
-        '2024': { Revenue: 400000000000 }
-      };
-      const fixture = TestBed.createComponent(ScoringComponent);
+      const fixture = TestBed.createComponent(MoatScoringComponent);
       fixture.detectChanges();
-      flushRequests(data);
+      flushRequests();
       fixture.detectChanges();
 
       const tableRows = fixture.nativeElement.querySelectorAll('.raw-table tbody tr');
-      expect(tableRows.length).toBe(1);
+      expect(tableRows.length).toBe(2);
     });
   });
 });

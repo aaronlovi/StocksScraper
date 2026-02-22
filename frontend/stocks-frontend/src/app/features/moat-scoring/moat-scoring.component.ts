@@ -8,7 +8,6 @@ import {
   CompanyDetail,
   MoatScoringResponse,
   MoatYearMetrics,
-  ScoringCheckResponse
 } from '../../core/services/api.service';
 import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
 import { SparklineChartComponent } from '../../shared/components/sparkline-chart/sparkline-chart.component';
@@ -166,6 +165,85 @@ export class MoatScoringComponent implements OnInit {
     return charts;
   });
 
+  scoreBadge = computed(() => {
+    const s = this.scoring();
+    if (!s) return '';
+    if (s.overallScore >= 10) return 'score-green';
+    if (s.overallScore >= 7) return 'score-yellow';
+    return 'score-red';
+  });
+
+  checkTooltips = computed<Record<number, string>>(() => {
+    const s = this.scoring();
+    if (!s) return {} as Record<number, string>;
+    const m = s.metrics;
+    const n = s.yearsOfData;
+    return {
+      1: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeCF),
+      2: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeOE),
+      3: 'Avg annual: Gross Profit / Revenue (' + n + ' yrs) = ' + fmtPct(m.averageGrossMargin),
+      4: 'Avg annual: Operating Income / Revenue (' + n + ' yrs) = ' + fmtPct(m.averageOperatingMargin),
+      5: 'CAGR: (Latest Rev / Oldest Rev)^(1/' + n + ') − 1 = ' + fmtPct(m.revenueCagr),
+      6: 'Owner Earnings > 0 in ' + m.positiveOeYears + ' of ' + m.totalOeYears + ' years',
+      7: 'Avg CapEx / Avg Owner Earnings = ' + fmtPct(m.capexRatio),
+      8: 'Dividends or buybacks in ' + m.capitalReturnYears + ' of ' + m.totalCapitalReturnYears + ' years',
+      9: 'Debt / Equity = ' + fmtRatio(m.debtToEquityRatio),
+      10: 'Operating Income / Interest Expense = ' + (m.interestCoverage != null ? m.interestCoverage.toFixed(2) + 'x' : 'N/A'),
+      11: n + ' years of annual financial data available',
+      12: '(Avg OE − Dividends) / Market Cap = ' + fmtPct(m.estimatedReturnOE),
+      13: 'Same as #12 — checks return isn\'t unrealistically high',
+    };
+  });
+
+  metricRows = computed<{ label: string; display: string; tooltip: string }[]>(() => {
+    const m = this.scoring()?.metrics;
+    const s = this.scoring();
+    if (!m || !s) return [];
+    const n = s.yearsOfData;
+    const shares = formatAbbrev(s.sharesOutstanding).replace('$', '');
+    return [
+      { label: 'Avg Gross Margin', display: fmtPct(m.averageGrossMargin), tooltip: 'Avg annual: Gross Profit / Revenue (' + n + ' yrs)' },
+      { label: 'Avg Operating Margin', display: fmtPct(m.averageOperatingMargin), tooltip: 'Avg annual: Operating Income / Revenue (' + n + ' yrs)' },
+      { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF), tooltip: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs)' },
+      { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE), tooltip: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs)' },
+      { label: 'Revenue CAGR', display: fmtPct(m.revenueCagr), tooltip: '(Latest Rev / Oldest Rev)^(1/' + n + ') − 1' },
+      { label: 'CapEx Ratio', display: fmtPct(m.capexRatio), tooltip: 'Avg CapEx / Avg Owner Earnings' },
+      { label: 'Interest Coverage', display: m.interestCoverage != null ? m.interestCoverage.toFixed(2) + 'x' : 'N/A', tooltip: 'Operating Income / Interest Expense (latest year)' },
+      { label: 'Debt / Equity', display: fmtRatio(m.debtToEquityRatio), tooltip: 'Total Debt / Stockholders\' Equity' },
+      { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE), tooltip: '(Avg OE − Dividends) / Market Cap' },
+      { label: 'Market Cap', display: fmtCurrency(m.marketCap), tooltip: 'Price × Shares = ' + fmtPrice(m.pricePerShare) + ' × ' + shares },
+      { label: 'Current Dividends Paid', display: fmtCurrency(m.currentDividendsPaid), tooltip: 'Dividends from most recent fiscal year' },
+      { label: 'Positive OE Years', display: m.positiveOeYears + ' / ' + m.totalOeYears, tooltip: 'Years where Owner Earnings > 0' },
+      { label: 'Capital Return Years', display: m.capitalReturnYears + ' / ' + m.totalCapitalReturnYears, tooltip: 'Years with dividends or stock buybacks' },
+    ];
+  });
+
+  yearKeys = computed<string[]>(() => {
+    const raw = this.scoring()?.rawDataByYear;
+    if (!raw) return [];
+    return Object.keys(raw).sort().reverse();
+  });
+
+  rawRows = computed<{ concept: string; values: Record<string, number | null> }[]>(() => {
+    const raw = this.scoring()?.rawDataByYear;
+    if (!raw) return [];
+    const years = this.yearKeys();
+    const conceptSet = new Set<string>();
+    for (const yr of years) {
+      for (const key of Object.keys(raw[yr])) {
+        conceptSet.add(key);
+      }
+    }
+    const concepts = Array.from(conceptSet).sort();
+    return concepts.map(concept => {
+      const values: Record<string, number | null> = {};
+      for (const yr of years) {
+        values[yr] = raw[yr][concept] ?? null;
+      }
+      return { concept, values };
+    });
+  });
+
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
@@ -211,14 +289,6 @@ export class MoatScoringComponent implements OnInit {
     });
   }
 
-  scoreBadgeClass(): string {
-    const s = this.scoring();
-    if (!s) return '';
-    if (s.overallScore >= 10) return 'score-green';
-    if (s.overallScore >= 7) return 'score-yellow';
-    return 'score-red';
-  }
-
   formatValue(val: number | null, threshold?: string): string {
     if (val == null) return '';
     if (threshold && threshold.includes('%')) return val.toFixed(2) + '%';
@@ -231,78 +301,6 @@ export class MoatScoringComponent implements OnInit {
     if (Math.abs(val) >= 1_000) return (val / 1_000).toFixed(2) + 'K';
     return val.toFixed(4);
   }
-
-  checkTooltip(check: ScoringCheckResponse): string {
-    const s = this.scoring()!;
-    const m = s.metrics;
-    const n = s.yearsOfData;
-    switch (check.checkNumber) {
-      case 1: return 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeCF);
-      case 2: return 'Avg annual: Owner Earnings / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeOE);
-      case 3: return 'Avg annual: Gross Profit / Revenue (' + n + ' yrs) = ' + fmtPct(m.averageGrossMargin);
-      case 4: return 'Avg annual: Operating Income / Revenue (' + n + ' yrs) = ' + fmtPct(m.averageOperatingMargin);
-      case 5: return 'CAGR: (Latest Rev / Oldest Rev)^(1/' + n + ') − 1 = ' + fmtPct(m.revenueCagr);
-      case 6: return 'Owner Earnings > 0 in ' + m.positiveOeYears + ' of ' + m.totalOeYears + ' years';
-      case 7: return 'Avg CapEx / Avg Owner Earnings = ' + fmtPct(m.capexRatio);
-      case 8: return 'Dividends or buybacks in ' + m.capitalReturnYears + ' of ' + m.totalCapitalReturnYears + ' years';
-      case 9: return 'Debt / Equity = ' + fmtRatio(m.debtToEquityRatio);
-      case 10: return 'Operating Income / Interest Expense = ' + (m.interestCoverage != null ? m.interestCoverage.toFixed(2) + 'x' : 'N/A');
-      case 11: return n + ' years of annual financial data available';
-      case 12: return '(Avg OE − Dividends) / Market Cap = ' + fmtPct(m.estimatedReturnOE);
-      case 13: return 'Same as #12 — checks return isn\'t unrealistically high';
-      default: return '';
-    }
-  }
-
-  metricRows(): { label: string; display: string; tooltip: string }[] {
-    const m = this.scoring()?.metrics;
-    const s = this.scoring();
-    if (!m || !s) return [];
-    const n = s.yearsOfData;
-    const shares = formatAbbrev(s.sharesOutstanding).replace('$', '');
-    return [
-      { label: 'Avg Gross Margin', display: fmtPct(m.averageGrossMargin), tooltip: 'Avg annual: Gross Profit / Revenue (' + n + ' yrs)' },
-      { label: 'Avg Operating Margin', display: fmtPct(m.averageOperatingMargin), tooltip: 'Avg annual: Operating Income / Revenue (' + n + ' yrs)' },
-      { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF), tooltip: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs)' },
-      { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE), tooltip: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs)' },
-      { label: 'Revenue CAGR', display: fmtPct(m.revenueCagr), tooltip: '(Latest Rev / Oldest Rev)^(1/' + n + ') − 1' },
-      { label: 'CapEx Ratio', display: fmtPct(m.capexRatio), tooltip: 'Avg CapEx / Avg Owner Earnings' },
-      { label: 'Interest Coverage', display: m.interestCoverage != null ? m.interestCoverage.toFixed(2) + 'x' : 'N/A', tooltip: 'Operating Income / Interest Expense (latest year)' },
-      { label: 'Debt / Equity', display: fmtRatio(m.debtToEquityRatio), tooltip: 'Total Debt / Stockholders\' Equity' },
-      { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE), tooltip: '(Avg OE − Dividends) / Market Cap' },
-      { label: 'Market Cap', display: fmtCurrency(m.marketCap), tooltip: 'Price × Shares = ' + fmtPrice(m.pricePerShare) + ' × ' + shares },
-      { label: 'Current Dividends Paid', display: fmtCurrency(m.currentDividendsPaid), tooltip: 'Dividends from most recent fiscal year' },
-      { label: 'Positive OE Years', display: m.positiveOeYears + ' / ' + m.totalOeYears, tooltip: 'Years where Owner Earnings > 0' },
-      { label: 'Capital Return Years', display: m.capitalReturnYears + ' / ' + m.totalCapitalReturnYears, tooltip: 'Years with dividends or stock buybacks' },
-    ];
-  }
-
-  yearKeys(): string[] {
-    const raw = this.scoring()?.rawDataByYear;
-    if (!raw) return [];
-    return Object.keys(raw).sort().reverse();
-  }
-
-  rawRows(): { concept: string; values: Record<string, number | null> }[] {
-    const raw = this.scoring()?.rawDataByYear;
-    if (!raw) return [];
-    const years = this.yearKeys();
-    const conceptSet = new Set<string>();
-    for (const yr of years) {
-      for (const key of Object.keys(raw[yr])) {
-        conceptSet.add(key);
-      }
-    }
-    const concepts = Array.from(conceptSet).sort();
-    return concepts.map(concept => {
-      const values: Record<string, number | null> = {};
-      for (const yr of years) {
-        values[yr] = raw[yr][concept] ?? null;
-      }
-      return { concept, values };
-    });
-  }
-
 }
 
 interface TrendChart {
@@ -342,4 +340,3 @@ function buildPctChart(
     formatTooltip: (v: number) => v.toFixed(2) + '%'
   };
 }
-

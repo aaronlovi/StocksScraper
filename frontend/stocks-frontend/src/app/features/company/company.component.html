@@ -1,6 +1,7 @@
-@if (company()) {
+@let c = company();
+@if (c) {
   <app-company-header
-    [company]="company()!"
+    [company]="c"
     titleSuffix=" — Filings"
     [links]="headerLinks()" />
 

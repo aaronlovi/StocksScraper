@@ -1,8 +1,9 @@
 <app-breadcrumb [segments]="breadcrumbSegments" />
 
-@if (company()) {
+@let c = company();
+@if (c) {
   <app-company-header
-    [company]="company()!"
+    [company]="c"
     titleSuffix=" — Graham Score"
     [links]="headerLinks()" />
 }
@@ -12,21 +13,22 @@
 } @else if (error()) {
   <p class="error">{{ error() }}</p>
 } @else if (scoring()) {
-  <div class="score-summary" [class]="scoreBadgeClass()">
-    <span class="score-value">{{ scoring()!.overallScore }}</span>
+  @let s = scoring()!;
+  <div class="score-summary" [class]="scoreBadge()">
+    <span class="score-value">{{ s.overallScore }}</span>
     <span class="score-sep">/</span>
-    <span class="score-total">{{ scoring()!.computableChecks }}</span>
+    <span class="score-total">{{ s.computableChecks }}</span>
   </div>
   <p class="score-caption">
-    {{ scoring()!.yearsOfData }} year{{ scoring()!.yearsOfData === 1 ? '' : 's' }} of data
-    @if (scoring()!.pricePerShare != null) {
-      &middot; Price: \${{ scoring()!.pricePerShare! | number:'1.2-2' }}
-      @if (scoring()!.priceDate) {
-        ({{ scoring()!.priceDate }})
+    {{ s.yearsOfData }} year{{ s.yearsOfData === 1 ? '' : 's' }} of data
+    @if (s.pricePerShare != null) {
+      &middot; Price: \${{ s.pricePerShare! | number:'1.2-2' }}
+      @if (s.priceDate) {
+        ({{ s.priceDate }})
       }
     }
-    @if (scoring()!.sharesOutstanding != null) {
-      &middot; Shares: {{ scoring()!.sharesOutstanding! | number:'1.0-0' }}
+    @if (s.sharesOutstanding != null) {
+      &middot; Shares: {{ s.sharesOutstanding! | number:'1.0-0' }}
     }
   </p>
 
@@ -44,10 +46,10 @@
           </tr>
         </thead>
         <tbody>
-          @for (check of scoring()!.scorecard; track check.checkNumber) {
+          @for (check of s.scorecard; track check.checkNumber) {
             <tr [class]="'check-' + check.result">
               <td>{{ check.checkNumber }}</td>
-              <td>{{ check.name }} <span class="info-icon" [attr.data-tooltip]="checkTooltip(check)">&#9432;</span></td>
+              <td>{{ check.name }} <span class="info-icon" [attr.data-tooltip]="checkTooltips()[check.checkNumber]">&#9432;</span></td>
               <td class="num">{{ formatValue(check.computedValue, check.threshold) }}</td>
               <td>{{ check.threshold }}</td>
               <td class="result-cell">
@@ -115,19 +117,20 @@
       </div>
     }
 
-    @if (workingCapital()) {
+    @let wc = workingCapital();
+    @if (wc) {
       <div class="trend-cell">
-        <h3>{{ workingCapital()!.label }} Trend <span class="info-icon" [attr.data-tooltip]="workingCapital()!.tooltip">&#9432;</span></h3>
+        <h3>{{ wc.label }} Trend <span class="info-icon" [attr.data-tooltip]="wc.tooltip">&#9432;</span></h3>
         <div class="ar-revenue-content">
           <table class="ar-revenue-table">
             <thead>
               <tr>
                 <th>Year</th>
-                <th class="num">{{ workingCapital()!.label }}</th>
+                <th class="num">{{ wc.label }}</th>
               </tr>
             </thead>
             <tbody>
-              @for (row of workingCapital()!.rows; track row.year) {
+              @for (row of wc.rows; track row.year) {
                 <tr>
                   <td>{{ row.year }}</td>
                   <td class="num">{{ row.display }}</td>
@@ -135,7 +138,7 @@
               }
             </tbody>
           </table>
-          <app-sparkline-chart [data]="workingCapital()!.sparkline" [formatTooltip]="formatAbbrevTooltip" />
+          <app-sparkline-chart [data]="wc.sparkline" [formatTooltip]="formatAbbrevTooltip" />
         </div>
       </div>
     }

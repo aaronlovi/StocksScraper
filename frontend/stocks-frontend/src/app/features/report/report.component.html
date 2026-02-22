@@ -1,7 +1,8 @@
 <app-breadcrumb [segments]="breadcrumbSegments" />
 
-@if (company()) {
-  <app-company-header [company]="company()!" />
+@let c = company();
+@if (c) {
+  <app-company-header [company]="c" />
 }
 
 @if (availableRoles().length > 0) {

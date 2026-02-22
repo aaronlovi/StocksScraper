@@ -26,7 +26,7 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
 
     @if (company()) {
       <div class="company-header">
-        <h2>{{ company()!.companyName ?? ('CIK ' + company()!.cik) }}</h2>
+        <h2>{{ company()!.companyName ?? ('CIK ' + company()!.cik) }} — Buffett Score</h2>
         <div class="company-subtitle">
           <span class="cik-label">CIK {{ company()!.cik }}</span>
           @if (company()!.latestPrice != null) {
@@ -42,11 +42,15 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
               <span class="badge">{{ t.ticker }}<span class="exchange">{{ t.exchange }}</span></span>
             }
           </div>
-          <div class="company-links">
+        }
+        <div class="company-links">
+          <a [routerLink]="['/company', cik]" class="external-link">Filings</a>
+          <a [routerLink]="['/company', cik, 'scoring']" class="external-link">Graham Score</a>
+          @if (company()!.tickers.length > 0) {
             <a class="external-link" [href]="'https://finance.yahoo.com/quote/' + company()!.tickers[0].ticker" target="_blank" rel="noopener">Yahoo Finance</a>
             <a class="external-link" [href]="'https://www.google.com/finance/quote/' + company()!.tickers[0].ticker + ':' + company()!.tickers[0].exchange" target="_blank" rel="noopener">Google Finance</a>
-          </div>
-        }
+          }
+        </div>
       </div>
     }
 
@@ -119,7 +123,7 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
 
       <!-- Trend Charts -->
       @for (chart of trendCharts(); track chart.title) {
-        <h3>{{ chart.title }}</h3>
+        <h3>{{ chart.title }} <span class="info-icon" [attr.data-tooltip]="chart.tooltip">&#9432;</span></h3>
         <div class="trend-content">
           <table class="trend-table">
             <thead>
@@ -357,6 +361,38 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
       font-size: 6.5px;
       fill: #64748b;
     }
+    .raw-table tbody tr:hover {
+      background: #f1f5f9;
+    }
+    .info-icon {
+      position: relative;
+      cursor: help;
+      font-size: 14px;
+      color: #94a3b8;
+      margin-left: 4px;
+    }
+    .info-icon:hover {
+      color: #64748b;
+    }
+    .info-icon:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 100%;
+      margin-top: 6px;
+      background: #1e293b;
+      color: #f8fafc;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 400;
+      white-space: normal;
+      width: 260px;
+      z-index: 10;
+      line-height: 1.4;
+      pointer-events: none;
+    }
   `]
 })
 export class MoatScoringComponent implements OnInit {
@@ -388,6 +424,7 @@ export class MoatScoringComponent implements OnInit {
     if (arDisplayRows.length > 0) {
       charts.push({
         title: 'AR / Revenue Trend',
+        tooltip: 'Accounts Receivable as a percentage of Revenue. Rising AR/Revenue may indicate customers are slower to pay or aggressive revenue recognition.',
         columnHeader: 'AR / Revenue',
         rows: arDisplayRows,
         sparkline: computeSparkline(arData, { yAxisFormat: 'percent' }),
@@ -399,19 +436,27 @@ export class MoatScoringComponent implements OnInit {
 
     // Gross Margin %
     charts.push(buildPctChart(
-      'Gross Margin Trend', 'Gross Margin', s.trendData, m => m.grossMarginPct));
+      'Gross Margin Trend', 'Gross Margin',
+      'Revenue minus Cost of Goods Sold, divided by Revenue. Measures pricing power and production efficiency.',
+      s.trendData, m => m.grossMarginPct));
 
     // Operating Margin %
     charts.push(buildPctChart(
-      'Operating Margin Trend', 'Op. Margin', s.trendData, m => m.operatingMarginPct));
+      'Operating Margin Trend', 'Op. Margin',
+      'Operating Income divided by Revenue. Shows profitability after operating expenses but before interest and taxes.',
+      s.trendData, m => m.operatingMarginPct));
 
     // ROE (CF) %
     charts.push(buildPctChart(
-      'ROE (CF) Trend', 'ROE (CF)', s.trendData, m => m.roeCfPct));
+      'ROE (CF) Trend', 'ROE (CF)',
+      'Return on Equity using Cash Flow. Net cash from operations divided by average stockholders\' equity.',
+      s.trendData, m => m.roeCfPct));
 
     // ROE (OE) %
     charts.push(buildPctChart(
-      'ROE (OE) Trend', 'ROE (OE)', s.trendData, m => m.roeOePct));
+      'ROE (OE) Trend', 'ROE (OE)',
+      'Return on Equity using Owner Earnings. Owner earnings (net income + depreciation - capex) divided by average stockholders\' equity.',
+      s.trendData, m => m.roeOePct));
 
     // Revenue
     const revData: { label: string; value: number }[] = [];
@@ -427,11 +472,46 @@ export class MoatScoringComponent implements OnInit {
     }
     charts.push({
       title: 'Revenue Trend',
+      tooltip: 'Total revenue (net sales) reported each fiscal year. Consistent growth indicates a durable competitive advantage.',
       columnHeader: 'Revenue',
       rows: revDisplayRows,
       sparkline: computeSparkline(revData, { yAxisFormat: 'currency' }),
       formatTooltip: (v: number) => formatAbbrevStatic(v)
     });
+
+    // Net Current Assets (Working Capital)
+    const raw = s.rawDataByYear;
+    if (raw) {
+      const years = Object.keys(raw).sort();
+      const wcData: { label: string; value: number }[] = [];
+      const wcDisplayRows: { label: string; display: string }[] = [];
+      for (const yr of years) {
+        const assets = raw[yr]['AssetsCurrent'] ?? null;
+        const liabilities = raw[yr]['LiabilitiesCurrent'] ?? null;
+        if (assets != null && liabilities != null) {
+          const wc = assets - liabilities;
+          wcDisplayRows.push({ label: yr, display: formatAbbrevStatic(wc) });
+          wcData.push({ label: yr, value: wc });
+        } else {
+          wcDisplayRows.push({ label: yr, display: '\u2014' });
+        }
+      }
+      if (wcDisplayRows.length > 0) {
+        charts.push({
+          title: 'Net Current Assets Trend',
+          tooltip: 'Current Assets minus Current Liabilities (working capital). Positive values mean the company can cover short-term obligations.',
+          columnHeader: 'Net Current Assets',
+          rows: wcDisplayRows,
+          sparkline: computeSparkline(wcData, { yAxisFormat: 'currency' }),
+          formatTooltip: (v: number) => formatAbbrevStatic(v)
+        });
+      }
+    }
+
+    // Show newest year first in tables
+    for (const chart of charts) {
+      chart.rows.reverse();
+    }
 
     return charts;
   });
@@ -566,6 +646,7 @@ export class MoatScoringComponent implements OnInit {
 
 interface TrendChart {
   title: string;
+  tooltip: string;
   columnHeader: string;
   rows: { label: string; display: string }[];
   sparkline: SparklineData | null;
@@ -575,6 +656,7 @@ interface TrendChart {
 function buildPctChart(
   title: string,
   columnHeader: string,
+  tooltip: string,
   trendData: MoatYearMetrics[],
   accessor: (m: MoatYearMetrics) => number | null
 ): TrendChart {
@@ -592,6 +674,7 @@ function buildPctChart(
   }
   return {
     title,
+    tooltip,
     columnHeader,
     rows: displayRows,
     sparkline: computeSparkline(sparkData, { yAxisFormat: 'percent' }),

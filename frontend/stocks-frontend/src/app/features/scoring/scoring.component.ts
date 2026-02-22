@@ -9,6 +9,7 @@ import {
   ScoringResponse,
   ScoringCheckResponse
 } from '../../core/services/api.service';
+import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
 
 @Component({
   selector: 'app-scoring',
@@ -25,7 +26,7 @@ import {
 
     @if (company()) {
       <div class="company-header">
-        <h2>{{ company()!.companyName ?? ('CIK ' + company()!.cik) }}</h2>
+        <h2>{{ company()!.companyName ?? ('CIK ' + company()!.cik) }} — Graham Score</h2>
         <div class="company-subtitle">
           <span class="cik-label">CIK {{ company()!.cik }}</span>
           @if (company()!.latestPrice != null) {
@@ -41,11 +42,15 @@ import {
               <span class="badge">{{ t.ticker }}<span class="exchange">{{ t.exchange }}</span></span>
             }
           </div>
-          <div class="company-links">
+        }
+        <div class="company-links">
+          <a [routerLink]="['/company', cik]" class="external-link">Filings</a>
+          <a [routerLink]="['/company', cik, 'moat-scoring']" class="external-link">Buffett Score</a>
+          @if (company()!.tickers.length > 0) {
             <a class="external-link" [href]="'https://finance.yahoo.com/quote/' + company()!.tickers[0].ticker" target="_blank" rel="noopener">Yahoo Finance</a>
             <a class="external-link" [href]="'https://www.google.com/finance/quote/' + company()!.tickers[0].ticker + ':' + company()!.tickers[0].exchange" target="_blank" rel="noopener">Google Finance</a>
-          </div>
-        }
+          }
+        </div>
       </div>
     }
 
@@ -117,7 +122,7 @@ import {
       </table>
 
       @if (arRevenueRows().length > 0) {
-        <h3>AR / Revenue Trend</h3>
+        <h3>AR / Revenue Trend <span class="info-icon" data-tooltip="Accounts Receivable as a percentage of Revenue. Rising AR/Revenue may indicate customers are slower to pay or aggressive revenue recognition.">&#9432;</span></h3>
         <div class="ar-revenue-content">
           <table class="ar-revenue-table">
             <thead>
@@ -168,6 +173,63 @@ import {
                   </circle>
                   <text [attr.x]="pt.x" [attr.y]="sparklineData().axisBottom + 12"
                         text-anchor="middle" class="axis-label">{{ pt.year }}</text>
+                }
+              </svg>
+            </div>
+          } @else {
+            <div class="sparkline-empty">Not enough data</div>
+          }
+        </div>
+      }
+
+      @if (workingCapital()) {
+        <h3>Net Current Assets Trend <span class="info-icon" data-tooltip="Current Assets minus Current Liabilities (working capital). Positive values mean the company can cover short-term obligations.">&#9432;</span></h3>
+        <div class="ar-revenue-content">
+          <table class="ar-revenue-table">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th class="num">Net Current Assets</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of workingCapital()!.rows; track row.year) {
+                <tr>
+                  <td>{{ row.year }}</td>
+                  <td class="num">{{ row.display }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          @if (workingCapital()!.sparkline) {
+            <div class="sparkline-container">
+              <svg viewBox="0 0 240 120" class="sparkline-svg">
+                @for (tick of workingCapital()!.sparkline!.yTicks; track tick.label) {
+                  <line [attr.x1]="workingCapital()!.sparkline!.axisLeft" [attr.y1]="tick.y"
+                        [attr.x2]="workingCapital()!.sparkline!.axisRight" [attr.y2]="tick.y"
+                        class="grid-line" />
+                  <text [attr.x]="workingCapital()!.sparkline!.axisLeft - 4" [attr.y]="tick.y + 2.5"
+                        text-anchor="end" class="axis-label">{{ tick.label }}</text>
+                }
+                <line [attr.x1]="workingCapital()!.sparkline!.axisLeft" [attr.y1]="workingCapital()!.sparkline!.axisTop"
+                      [attr.x2]="workingCapital()!.sparkline!.axisLeft" [attr.y2]="workingCapital()!.sparkline!.axisBottom"
+                      class="axis-line" />
+                <line [attr.x1]="workingCapital()!.sparkline!.axisLeft" [attr.y1]="workingCapital()!.sparkline!.axisBottom"
+                      [attr.x2]="workingCapital()!.sparkline!.axisRight" [attr.y2]="workingCapital()!.sparkline!.axisBottom"
+                      class="axis-line" />
+                <polyline
+                  [attr.points]="workingCapital()!.sparkline!.polyline"
+                  fill="none"
+                  stroke="#3b82f6"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                  stroke-linecap="round" />
+                @for (pt of workingCapital()!.sparkline!.points; track pt.label) {
+                  <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="3" fill="#3b82f6">
+                    <title>{{ pt.label }}: {{ formatAbbrev(pt.value) }}</title>
+                  </circle>
+                  <text [attr.x]="pt.x" [attr.y]="workingCapital()!.sparkline!.axisBottom + 12"
+                        text-anchor="middle" class="axis-label">{{ pt.label }}</text>
                 }
               </svg>
             </div>
@@ -359,6 +421,38 @@ import {
       font-size: 6.5px;
       fill: #64748b;
     }
+    .raw-table tbody tr:hover {
+      background: #f1f5f9;
+    }
+    .info-icon {
+      position: relative;
+      cursor: help;
+      font-size: 14px;
+      color: #94a3b8;
+      margin-left: 4px;
+    }
+    .info-icon:hover {
+      color: #64748b;
+    }
+    .info-icon:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 100%;
+      margin-top: 6px;
+      background: #1e293b;
+      color: #f8fafc;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 400;
+      white-space: normal;
+      width: 260px;
+      z-index: 10;
+      line-height: 1.4;
+      pointer-events: none;
+    }
   `]
 })
 export class ScoringComponent implements OnInit {
@@ -368,6 +462,32 @@ export class ScoringComponent implements OnInit {
   loading = signal(true);
   error = signal<string | null>(null);
   arRevenueRows = signal<ArRevenueRow[]>([]);
+
+  workingCapital = computed(() => {
+    const s = this.scoring();
+    if (!s?.rawDataByYear) return null;
+    const raw = s.rawDataByYear;
+    const years = Object.keys(raw).sort();
+    const sparkData: { label: string; value: number }[] = [];
+    const rows: { year: string; display: string }[] = [];
+    for (const yr of years) {
+      const assets = raw[yr]['AssetsCurrent'] ?? null;
+      const liabilities = raw[yr]['LiabilitiesCurrent'] ?? null;
+      if (assets != null && liabilities != null) {
+        const wc = assets - liabilities;
+        rows.push({ year: yr, display: this.formatAbbrev(wc) });
+        sparkData.push({ label: yr, value: wc });
+      } else {
+        rows.push({ year: yr, display: '\u2014' });
+      }
+    }
+    rows.reverse();
+    if (rows.length === 0) return null;
+    return {
+      rows,
+      sparkline: computeSparkline(sparkData, { yAxisFormat: 'currency' })
+    };
+  });
 
   sparklineData = computed(() => {
     const rows = this.arRevenueRows();

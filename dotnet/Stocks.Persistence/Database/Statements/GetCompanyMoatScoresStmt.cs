@@ -93,7 +93,7 @@ SELECT company_id, cik, company_name, ticker, exchange,
     COUNT(*) OVER() AS total_count
 FROM company_moat_scores
 {whereClause}
-ORDER BY {orderColumn} {direction} {nullsPosition}, company_id ASC
+ORDER BY {orderColumn} {direction} {nullsPosition}, computable_checks DESC, company_id ASC
 LIMIT @limit OFFSET @offset";
     }
 

@@ -20,7 +20,7 @@ import {
       <span class="sep">/</span>
       <a [routerLink]="['/company', cik]">{{ cik }}</a>
       <span class="sep">/</span>
-      <span>Value Score</span>
+      <span>Graham Score</span>
     </nav>
 
     @if (company()) {

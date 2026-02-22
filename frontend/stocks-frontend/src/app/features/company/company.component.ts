@@ -33,7 +33,7 @@ import {
           </div>
         }
         <div class="company-links">
-          <a [routerLink]="['/company', cik, 'scoring']" class="scoring-link">Value Score</a>
+          <a [routerLink]="['/company', cik, 'scoring']" class="scoring-link">Graham Score</a>
           @if (company()!.tickers.length > 0) {
             <a class="external-link" [href]="'https://finance.yahoo.com/quote/' + company()!.tickers[0].ticker" target="_blank" rel="noopener">Yahoo Finance</a>
             <a class="external-link" [href]="'https://www.google.com/finance/quote/' + company()!.tickers[0].ticker + ':' + company()!.tickers[0].exchange" target="_blank" rel="noopener">Google Finance</a>

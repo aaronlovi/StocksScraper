@@ -64,6 +64,13 @@ export function computeSparkline(
     niceMin = Math.floor(rawMin / tickStep) * tickStep;
     niceMax = Math.ceil(rawMax / tickStep) * tickStep;
     if (niceMin === niceMax) niceMax = niceMin + tickStep;
+
+    // Force percent Y-axis to include zero for honest representation
+    if (niceMin >= 0) {
+      niceMin = 0;
+    } else {
+      niceMin = -100;
+    }
   }
 
   const rangeV = niceMax - niceMin;

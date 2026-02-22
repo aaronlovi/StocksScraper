@@ -16,13 +16,13 @@ export const routes: Routes = [
   },
   {
     path: 'scores',
-    title: 'Stocks - Scores',
+    title: 'Stocks - Graham Scores',
     loadComponent: () =>
       import('./features/scores-report/scores-report.component').then(m => m.ScoresReportComponent)
   },
   {
     path: 'moat-scores',
-    title: 'Stocks - Moat Scores',
+    title: 'Stocks - Buffett Scores',
     loadComponent: () =>
       import('./features/moat-scores-report/moat-scores-report.component').then(m => m.MoatScoresReportComponent)
   },
@@ -38,7 +38,7 @@ export const routes: Routes = [
   },
   {
     path: 'company/:cik/moat-scoring',
-    title: 'Stocks - Moat Score',
+    title: 'Stocks - Buffett Score',
     loadComponent: () =>
       import('./features/moat-scoring/moat-scoring.component').then(m => m.MoatScoringComponent)
   },

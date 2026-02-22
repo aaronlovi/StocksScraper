@@ -12,7 +12,7 @@ import {
   standalone: true,
   imports: [RouterLink, FormsModule],
   template: `
-    <h2>Company Scores Report</h2>
+    <h2>Company Graham Scores Report</h2>
 
     <div class="filters">
       <label>

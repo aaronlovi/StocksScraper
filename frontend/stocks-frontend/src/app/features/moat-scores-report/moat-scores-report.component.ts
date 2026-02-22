@@ -12,7 +12,7 @@ import {
   standalone: true,
   imports: [RouterLink, FormsModule],
   template: `
-    <h2>Company Moat Scores Report</h2>
+    <h2>Company Buffett Scores Report</h2>
 
     <div class="filters">
       <label>
@@ -46,7 +46,7 @@ import {
     </div>
 
     @if (loading()) {
-      <p>Loading moat scores...</p>
+      <p>Loading Buffett scores...</p>
     } @else if (error()) {
       <p class="error">{{ error() }}</p>
     } @else if (items().length === 0) {
@@ -62,6 +62,7 @@ import {
             <th>Ticker</th>
             <th>Exchange</th>
             <th class="num">Price</th>
+            <th class="num">Market Cap</th>
             <th class="num sortable" (click)="toggleSort('averageGrossMargin')">
               Gross Margin {{ sortIndicator('averageGrossMargin') }}
             </th>
@@ -96,6 +97,7 @@ import {
               <td>{{ row.ticker ?? '' }}</td>
               <td>{{ row.exchange ?? '' }}</td>
               <td class="num">{{ fmtPrice(row.pricePerShare) }}</td>
+              <td class="num">{{ fmtMarketCap(row.pricePerShare, row.sharesOutstanding) }}</td>
               <td class="num">{{ fmtPct(row.averageGrossMargin) }}</td>
               <td class="num">{{ fmtPct(row.averageOperatingMargin) }}</td>
               <td class="num">{{ fmtPct(row.averageRoeCF) }}</td>
@@ -266,14 +268,29 @@ export class MoatScoresReportComponent implements OnInit {
   }
 
   rowHighlightClass(score: number, computableChecks: number): string {
-    if (score === computableChecks && computableChecks === 13) return 'row-perfect';
-    if (score === computableChecks - 1 && computableChecks === 13) return 'row-near-perfect';
+    if (score === computableChecks) return 'row-perfect';
+    if (score === computableChecks - 1) return 'row-near-perfect';
     return '';
   }
 
   fmtPrice(val: number | null): string {
     if (val == null) return '';
     return '$' + val.toFixed(2);
+  }
+
+  fmtMarketCap(price: number | null, shares: number | null): string {
+    if (price == null || shares == null) return '';
+    return this.fmtCurrency(price * shares);
+  }
+
+  fmtCurrency(val: number | null): string {
+    if (val == null) return '';
+    const sign = val < 0 ? '-' : '';
+    const abs = Math.abs(val);
+    if (abs >= 1_000_000_000_000) return sign + '$' + (abs / 1_000_000_000_000).toFixed(2) + 'T';
+    if (abs >= 1_000_000_000) return sign + '$' + (abs / 1_000_000_000).toFixed(2) + 'B';
+    if (abs >= 1_000_000) return sign + '$' + (abs / 1_000_000).toFixed(2) + 'M';
+    return sign + '$' + abs.toFixed(2);
   }
 
   fmtPct(val: number | null): string {
@@ -302,7 +319,7 @@ export class MoatScoresReportComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Failed to load moat scores report.');
+        this.error.set('Failed to load Buffett scores report.');
         this.loading.set(false);
       }
     });

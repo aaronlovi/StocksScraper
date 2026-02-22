@@ -21,7 +21,7 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
       <span class="sep">/</span>
       <a [routerLink]="['/company', cik]">{{ cik }}</a>
       <span class="sep">/</span>
-      <span>Moat Score</span>
+      <span>Buffett Score</span>
     </nav>
 
     @if (company()) {
@@ -51,7 +51,7 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
     }
 
     @if (loading()) {
-      <p>Loading moat scoring data...</p>
+      <p>Loading Buffett scoring data...</p>
     } @else if (error()) {
       <p class="error">{{ error() }}</p>
     } @else if (scoring()) {
@@ -454,7 +454,7 @@ export class MoatScoringComponent implements OnInit {
       next: data => {
         this.company.set(data);
         const ticker = data.tickers.length > 0 ? data.tickers[0].ticker : ('CIK ' + data.cik);
-        this.titleService.setTitle('Stocks - ' + ticker + ' Moat');
+        this.titleService.setTitle('Stocks - ' + ticker + ' Buffett');
       },
       error: () => {}
     });
@@ -465,7 +465,7 @@ export class MoatScoringComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Failed to load moat scoring data.');
+        this.error.set('Failed to load Buffett scoring data.');
         this.loading.set(false);
       }
     });

@@ -46,6 +46,7 @@ public class MoatScoringService {
     internal static readonly string[] InterestExpenseChain = [
         "InterestExpense",
         "InterestExpenseDebt",
+        "InterestExpenseNonoperating",
     ];
 
     // Combined concept names: all Value Score concepts + Moat-specific ones
@@ -64,6 +65,7 @@ public class MoatScoringService {
             "OperatingIncomeLoss",
             "InterestExpense",
             "InterestExpenseDebt",
+            "InterestExpenseNonoperating",
         };
 
         var combined = new HashSet<string>(ScoringService.AllConceptNames, StringComparer.Ordinal);

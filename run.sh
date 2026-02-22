@@ -40,7 +40,9 @@ display_menu() {
     echo ""
     printf "  %-${col1_w}s  %s\n" "--- Other ---"                 ""
     printf "  %-${col1_w}s  %s\n" "2) Print financial statement"  "7) Import inline XBRL shares"
-    printf "  %-${col1_w}s  %s\n" "8) Compute all scores"         "q) Exit"
+    printf "  %-${col1_w}s  %s\n" "8) Compute value scores"        "q) Exit"
+    printf "  %-${col1_w}s  %s\n" "9) Compute moat scores"         ""
+    printf "  %-${col1_w}s  %s\n" "10) Compute all scores (both)"  ""
     echo "========================================================================"
 }
 
@@ -189,13 +191,40 @@ while true; do
             popd > /dev/null
             ;;
         8)
-            echo "Computing all company scores..."
+            echo "Computing value scores..."
             pushd $WORKING_DIR > /dev/null
             dotnet run --project Stocks.EDGARScraper.csproj -- --compute-all-scores
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             fi
             popd > /dev/null
+            ;;
+        9)
+            echo "Computing moat scores..."
+            pushd $WORKING_DIR > /dev/null
+            dotnet run --project Stocks.EDGARScraper.csproj -- --compute-all-moat-scores
+            if [ $? -ne 0 ]; then
+                echo "The application failed to run. Check the output for errors."
+            fi
+            popd > /dev/null
+            ;;
+        10)
+            echo "Computing value scores..."
+            pushd $WORKING_DIR > /dev/null
+            dotnet run --project Stocks.EDGARScraper.csproj -- --compute-all-scores
+            if [ $? -ne 0 ]; then
+                echo "Value scores failed. Check the output for errors."
+                popd > /dev/null
+            else
+                popd > /dev/null
+                echo "Computing moat scores..."
+                pushd $WORKING_DIR > /dev/null
+                dotnet run --project Stocks.EDGARScraper.csproj -- --compute-all-moat-scores
+                if [ $? -ne 0 ]; then
+                    echo "Moat scores failed. Check the output for errors."
+                fi
+                popd > /dev/null
+            fi
             ;;
         q)
             echo "Exiting..."

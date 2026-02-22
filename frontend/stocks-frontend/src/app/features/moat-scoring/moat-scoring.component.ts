@@ -52,73 +52,88 @@ import { CompanyHeaderComponent, CompanyHeaderLink } from '../../shared/componen
         }
       </p>
 
-      <h3>Scorecard</h3>
-      <table class="scorecard-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Check</th>
-            <th>Value</th>
-            <th>Threshold</th>
-            <th class="result-cell">Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (check of scoring()!.scorecard; track check.checkNumber) {
-            <tr [class]="'check-' + check.result">
-              <td>{{ check.checkNumber }}</td>
-              <td>{{ check.name }}</td>
-              <td class="num">{{ formatValue(check.computedValue, check.threshold) }}</td>
-              <td>{{ check.threshold }}</td>
-              <td class="result-cell">
-                @if (check.result === 'pass') {
-                  <span class="indicator pass">&#10003;</span>
-                } @else if (check.result === 'fail') {
-                  <span class="indicator fail">&#10007;</span>
-                } @else {
-                  <span class="indicator na">&mdash;</span>
-                }
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-
-      <h3>Derived Metrics</h3>
-      <table class="metrics-table">
-        <tbody>
-          @for (m of metricRows(); track m.label) {
-            <tr>
-              <td class="metric-label">{{ m.label }}</td>
-              <td class="num">{{ m.display }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-
-      <!-- Trend Charts -->
-      @for (chart of trendCharts(); track chart.title) {
-        <h3>{{ chart.title }} <span class="info-icon" [attr.data-tooltip]="chart.tooltip">&#9432;</span></h3>
-        <div class="trend-content">
-          <table class="trend-table">
+      <div class="scorecard-layout">
+        <div>
+          <h3>Scorecard</h3>
+          <table class="scorecard-table">
             <thead>
               <tr>
-                <th>Year</th>
-                <th class="num">{{ chart.columnHeader }}</th>
+                <th>#</th>
+                <th>Check</th>
+                <th>Value</th>
+                <th>Threshold</th>
+                <th class="result-cell">Result</th>
               </tr>
             </thead>
             <tbody>
-              @for (row of chart.rows; track row.label) {
-                <tr>
-                  <td>{{ row.label }}</td>
-                  <td class="num">{{ row.display }}</td>
+              @for (check of scoring()!.scorecard; track check.checkNumber) {
+                <tr [class]="'check-' + check.result">
+                  <td>{{ check.checkNumber }}</td>
+                  <td>{{ check.name }}</td>
+                  <td class="num">{{ formatValue(check.computedValue, check.threshold) }}</td>
+                  <td>{{ check.threshold }}</td>
+                  <td class="result-cell">
+                    @if (check.result === 'pass') {
+                      <span class="indicator pass">&#10003;</span>
+                    } @else if (check.result === 'fail') {
+                      <span class="indicator fail">&#10007;</span>
+                    } @else {
+                      <span class="indicator na">&mdash;</span>
+                    }
+                  </td>
                 </tr>
               }
             </tbody>
           </table>
-          <app-sparkline-chart [data]="chart.sparkline" [formatTooltip]="chart.formatTooltip" />
         </div>
-      }
+        <div>
+          <h3>Derived Metrics</h3>
+          <table class="metrics-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th class="num">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of metricRows(); track m.label) {
+                <tr>
+                  <td>{{ m.label }}</td>
+                  <td class="num">{{ m.display }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Trend Charts -->
+      <div class="trends-grid">
+        @for (chart of trendCharts(); track chart.title) {
+          <div class="trend-cell">
+            <h3>{{ chart.title }} <span class="info-icon" [attr.data-tooltip]="chart.tooltip">&#9432;</span></h3>
+            <div class="trend-content">
+              <table class="trend-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th class="num">{{ chart.columnHeader }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of chart.rows; track row.label) {
+                    <tr>
+                      <td>{{ row.label }}</td>
+                      <td class="num">{{ row.display }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              <app-sparkline-chart [data]="chart.sparkline" [formatTooltip]="chart.formatTooltip" />
+            </div>
+          </div>
+        }
+      </div>
 
       @if (yearKeys().length > 0) {
         <h3>Raw Data</h3>
@@ -192,11 +207,22 @@ import { CompanyHeaderComponent, CompanyHeaderLink } from '../../shared/componen
     .indicator.pass { color: #16a34a; font-weight: 700; }
     .indicator.fail { color: #dc2626; font-weight: 700; }
     .indicator.na { color: #94a3b8; }
-    .metrics-table { max-width: 500px; }
-    .metric-label { font-weight: 500; }
+    .scorecard-layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 72px;
+    }
+    .scorecard-table { width: auto; }
+    .metrics-table { width: auto; }
+    .metrics-table tbody tr:hover { background: #f1f5f9; }
     .raw-table { font-size: 12px; }
     .raw-table th { font-size: 11px; text-transform: uppercase; }
     .error { color: #dc2626; }
+    .trends-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 48px;
+    }
     .trend-content {
       display: flex;
       align-items: flex-start;
@@ -204,7 +230,9 @@ import { CompanyHeaderComponent, CompanyHeaderLink } from '../../shared/componen
     }
     .trend-table {
       width: auto;
-      min-width: 200px;
+    }
+    .trend-table td, .trend-table th {
+      padding: 4px 8px;
     }
     .trend-table .num {
       text-align: right;

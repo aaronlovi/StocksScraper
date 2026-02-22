@@ -52,99 +52,116 @@ import { CompanyHeaderComponent, CompanyHeaderLink } from '../../shared/componen
         }
       </p>
 
-      <h3>Scorecard</h3>
-      <table class="scorecard-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Check</th>
-            <th>Value</th>
-            <th>Threshold</th>
-            <th class="result-cell">Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (check of scoring()!.scorecard; track check.checkNumber) {
-            <tr [class]="'check-' + check.result">
-              <td>{{ check.checkNumber }}</td>
-              <td>{{ check.name }}</td>
-              <td class="num">{{ formatValue(check.computedValue, check.threshold) }}</td>
-              <td>{{ check.threshold }}</td>
-              <td class="result-cell">
-                @if (check.result === 'pass') {
-                  <span class="indicator pass">&#10003;</span>
-                } @else if (check.result === 'fail') {
-                  <span class="indicator fail">&#10007;</span>
-                } @else {
-                  <span class="indicator na">&mdash;</span>
-                }
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-
-      <h3>Derived Metrics</h3>
-      <table class="metrics-table">
-        <tbody>
-          @for (m of metricRows(); track m.label) {
-            <tr>
-              <td class="metric-label">{{ m.label }}</td>
-              <td class="num">{{ m.display }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-
-      @if (arRevenueRows().length > 0) {
-        <h3>AR / Revenue Trend <span class="info-icon" data-tooltip="Accounts Receivable as a percentage of Revenue. Rising AR/Revenue may indicate customers are slower to pay or aggressive revenue recognition.">&#9432;</span></h3>
-        <div class="ar-revenue-content">
-          <table class="ar-revenue-table">
+      <div class="scorecard-layout">
+        <div>
+          <h3>Scorecard</h3>
+          <table class="scorecard-table">
             <thead>
               <tr>
-                <th>Year</th>
-                <th class="num">AR</th>
-                <th class="num">Revenue</th>
-                <th class="num">AR / Revenue</th>
+                <th>#</th>
+                <th>Check</th>
+                <th>Value</th>
+                <th>Threshold</th>
+                <th class="result-cell">Result</th>
               </tr>
             </thead>
             <tbody>
-              @for (row of arRevenueRows(); track row.year) {
-                <tr>
-                  <td>{{ row.year }}</td>
-                  <td class="num">{{ row.accountsReceivable != null ? formatAbbrev(row.accountsReceivable) : '—' }}</td>
-                  <td class="num">{{ row.revenue != null ? formatAbbrev(row.revenue) : '—' }}</td>
-                  <td class="num">{{ row.ratio != null ? formatArPct(row.ratio) : '—' }}</td>
+              @for (check of scoring()!.scorecard; track check.checkNumber) {
+                <tr [class]="'check-' + check.result">
+                  <td>{{ check.checkNumber }}</td>
+                  <td>{{ check.name }}</td>
+                  <td class="num">{{ formatValue(check.computedValue, check.threshold) }}</td>
+                  <td>{{ check.threshold }}</td>
+                  <td class="result-cell">
+                    @if (check.result === 'pass') {
+                      <span class="indicator pass">&#10003;</span>
+                    } @else if (check.result === 'fail') {
+                      <span class="indicator fail">&#10007;</span>
+                    } @else {
+                      <span class="indicator na">&mdash;</span>
+                    }
+                  </td>
                 </tr>
               }
             </tbody>
           </table>
-          <app-sparkline-chart [data]="sparklineData()" [formatTooltip]="formatArPctTooltip" />
         </div>
-      }
-
-      @if (workingCapital()) {
-        <h3>{{ workingCapital()!.label }} Trend <span class="info-icon" [attr.data-tooltip]="workingCapital()!.tooltip">&#9432;</span></h3>
-        <div class="ar-revenue-content">
-          <table class="ar-revenue-table">
+        <div>
+          <h3>Derived Metrics</h3>
+          <table class="metrics-table">
             <thead>
               <tr>
-                <th>Year</th>
-                <th class="num">{{ workingCapital()!.label }}</th>
+                <th>Metric</th>
+                <th class="num">Value</th>
               </tr>
             </thead>
             <tbody>
-              @for (row of workingCapital()!.rows; track row.year) {
+              @for (m of metricRows(); track m.label) {
                 <tr>
-                  <td>{{ row.year }}</td>
-                  <td class="num">{{ row.display }}</td>
+                  <td>{{ m.label }}</td>
+                  <td class="num">{{ m.display }}</td>
                 </tr>
               }
             </tbody>
           </table>
-          <app-sparkline-chart [data]="workingCapital()!.sparkline" [formatTooltip]="formatAbbrevTooltip" />
         </div>
-      }
+      </div>
+
+      <div class="trends-grid">
+        @if (arRevenueRows().length > 0) {
+          <div class="trend-cell">
+            <h3>AR / Revenue Trend <span class="info-icon" data-tooltip="Accounts Receivable as a percentage of Revenue. Rising AR/Revenue may indicate customers are slower to pay or aggressive revenue recognition.">&#9432;</span></h3>
+            <div class="ar-revenue-content">
+              <table class="ar-revenue-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th class="num">AR</th>
+                    <th class="num">Revenue</th>
+                    <th class="num">AR / Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of arRevenueRows(); track row.year) {
+                    <tr>
+                      <td>{{ row.year }}</td>
+                      <td class="num">{{ row.accountsReceivable != null ? formatAbbrev(row.accountsReceivable) : '—' }}</td>
+                      <td class="num">{{ row.revenue != null ? formatAbbrev(row.revenue) : '—' }}</td>
+                      <td class="num">{{ row.ratio != null ? formatArPct(row.ratio) : '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              <app-sparkline-chart [data]="sparklineData()" [formatTooltip]="formatArPctTooltip" />
+            </div>
+          </div>
+        }
+
+        @if (workingCapital()) {
+          <div class="trend-cell">
+            <h3>{{ workingCapital()!.label }} Trend <span class="info-icon" [attr.data-tooltip]="workingCapital()!.tooltip">&#9432;</span></h3>
+            <div class="ar-revenue-content">
+              <table class="ar-revenue-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th class="num">{{ workingCapital()!.label }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of workingCapital()!.rows; track row.year) {
+                    <tr>
+                      <td>{{ row.year }}</td>
+                      <td class="num">{{ row.display }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              <app-sparkline-chart [data]="workingCapital()!.sparkline" [formatTooltip]="formatAbbrevTooltip" />
+            </div>
+          </div>
+        }
+      </div>
 
       @if (yearKeys().length > 0) {
         <h3>Raw Data</h3>
@@ -218,11 +235,22 @@ import { CompanyHeaderComponent, CompanyHeaderLink } from '../../shared/componen
     .indicator.pass { color: #16a34a; font-weight: 700; }
     .indicator.fail { color: #dc2626; font-weight: 700; }
     .indicator.na { color: #94a3b8; }
-    .metrics-table { max-width: 500px; }
-    .metric-label { font-weight: 500; }
+    .scorecard-layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 72px;
+    }
+    .scorecard-table { width: auto; }
+    .metrics-table { width: auto; }
+    .metrics-table tbody tr:hover { background: #f1f5f9; }
     .raw-table { font-size: 12px; }
     .raw-table th { font-size: 11px; text-transform: uppercase; }
     .error { color: #dc2626; }
+    .trends-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 48px;
+    }
     .ar-revenue-content {
       display: flex;
       align-items: flex-start;
@@ -230,7 +258,9 @@ import { CompanyHeaderComponent, CompanyHeaderLink } from '../../shared/componen
     }
     .ar-revenue-table {
       width: auto;
-      min-width: 400px;
+    }
+    .ar-revenue-table td, .ar-revenue-table th {
+      padding: 4px 8px;
     }
     .ar-revenue-table .num {
       text-align: right;

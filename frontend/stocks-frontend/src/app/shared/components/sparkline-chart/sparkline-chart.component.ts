@@ -84,7 +84,7 @@ function pctClass(start: number, end: number): string {
       flex-shrink: 0;
     }
     .sparkline-container {
-      width: 300px;
+      width: 360px;
       padding-top: 8px;
     }
     .sparkline-svg {

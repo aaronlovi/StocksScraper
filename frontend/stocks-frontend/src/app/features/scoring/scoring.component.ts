@@ -85,7 +85,7 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
             <th>Check</th>
             <th>Value</th>
             <th>Threshold</th>
-            <th>Result</th>
+            <th class="result-cell">Result</th>
           </tr>
         </thead>
         <tbody>
@@ -367,6 +367,7 @@ import { computeSparkline, SparklineData } from '../../shared/sparkline.utils';
     .scorecard-table .check-pass { background: #f0fdf4; }
     .scorecard-table .check-fail { background: #fef2f2; }
     .scorecard-table .check-na { background: #f8fafc; }
+    .scorecard-table tbody tr:hover { filter: brightness(0.95); }
     .result-cell { text-align: center; }
     .indicator.pass { color: #16a34a; font-weight: 700; }
     .indicator.fail { color: #dc2626; font-weight: 700; }

@@ -22,7 +22,7 @@
   <p class="score-caption">
     {{ s.yearsOfData }} year{{ s.yearsOfData === 1 ? '' : 's' }} of data
     @if (s.pricePerShare != null) {
-      &middot; Price: \${{ s.pricePerShare! | number:'1.2-2' }}
+      &middot; Price: ${{ s.pricePerShare! | number:'1.2-2' }}
       @if (s.priceDate) {
         ({{ s.priceDate }})
       }

@@ -5,20 +5,18 @@ namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class DropAllTablesStmt : NonQueryDbStmtBase {
     private const string sql = @"
-DROP TABLE IF EXISTS changelog;
-DROP TABLE IF EXISTS companies;
-DROP TABLE IF EXISTS company_names;
-DROP TABLE IF EXISTS data_point_units;
-DROP TABLE IF EXISTS data_points;
-DROP TABLE IF EXISTS filing_categories;
-DROP TABLE IF EXISTS filing_types;
-DROP TABLE IF EXISTS generator;
-DROP TABLE IF EXISTS submissions;
-DROP TABLE IF EXISTS taxonomy_period_types;
-DROP TABLE IF EXISTS taxonomy_balance_types;
-DROP TABLE IF EXISTS taxonomy_types;
-DROP TABLE IF EXISTS taxonomy_concepts;
-DROP TABLE IF EXISTS taxonomy_presentation;
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = current_schema()
+    LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END $$;
 ";
 
     public DropAllTablesStmt() : base(sql, nameof(DropAllTablesStmt)) { }

@@ -1,0 +1,6 @@
+.page-subtitle {
+  margin: -0.5rem 0 1rem;
+  color: var(--text-muted, #666);
+  font-size: 0.9rem;
+  max-width: 60ch;
+}

@@ -253,6 +253,62 @@ export interface ReturnsReportParams {
   exchange: string | null;
 }
 
+export interface SnapshotReturnsParams {
+  asOfDate: string;
+  page: number;
+  pageSize: number;
+  sortBy: string;
+  sortDir: string;
+  minScore: number | null;
+  exchange: string | null;
+}
+
+export interface GrahamBacktestConstituent {
+  companyId: number;
+  cik: string;
+  companyName: string | null;
+  ticker: string | null;
+  exchange: string | null;
+  startPrice: number | null;
+  startPriceDate: string | null;
+  endPrice: number | null;
+  endPriceDate: string | null;
+  periodReturnPct: number | null;
+  entered: boolean;
+  left: boolean;
+}
+
+export interface GrahamBacktestPeriod {
+  startDate: string;
+  endDate: string;
+  constituentCount: number;
+  portfolioReturnPct: number;
+  cumulativeValue: number;
+  benchmarkReturnPct: number | null;
+  benchmarkCumulativeValue: number | null;
+  constituents: GrahamBacktestConstituent[];
+}
+
+export interface GrahamBacktestSummary {
+  firstDate: string;
+  lastDate: string;
+  periodCount: number;
+  averageConstituents: number;
+  totalReturnPct: number;
+  annualizedReturnPct: number | null;
+  finalValue: number;
+  benchmarkTotalReturnPct: number | null;
+  benchmarkAnnualizedReturnPct: number | null;
+  benchmarkFinalValue: number | null;
+  benchmarkTicker: string;
+  minScore: number;
+}
+
+export interface GrahamBacktestReport {
+  summary: GrahamBacktestSummary;
+  periods: GrahamBacktestPeriod[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   constructor(private http: HttpClient) {}
@@ -347,6 +403,30 @@ export class ApiService {
     return this.http.get<PaginatedResponse<CompanyScoreReturnSummary>>(
       `/api/reports/graham-returns?${parts.join('&')}`
     );
+  }
+
+  getGrahamSnapshotDates(): Observable<string[]> {
+    return this.http.get<string[]>(`/api/reports/graham-snapshot-dates`);
+  }
+
+  getGrahamSnapshotReturns(params: SnapshotReturnsParams): Observable<PaginatedResponse<CompanyScoreReturnSummary>> {
+    const parts: string[] = [
+      `asOfDate=${params.asOfDate}`,
+      `page=${params.page}`,
+      `pageSize=${params.pageSize}`,
+      `sortBy=${params.sortBy}`,
+      `sortDir=${params.sortDir}`
+    ];
+    if (params.minScore != null) parts.push(`minScore=${params.minScore}`);
+    if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
+    return this.http.get<PaginatedResponse<CompanyScoreReturnSummary>>(
+      `/api/reports/graham-snapshot?${parts.join('&')}`
+    );
+  }
+
+  getGrahamBacktest(minScore: number | null): Observable<GrahamBacktestReport> {
+    const suffix = minScore != null ? `?minScore=${minScore}` : '';
+    return this.http.get<GrahamBacktestReport>(`/api/reports/graham-backtest${suffix}`);
   }
 
   getBuffettReturns(params: ReturnsReportParams): Observable<PaginatedResponse<CompanyScoreReturnSummary>> {

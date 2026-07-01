@@ -444,6 +444,20 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
+    public async Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPointsAsOf(
+        string[] conceptNames, DateOnly asOfDate, CancellationToken ct) {
+        var stmt = new GetAllScoringDataPointsStmt(conceptNames, 5, asOfDate);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetAllScoringDataPointsAsOf success - AsOfDate: {AsOfDate}, Num results: {NumResults}",
+                asOfDate, stmt.Results.Count);
+            return Result<IReadOnlyCollection<BatchScoringConceptValue>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetAllScoringDataPointsAsOf failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<BatchScoringConceptValue>>.Failure(res);
+        }
+    }
+
     public async Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct) {
         var stmt = new GetAllLatestPricesStmt();
         DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
@@ -464,6 +478,19 @@ public sealed class DbmService : IDisposable, IDbmService {
             return Result<IReadOnlyCollection<LatestPrice>>.Success(stmt.Results);
         } else {
             _logger.LogWarning("GetAllPricesNearDate failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<LatestPrice>>.Failure(res);
+        }
+    }
+
+    public async Task<Result<IReadOnlyCollection<LatestPrice>>> GetPricesNearDateForTickers(
+        DateOnly targetDate, string[] tickers, CancellationToken ct) {
+        var stmt = new GetPricesNearDateForTickersStmt(targetDate, tickers);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetPricesNearDateForTickers success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<IReadOnlyCollection<LatestPrice>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetPricesNearDateForTickers failed with error {Error}", res.ErrorMessage);
             return Result<IReadOnlyCollection<LatestPrice>>.Failure(res);
         }
     }
@@ -499,6 +526,67 @@ public sealed class DbmService : IDisposable, IDbmService {
         } else {
             _logger.LogWarning("GetCompanyScores failed with error {Error}", res.ErrorMessage);
             return Result<PagedResults<CompanyScoreSummary>>.Failure(res);
+        }
+    }
+
+    public async Task<Result> DeleteGrahamScoreSnapshotsByDate(DateOnly asOfDate, CancellationToken ct) {
+        var stmt = new DeleteGrahamScoreSnapshotsByDateStmt(asOfDate);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("DeleteGrahamScoreSnapshotsByDate success - AsOfDate: {AsOfDate}", asOfDate);
+        else
+            _logger.LogError("DeleteGrahamScoreSnapshotsByDate failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result> BulkInsertGrahamScoreSnapshots(
+        DateOnly asOfDate, List<CompanyScoreSummary> scores, CancellationToken ct) {
+        var stmt = new BulkInsertGrahamScoreSnapshotsStmt(asOfDate, scores);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("BulkInsertGrahamScoreSnapshots success - AsOfDate: {AsOfDate}, Num scores: {NumScores}",
+                asOfDate, scores.Count);
+        else
+            _logger.LogError("BulkInsertGrahamScoreSnapshots failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result<IReadOnlyCollection<DateOnly>>> GetGrahamScoreSnapshotDates(CancellationToken ct) {
+        var stmt = new GetGrahamScoreSnapshotDatesStmt();
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetGrahamScoreSnapshotDates success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<IReadOnlyCollection<DateOnly>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetGrahamScoreSnapshotDates failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<DateOnly>>.Failure(res);
+        }
+    }
+
+    public async Task<Result<PagedResults<CompanyScoreSummary>>> GetGrahamScoreSnapshots(
+        DateOnly asOfDate, PaginationRequest pagination, ScoresFilter? filter, CancellationToken ct) {
+        var stmt = new GetGrahamScoreSnapshotsStmt(asOfDate, pagination, filter);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetGrahamScoreSnapshots success - AsOfDate: {AsOfDate}, Num results: {NumResults}",
+                asOfDate, stmt.Results.Count);
+            return Result<PagedResults<CompanyScoreSummary>>.Success(stmt.GetPagedResults());
+        } else {
+            _logger.LogWarning("GetGrahamScoreSnapshots failed with error {Error}", res.ErrorMessage);
+            return Result<PagedResults<CompanyScoreSummary>>.Failure(res);
+        }
+    }
+
+    public async Task<Result<IReadOnlyCollection<GrahamSnapshotConstituent>>> GetGrahamSnapshotConstituents(
+        int minScore, CancellationToken ct) {
+        var stmt = new GetGrahamSnapshotConstituentsStmt(minScore);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetGrahamSnapshotConstituents success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<IReadOnlyCollection<GrahamSnapshotConstituent>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetGrahamSnapshotConstituents failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<GrahamSnapshotConstituent>>.Failure(res);
         }
     }
 

@@ -39,6 +39,18 @@ export const routes: Routes = [
       import('./features/buffett-returns-report/buffett-returns-report.component').then(m => m.BuffettReturnsReportComponent)
   },
   {
+    path: 'graham-snapshot',
+    title: 'Stocks - Graham Snapshot',
+    loadComponent: () =>
+      import('./features/graham-snapshot-report/graham-snapshot-report.component').then(m => m.GrahamSnapshotReportComponent)
+  },
+  {
+    path: 'graham-backtest',
+    title: 'Stocks - Graham Backtest',
+    loadComponent: () =>
+      import('./features/graham-backtest-report/graham-backtest-report.component').then(m => m.GrahamBacktestReportComponent)
+  },
+  {
     path: 'company/:cik',
     loadComponent: () =>
       import('./features/company/company.component').then(m => m.CompanyComponent)

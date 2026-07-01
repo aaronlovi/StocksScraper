@@ -80,8 +80,14 @@ public interface IDbmService {
     // Batch scoring data with configurable year limit
     Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPoints(
         string[] conceptNames, int yearLimit, CancellationToken ct);
+
+    // Batch scoring data as of a historical date: only filings accepted by that date are used
+    Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPointsAsOf(
+        string[] conceptNames, DateOnly asOfDate, CancellationToken ct);
     Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct);
     Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllPricesNearDate(DateOnly targetDate, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<LatestPrice>>> GetPricesNearDateForTickers(
+        DateOnly targetDate, string[] tickers, CancellationToken ct);
 
     // Company scores persistence
     Task<Result> TruncateCompanyScores(CancellationToken ct);
@@ -89,6 +95,15 @@ public interface IDbmService {
     Task<Result<PagedResults<CompanyScoreSummary>>> GetCompanyScores(
         PaginationRequest pagination, ScoresSortBy sortBy, SortDirection sortDir,
         ScoresFilter? filter, CancellationToken ct);
+
+    // Graham score snapshots (point-in-time scores for backtesting)
+    Task<Result> DeleteGrahamScoreSnapshotsByDate(DateOnly asOfDate, CancellationToken ct);
+    Task<Result> BulkInsertGrahamScoreSnapshots(DateOnly asOfDate, List<CompanyScoreSummary> scores, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<DateOnly>>> GetGrahamScoreSnapshotDates(CancellationToken ct);
+    Task<Result<PagedResults<CompanyScoreSummary>>> GetGrahamScoreSnapshots(
+        DateOnly asOfDate, PaginationRequest pagination, ScoresFilter? filter, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<GrahamSnapshotConstituent>>> GetGrahamSnapshotConstituents(
+        int minScore, CancellationToken ct);
 
     // Company moat scores persistence
     Task<Result> TruncateCompanyMoatScores(CancellationToken ct);

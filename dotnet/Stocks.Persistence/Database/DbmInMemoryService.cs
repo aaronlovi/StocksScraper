@@ -216,6 +216,11 @@ public sealed class DbmInMemoryService : IDbmService {
         Task.FromResult(Result<IReadOnlyCollection<BatchScoringConceptValue>>.Success(
             _data.GetAllScoringDataPoints(conceptNames, yearLimit)));
 
+    public Task<Result<IReadOnlyCollection<BatchScoringConceptValue>>> GetAllScoringDataPointsAsOf(
+        string[] conceptNames, DateOnly asOfDate, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<BatchScoringConceptValue>>.Success(
+            _data.GetAllScoringDataPoints(conceptNames, 5, asOfDate)));
+
     public Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllLatestPrices(CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<LatestPrice>>.Success(
             _data.GetAllLatestPrices()));
@@ -223,6 +228,35 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<IReadOnlyCollection<LatestPrice>>> GetAllPricesNearDate(DateOnly targetDate, CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<LatestPrice>>.Success(
             _data.GetAllPricesNearDate(targetDate)));
+
+    public Task<Result<IReadOnlyCollection<LatestPrice>>> GetPricesNearDateForTickers(
+        DateOnly targetDate, string[] tickers, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<LatestPrice>>.Success(
+            _data.GetPricesNearDateForTickers(targetDate, tickers)));
+
+    public Task<Result> DeleteGrahamScoreSnapshotsByDate(DateOnly asOfDate, CancellationToken ct) {
+        _data.DeleteGrahamScoreSnapshotsByDate(asOfDate);
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result> BulkInsertGrahamScoreSnapshots(DateOnly asOfDate, List<CompanyScoreSummary> scores, CancellationToken ct) {
+        _data.AddGrahamScoreSnapshots(asOfDate, scores);
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result<IReadOnlyCollection<DateOnly>>> GetGrahamScoreSnapshotDates(CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<DateOnly>>.Success(
+            _data.GetGrahamScoreSnapshotDates()));
+
+    public Task<Result<PagedResults<CompanyScoreSummary>>> GetGrahamScoreSnapshots(
+        DateOnly asOfDate, PaginationRequest pagination, ScoresFilter? filter, CancellationToken ct) =>
+        Task.FromResult(Result<PagedResults<CompanyScoreSummary>>.Success(
+            _data.GetGrahamScoreSnapshotsPaged(asOfDate, pagination, filter)));
+
+    public Task<Result<IReadOnlyCollection<GrahamSnapshotConstituent>>> GetGrahamSnapshotConstituents(
+        int minScore, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<GrahamSnapshotConstituent>>.Success(
+            _data.GetGrahamSnapshotConstituents(minScore)));
 
     public Task<Result> TruncateCompanyScores(CancellationToken ct) {
         _data.TruncateCompanyScores();

@@ -1,0 +1,153 @@
+<h2>Graham Backtest</h2>
+<p class="page-subtitle">
+  Monthly-rebalanced simulation: at each month-end, buy every company that scored
+  {{ minScore }}/15 on that day (using only information available back then), hold one
+  month, then roll into the new list. Compared against SPY.
+</p>
+
+<div class="filters">
+  <label>
+    Min Score
+    <select [(ngModel)]="minScore" (ngModelChange)="onFilterChange()">
+      <option [ngValue]="15">15</option>
+      <option [ngValue]="14">14+</option>
+      <option [ngValue]="13">13+</option>
+    </select>
+  </label>
+</div>
+
+@if (loading()) {
+  <app-loading-overlay />
+} @else if (error()) {
+  <p class="error">{{ error() }}</p>
+} @else if (report(); as rpt) {
+  <div class="summary">
+    <h3>{{ rpt.summary.firstDate }} — {{ rpt.summary.lastDate }} · {{ rpt.summary.periodCount }} periods</h3>
+    <div class="summary-grid">
+      <div class="summary-item">
+        <span class="summary-label">Strategy Total Return</span>
+        <span class="summary-value" [class]="returnClass(rpt.summary.totalReturnPct)">{{ fmtReturn(rpt.summary.totalReturnPct) }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Strategy Annualized</span>
+        <span class="summary-value" [class]="returnClass(rpt.summary.annualizedReturnPct)">{{ fmtReturn(rpt.summary.annualizedReturnPct) }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">$1,000 → Strategy</span>
+        <span class="summary-value">{{ fmtInvested(rpt.summary.finalValue) }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">{{ rpt.summary.benchmarkTicker }} Total Return</span>
+        <span class="summary-value" [class]="returnClass(rpt.summary.benchmarkTotalReturnPct)">{{ fmtReturn(rpt.summary.benchmarkTotalReturnPct) }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">{{ rpt.summary.benchmarkTicker }} Annualized</span>
+        <span class="summary-value" [class]="returnClass(rpt.summary.benchmarkAnnualizedReturnPct)">{{ fmtReturn(rpt.summary.benchmarkAnnualizedReturnPct) }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">$1,000 → {{ rpt.summary.benchmarkTicker }}</span>
+        <span class="summary-value">{{ fmtInvested(rpt.summary.benchmarkFinalValue) }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Avg Holdings / Month</span>
+        <span class="summary-value">{{ rpt.summary.averageConstituents }}</span>
+      </div>
+    </div>
+  </div>
+
+  @if (chart(); as ch) {
+    <div class="chart-card">
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-swatch strategy"></span>Strategy</span>
+        @if (ch.benchmarkPoints) {
+          <span class="legend-item"><span class="legend-swatch benchmark"></span>{{ rpt.summary.benchmarkTicker }}</span>
+        }
+      </div>
+      <svg [attr.viewBox]="'0 0 ' + ch.width + ' ' + ch.height" preserveAspectRatio="xMidYMid meet" class="backtest-chart" role="img" aria-label="Cumulative value of $1,000: strategy vs benchmark">
+        @for (tick of ch.yTicks; track tick.label) {
+          <line [attr.x1]="60" [attr.x2]="ch.width - 16" [attr.y1]="tick.y" [attr.y2]="tick.y" class="grid-line" />
+          <text [attr.x]="54" [attr.y]="tick.y + 4" text-anchor="end" class="axis-label">{{ tick.label }}</text>
+        }
+        @if (ch.benchmarkPoints) {
+          <polyline [attr.points]="ch.benchmarkPoints" class="benchmark-line" />
+        }
+        <polyline [attr.points]="ch.strategyPoints" class="strategy-line" />
+        @for (lbl of ch.xLabels; track lbl.label) {
+          <text [attr.x]="lbl.x" [attr.y]="ch.height - 8" [attr.text-anchor]="lbl.anchor" class="axis-label">{{ lbl.label }}</text>
+        }
+      </svg>
+    </div>
+  }
+
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th>Period</th>
+        <th class="num">Holdings</th>
+        <th class="num">Return %</th>
+        <th class="num">$1,000 → Strategy</th>
+        <th class="num">SPY %</th>
+        <th class="num">$1,000 → SPY</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (period of rpt.periods; track period.startDate; let i = $index) {
+        <tr class="period-row" (click)="toggleExpand(i)">
+          <td class="expand-cell">{{ isExpanded(i) ? '▾' : '▸' }}</td>
+          <td>{{ period.startDate }} → {{ period.endDate }}</td>
+          <td class="num">{{ period.constituentCount }}</td>
+          <td class="num" [class]="returnClass(period.portfolioReturnPct)">{{ fmtReturn(period.portfolioReturnPct) }}</td>
+          <td class="num">{{ fmtInvested(period.cumulativeValue) }}</td>
+          <td class="num" [class]="returnClass(period.benchmarkReturnPct)">{{ fmtReturn(period.benchmarkReturnPct) }}</td>
+          <td class="num">{{ fmtInvested(period.benchmarkCumulativeValue) }}</td>
+        </tr>
+        @if (isExpanded(i)) {
+          <tr class="constituents-row">
+            <td colspan="7">
+              @if (period.constituents.length === 0) {
+                <p class="no-results">No companies qualified this month — the portfolio sat in cash.</p>
+              } @else {
+                <table class="constituents-table">
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Ticker</th>
+                      <th></th>
+                      <th class="num">Buy Price</th>
+                      <th class="num">Sell Price</th>
+                      <th class="num">Return %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (c of period.constituents; track c.companyId) {
+                      <tr>
+                        <td>
+                          <a [routerLink]="['/company', c.cik, 'scoring']" target="_blank">{{ c.companyName ?? ('CIK ' + c.cik) }}</a>
+                        </td>
+                        <td>{{ c.ticker ?? '' }}</td>
+                        <td class="badges">
+                          @if (c.entered) { <span class="flow-badge entered">new</span> }
+                          @if (c.left) { <span class="flow-badge left">out next</span> }
+                        </td>
+                        <td class="num">{{ fmtPrice(c.startPrice) }}</td>
+                        <td class="num">{{ fmtPrice(c.endPrice) }}</td>
+                        <td class="num" [class]="returnClass(c.periodReturnPct)">{{ fmtReturn(c.periodReturnPct) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+
+  <p class="computed-at">
+    Simulation assumes equal-weight buys at each month-end close, no trading costs or taxes.
+    Holdings without a newer price are carried flat. Survivorship and split effects may skew
+    older periods — treat this as a rough proof of concept, not investment advice.
+  </p>
+}

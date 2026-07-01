@@ -195,24 +195,38 @@ public class ScoringService {
 
     private static readonly Dictionary<string, TaxonomyBalanceTypes> EmptyBalanceTypes = new(StringComparer.Ordinal);
 
-    public async Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScores(CancellationToken ct) {
+    public Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScores(CancellationToken ct) =>
+        ComputeAllScoresCore(null, ct);
+
+    /// <summary>
+    /// Computes scores for all companies as of a historical date: only filings publicly
+    /// available (accepted) by that date, and the price at/just before that date, are used.
+    /// </summary>
+    public Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScoresAsOf(
+        DateOnly asOfDate, CancellationToken ct) =>
+        ComputeAllScoresCore(asOfDate, ct);
+
+    private async Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScoresCore(
+        DateOnly? asOfDate, CancellationToken ct) {
         // 1. Fetch all scoring data points in one query
-        _logger?.LogInformation("Fetching scoring data points...");
-        Result<IReadOnlyCollection<BatchScoringConceptValue>> dataResult =
-            await _dbmService.GetAllScoringDataPoints(AllConceptNames, ct);
+        _logger?.LogInformation("Fetching scoring data points (as of {AsOfDate})...", asOfDate?.ToString() ?? "now");
+        Result<IReadOnlyCollection<BatchScoringConceptValue>> dataResult = asOfDate.HasValue
+            ? await _dbmService.GetAllScoringDataPointsAsOf(AllConceptNames, asOfDate.Value, ct)
+            : await _dbmService.GetAllScoringDataPoints(AllConceptNames, ct);
         if (dataResult.IsFailure || dataResult.Value is null)
             return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch batch scoring data points.");
         _logger?.LogInformation("Fetched {Count} scoring data points", dataResult.Value.Count);
 
-        // 2. Fetch latest prices for all tickers
-        _logger?.LogInformation("Fetching latest prices...");
-        Result<IReadOnlyCollection<LatestPrice>> pricesResult =
-            await _dbmService.GetAllLatestPrices(ct);
+        // 2. Fetch prices for all tickers (latest, or at the as-of date)
+        _logger?.LogInformation("Fetching prices...");
+        Result<IReadOnlyCollection<LatestPrice>> pricesResult = asOfDate.HasValue
+            ? await _dbmService.GetAllPricesNearDate(asOfDate.Value, ct)
+            : await _dbmService.GetAllLatestPrices(ct);
         if (pricesResult.IsFailure || pricesResult.Value is null)
             return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
-                ErrorCodes.GenericError, "Failed to fetch latest prices.");
-        _logger?.LogInformation("Fetched {Count} latest prices", pricesResult.Value.Count);
+                ErrorCodes.GenericError, "Failed to fetch prices.");
+        _logger?.LogInformation("Fetched {Count} prices", pricesResult.Value.Count);
 
         // 3. Fetch company tickers (company_id → ticker)
         _logger?.LogInformation("Fetching company tickers...");

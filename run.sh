@@ -43,6 +43,7 @@ display_menu() {
     printf "  %-${col1_w}s  %s\n" "8) Compute value scores"        "q) Exit"
     printf "  %-${col1_w}s  %s\n" "9) Compute moat scores"         ""
     printf "  %-${col1_w}s  %s\n" "10) Compute all scores (both)"  ""
+    printf "  %-${col1_w}s  %s\n" "11) Compute score snapshots (backtest)" ""
     echo "========================================================================"
 }
 
@@ -225,6 +226,22 @@ while true; do
                 fi
                 popd > /dev/null
             fi
+            ;;
+        11)
+            DEFAULT_FROM=$(date -d "-5 years" +%Y-%m-01)
+            DEFAULT_TO=$(date +%F)
+            read -p "From date [$DEFAULT_FROM]: " SNAP_FROM
+            read -p "To date [$DEFAULT_TO]: " SNAP_TO
+            SNAP_FROM=${SNAP_FROM:-$DEFAULT_FROM}
+            SNAP_TO=${SNAP_TO:-$DEFAULT_TO}
+            echo "Computing Graham score snapshots at each month-end from $SNAP_FROM to $SNAP_TO..."
+            echo "(Run this LAST after reloading data: it needs EDGAR filings, tickers, prices, and inline XBRL shares.)"
+            pushd $WORKING_DIR > /dev/null
+            dotnet run --project Stocks.EDGARScraper.csproj -- --compute-score-snapshots --from "$SNAP_FROM" --to "$SNAP_TO"
+            if [ $? -ne 0 ]; then
+                echo "The application failed to run. Check the output for errors."
+            fi
+            popd > /dev/null
             ;;
         q)
             echo "Exiting..."

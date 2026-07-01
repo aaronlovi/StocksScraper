@@ -7,12 +7,20 @@ using Stocks.DataModels.Scoring;
 namespace Stocks.Persistence.Database.Statements;
 
 internal class GetAllScoringDataPointsStmt : QueryDbStmtBase {
-    private const string Sql = @"
+    // When an as-of cutoff is set, only submissions publicly available by that date
+    // (acceptance_datetime before the end of the as-of day) are eligible. This is what
+    // prevents look-ahead bias in historical score snapshots.
+    private static string BuildSql(bool hasAsOfCutoff) {
+        string cutoff = hasAsOfCutoff
+            ? " AND s.acceptance_datetime < @as_of_cutoff AND s.report_date <= @as_of_date"
+            : string.Empty;
+
+        return $@"
 WITH annual_ranked_dates AS (
     SELECT s.company_id, s.report_date,
            ROW_NUMBER() OVER (PARTITION BY s.company_id ORDER BY s.report_date DESC) AS rn
     FROM submissions s
-    WHERE s.filing_type = 1
+    WHERE s.filing_type = 1{cutoff}
       AND EXISTS (
           SELECT 1 FROM data_points dp2
           JOIN taxonomy_concepts tc2 ON dp2.taxonomy_concept_id = tc2.taxonomy_concept_id
@@ -25,7 +33,7 @@ latest_any_date AS (
     SELECT DISTINCT ON (s.company_id)
         s.company_id, s.report_date
     FROM submissions s
-    WHERE s.filing_type IN (1, 2)
+    WHERE s.filing_type IN (1, 2){cutoff}
       AND EXISTS (
           SELECT 1 FROM data_points dp2
           JOIN taxonomy_concepts tc2 ON dp2.taxonomy_concept_id = tc2.taxonomy_concept_id
@@ -47,12 +55,14 @@ FROM data_points dp
 JOIN taxonomy_concepts tc ON dp.taxonomy_concept_id = tc.taxonomy_concept_id
 JOIN submissions s ON dp.submission_id = s.submission_id AND dp.company_id = s.company_id
 JOIN eligible_dates ed ON ed.company_id = dp.company_id AND ed.report_date = s.report_date
-WHERE s.filing_type IN (1, 2)
+WHERE s.filing_type IN (1, 2){cutoff}
   AND tc.name = ANY(@concept_names)
 ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_date ASC";
+    }
 
     private readonly string[] _conceptNames;
     private readonly int _yearLimit;
+    private readonly DateOnly? _asOfDate;
     private readonly List<BatchScoringConceptValue> _results = [];
 
     private int _companyIdIndex = -1;
@@ -66,9 +76,13 @@ ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_dat
         : this(conceptNames, 5) { }
 
     public GetAllScoringDataPointsStmt(string[] conceptNames, int yearLimit)
-        : base(Sql, nameof(GetAllScoringDataPointsStmt)) {
+        : this(conceptNames, yearLimit, null) { }
+
+    public GetAllScoringDataPointsStmt(string[] conceptNames, int yearLimit, DateOnly? asOfDate)
+        : base(BuildSql(asOfDate.HasValue), nameof(GetAllScoringDataPointsStmt)) {
         _conceptNames = conceptNames;
         _yearLimit = yearLimit;
+        _asOfDate = asOfDate;
     }
 
     public IReadOnlyCollection<BatchScoringConceptValue> Results => _results;
@@ -87,11 +101,22 @@ ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_dat
 
     protected override void ClearResults() => _results.Clear();
 
-    protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() =>
-        [
+    protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() {
+        var parameters = new List<NpgsqlParameter> {
             new NpgsqlParameter("concept_names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = _conceptNames },
             new NpgsqlParameter<int>("year_limit", _yearLimit)
-        ];
+        };
+
+        if (_asOfDate.HasValue) {
+            // Anything accepted before the end of the as-of day (UTC) counts as public
+            DateTime cutoffUtc = DateTime.SpecifyKind(
+                _asOfDate.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            parameters.Add(new NpgsqlParameter<DateTime>("as_of_cutoff", cutoffUtc) { NpgsqlDbType = NpgsqlDbType.TimestampTz });
+            parameters.Add(new NpgsqlParameter<DateTime>("as_of_date", _asOfDate.Value.ToDateTime(TimeOnly.MinValue)) { NpgsqlDbType = NpgsqlDbType.Date });
+        }
+
+        return parameters;
+    }
 
     protected override bool ProcessCurrentRow(NpgsqlDataReader reader) {
         var value = new BatchScoringConceptValue(

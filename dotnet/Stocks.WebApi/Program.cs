@@ -23,6 +23,7 @@ public class Program {
             _ = builder.Services.AddSingleton<ScoringService>();
             _ = builder.Services.AddSingleton<MoatScoringService>();
             _ = builder.Services.AddSingleton<InvestmentReturnReportService>();
+            _ = builder.Services.AddSingleton<GrahamBacktestService>();
             _ = builder.Services.AddSingleton<TypeaheadTrieService>();
             _ = builder.Services.AddHostedService(sp => sp.GetRequiredService<TypeaheadTrieService>());
         }
@@ -53,6 +54,7 @@ public class Program {
         app.MapMoatScoringEndpoints();
         app.MapMoatReportEndpoints();
         app.MapGrahamReturnsEndpoints();
+        app.MapGrahamBacktestEndpoints();
         app.MapBuffettReturnsEndpoints();
 
         app.Run();

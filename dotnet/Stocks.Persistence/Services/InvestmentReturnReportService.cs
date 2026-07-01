@@ -34,6 +34,27 @@ public sealed class InvestmentReturnReportService {
         return await BuildReturnResults(scoresResult.Value.Items, startDate, pagination, sortBy, sortDir, ct);
     }
 
+    /// <summary>
+    /// Point-in-time report: companies from the stored snapshot at asOfDate, enriched
+    /// with their price return from that date until today.
+    /// </summary>
+    public async Task<Result<PagedResults<CompanyScoreReturnSummary>>> GetGrahamSnapshotReturns(
+        DateOnly asOfDate, PaginationRequest pagination, ReturnsReportSortBy sortBy,
+        SortDirection sortDir, ReturnsReportFilter? filter, CancellationToken ct) {
+
+        ScoresFilter? scoresFilter = filter is not null
+            ? new ScoresFilter(filter.MinScore, filter.MaxScore, filter.Exchange)
+            : null;
+
+        var largePage = new PaginationRequest(1, 10000, 10000);
+        Result<PagedResults<CompanyScoreSummary>> scoresResult =
+            await _dbm.GetGrahamScoreSnapshots(asOfDate, largePage, scoresFilter, ct);
+        if (scoresResult.IsFailure || scoresResult.Value is null)
+            return Result<PagedResults<CompanyScoreReturnSummary>>.Failure(ErrorCodes.GenericError, scoresResult.ErrorMessage);
+
+        return await BuildReturnResults(scoresResult.Value.Items, asOfDate, pagination, sortBy, sortDir, ct);
+    }
+
     public async Task<Result<PagedResults<CompanyScoreReturnSummary>>> GetBuffettReturns(
         DateOnly startDate, PaginationRequest pagination, ReturnsReportSortBy sortBy,
         SortDirection sortDir, ReturnsReportFilter? filter, CancellationToken ct) {

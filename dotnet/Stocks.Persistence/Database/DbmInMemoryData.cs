@@ -495,16 +495,21 @@ public sealed class DbmInMemoryData {
 
     // Batch scoring data points (all companies)
 
-    public IReadOnlyCollection<BatchScoringConceptValue> GetAllScoringDataPoints(string[] conceptNames, int yearLimit = 5) {
+    public IReadOnlyCollection<BatchScoringConceptValue> GetAllScoringDataPoints(
+        string[] conceptNames, int yearLimit = 5, DateOnly? asOfDate = null) {
         var conceptSet = new HashSet<string>(conceptNames, StringComparer.Ordinal);
         var results = new List<BatchScoringConceptValue>();
 
         lock (_mutex) {
-            // Build a lookup of submission_id → Submission for 10-K and 10-Q filings
+            // Build a lookup of submission_id → Submission for 10-K and 10-Q filings.
+            // With an as-of date, only submissions publicly available by that date qualify.
             var eligibleSubmissions = new Dictionary<ulong, Submission>();
             foreach (Submission s in _submissions) {
-                if (s.FilingType == FilingType.TenK || s.FilingType == FilingType.TenQ)
-                    eligibleSubmissions[s.SubmissionId] = s;
+                if (s.FilingType != FilingType.TenK && s.FilingType != FilingType.TenQ)
+                    continue;
+                if (asOfDate.HasValue && !IsPublicByDate(s, asOfDate.Value))
+                    continue;
+                eligibleSubmissions[s.SubmissionId] = s;
             }
 
             // Build taxonomy concept id → (name, balanceTypeId) lookup
@@ -630,6 +635,35 @@ public sealed class DbmInMemoryData {
         return results;
     }
 
+    public IReadOnlyCollection<LatestPrice> GetPricesNearDateForTickers(DateOnly targetDate, string[] tickers) {
+        var tickerSet = new HashSet<string>(tickers, StringComparer.OrdinalIgnoreCase);
+        var results = new List<LatestPrice>();
+        lock (_mutex) {
+            var nearestByTicker = new Dictionary<string, LatestPrice>(StringComparer.OrdinalIgnoreCase);
+            foreach (PriceRow price in _prices) {
+                if (price.PriceDate > targetDate)
+                    continue;
+                if (!tickerSet.Contains(price.Ticker))
+                    continue;
+                if (!nearestByTicker.TryGetValue(price.Ticker, out LatestPrice? existing) || price.PriceDate > existing.PriceDate)
+                    nearestByTicker[price.Ticker] = new LatestPrice(price.Ticker, price.Close, price.PriceDate);
+            }
+            foreach (var entry in nearestByTicker)
+                results.Add(entry.Value);
+        }
+        return results;
+    }
+
+    // Whether a filing was publicly available by the end of the given day
+    private static bool IsPublicByDate(Submission s, DateOnly asOfDate) {
+        if (s.ReportDate > asOfDate)
+            return false;
+        if (s.AcceptanceTime is null)
+            return false;
+        DateTime cutoff = asOfDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        return s.AcceptanceTime.Value < cutoff;
+    }
+
     // Data points by submission
 
     public IReadOnlyCollection<DataPoint> GetDataPointsForSubmission(ulong companyId, ulong submissionId) {
@@ -704,6 +738,97 @@ public sealed class DbmInMemoryData {
             var paginationResponse = new PaginationResponse(pagination.PageNumber, totalItems, totalPages);
             return new PagedResults<CompanyScoreSummary>(page, paginationResponse);
         }
+    }
+
+    // Graham score snapshots
+
+    private sealed record GrahamSnapshotRow(DateOnly AsOfDate, CompanyScoreSummary Score);
+
+    private readonly List<GrahamSnapshotRow> _grahamScoreSnapshots = [];
+
+    public void DeleteGrahamScoreSnapshotsByDate(DateOnly asOfDate) {
+        lock (_mutex)
+            _ = _grahamScoreSnapshots.RemoveAll(row => row.AsOfDate == asOfDate);
+    }
+
+    public void AddGrahamScoreSnapshots(DateOnly asOfDate, IReadOnlyCollection<CompanyScoreSummary> scores) {
+        lock (_mutex) {
+            foreach (CompanyScoreSummary score in scores)
+                _grahamScoreSnapshots.Add(new GrahamSnapshotRow(asOfDate, score));
+        }
+    }
+
+    public IReadOnlyCollection<DateOnly> GetGrahamScoreSnapshotDates() {
+        lock (_mutex) {
+            var dates = new SortedSet<DateOnly>();
+            foreach (GrahamSnapshotRow row in _grahamScoreSnapshots)
+                _ = dates.Add(row.AsOfDate);
+            return [.. dates];
+        }
+    }
+
+    public PagedResults<CompanyScoreSummary> GetGrahamScoreSnapshotsPaged(
+        DateOnly asOfDate, PaginationRequest pagination, ScoresFilter? filter) {
+        lock (_mutex) {
+            var filtered = new List<CompanyScoreSummary>();
+            foreach (GrahamSnapshotRow row in _grahamScoreSnapshots) {
+                if (row.AsOfDate != asOfDate)
+                    continue;
+                CompanyScoreSummary s = row.Score;
+                if (filter is not null) {
+                    if (filter.MinScore.HasValue && s.OverallScore < filter.MinScore.Value)
+                        continue;
+                    if (filter.MaxScore.HasValue && s.OverallScore > filter.MaxScore.Value)
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(filter.Exchange)
+                        && !string.Equals(s.Exchange, filter.Exchange, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
+                filtered.Add(s);
+            }
+
+            filtered.Sort((a, b) => {
+                int cmp = b.OverallScore.CompareTo(a.OverallScore);
+                if (cmp == 0)
+                    cmp = b.ComputableChecks.CompareTo(a.ComputableChecks);
+                if (cmp == 0)
+                    cmp = a.CompanyId.CompareTo(b.CompanyId);
+                return cmp;
+            });
+
+            uint totalItems = (uint)filtered.Count;
+            int offset = (int)((pagination.PageNumber - 1) * pagination.PageSize);
+            int limit = (int)pagination.PageSize;
+
+            var page = new List<CompanyScoreSummary>();
+            for (int i = offset; i < filtered.Count && page.Count < limit; i++)
+                page.Add(filtered[i]);
+
+            uint totalPages = totalItems == 0 ? 0 : (uint)Math.Ceiling(totalItems / (double)pagination.PageSize);
+            var paginationResponse = new PaginationResponse(pagination.PageNumber, totalItems, totalPages);
+            return new PagedResults<CompanyScoreSummary>(page, paginationResponse);
+        }
+    }
+
+    public IReadOnlyCollection<GrahamSnapshotConstituent> GetGrahamSnapshotConstituents(int minScore) {
+        var results = new List<GrahamSnapshotConstituent>();
+        lock (_mutex) {
+            foreach (GrahamSnapshotRow row in _grahamScoreSnapshots) {
+                CompanyScoreSummary s = row.Score;
+                if (s.OverallScore < minScore)
+                    continue;
+                results.Add(new GrahamSnapshotConstituent(
+                    row.AsOfDate, s.CompanyId, s.Cik, s.CompanyName, s.Ticker, s.Exchange,
+                    s.OverallScore, s.ComputableChecks, s.PricePerShare, s.PriceDate));
+            }
+        }
+        results.Sort((a, b) => {
+            int cmp = a.AsOfDate.CompareTo(b.AsOfDate);
+            if (cmp == 0)
+                cmp = a.CompanyId.CompareTo(b.CompanyId);
+            return cmp;
+        });
+        return results;
     }
 
     // Company moat scores

@@ -1,0 +1,149 @@
+<h2>Graham Snapshot</h2>
+<p class="page-subtitle">
+  Companies as scored on a past date — using only filings and prices available back then —
+  and how they have performed since.
+</p>
+
+<div class="filters">
+  <label>
+    Snapshot Date
+    <select [ngModel]="asOfDate" (ngModelChange)="onDateChange($event)">
+      @for (d of snapshotDates(); track d) {
+        <option [value]="d">{{ d }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    Min Score
+    <select [(ngModel)]="minScore" (ngModelChange)="onFilterChange()">
+      <option [ngValue]="null">Any</option>
+      <option [ngValue]="15">15</option>
+      <option [ngValue]="14">14+</option>
+      <option [ngValue]="13">13+</option>
+      <option [ngValue]="10">10+</option>
+    </select>
+  </label>
+  <label>
+    Exchange
+    <select [(ngModel)]="exchange" (ngModelChange)="onFilterChange()">
+      <option [ngValue]="null">All</option>
+      <option value="NASDAQ">NASDAQ</option>
+      <option value="NYSE">NYSE</option>
+      <option value="CBOE">CBOE</option>
+    </select>
+  </label>
+  <label>
+    Page Size
+    <select [(ngModel)]="pageSize" (ngModelChange)="onFilterChange()">
+      <option [ngValue]="25">25</option>
+      <option [ngValue]="50">50</option>
+      <option [ngValue]="100">100</option>
+    </select>
+  </label>
+</div>
+
+@if (loading()) {
+  <app-loading-overlay />
+} @else if (error()) {
+  <p class="error">{{ error() }}</p>
+} @else if (items().length === 0) {
+  <p class="no-results">No companies match the current filters.</p>
+} @else {
+  <table>
+    <thead>
+      <tr>
+        <th class="sortable" (click)="toggleSort('overallScore')">
+          Score {{ sort.indicator('overallScore') }}
+        </th>
+        <th>Company</th>
+        <th>Ticker</th>
+        <th>Exchange</th>
+        <th class="num">Price Then</th>
+        <th class="num">Price Now</th>
+        <th class="num sortable" (click)="toggleSort('totalReturnPct')">
+          Total Return % {{ sort.indicator('totalReturnPct') }}
+        </th>
+        <th class="num sortable" (click)="toggleSort('annualizedReturnPct')">
+          Annualized % {{ sort.indicator('annualizedReturnPct') }}
+        </th>
+        <th class="num sortable" (click)="toggleSort('currentValueOf1000')">
+          $1,000 Invested {{ sort.indicator('currentValueOf1000') }}
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of items(); track row.companyId) {
+        <tr [class]="rowHighlightClass(row.overallScore, row.computableChecks)">
+          <td>
+            <span class="score-badge" [class]="scoreBadgeClass(row.overallScore)">
+              {{ row.overallScore }}/{{ row.computableChecks }}
+            </span>
+          </td>
+          <td>
+            <a [routerLink]="['/company', row.cik, 'scoring']" target="_blank">{{ row.companyName ?? ('CIK ' + row.cik) }}</a>
+          </td>
+          <td>{{ row.ticker ?? '' }}</td>
+          <td>{{ row.exchange ?? '' }}</td>
+          <td class="num">{{ fmtPrice(row.startPrice ?? row.pricePerShare) }}</td>
+          <td class="num">{{ fmtPrice(row.endPrice) }}</td>
+          <td class="num" [class]="returnClass(row.totalReturnPct)">{{ fmtReturn(row.totalReturnPct) }}</td>
+          <td class="num" [class]="returnClass(row.annualizedReturnPct)">{{ fmtReturn(row.annualizedReturnPct) }}</td>
+          <td class="num">{{ fmtInvested(row.currentValueOf1000) }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  @if (summary()) {
+    @let sum = summary()!;
+    <div class="summary">
+      <h3>Summary</h3>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span class="summary-label">Companies with return data</span>
+          <span class="summary-value">{{ sum.count }} of {{ items().length }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Avg Total Return</span>
+          <span class="summary-value" [class]="returnClass(sum.avgTotalReturn)">{{ fmtReturn(sum.avgTotalReturn) }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Median Total Return</span>
+          <span class="summary-value" [class]="returnClass(sum.medianTotalReturn)">{{ fmtReturn(sum.medianTotalReturn) }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Avg Annualized Return</span>
+          <span class="summary-value" [class]="returnClass(sum.avgAnnualizedReturn)">{{ fmtReturn(sum.avgAnnualizedReturn) }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Avg $1,000 Invested</span>
+          <span class="summary-value">{{ fmtInvested(sum.avgValueOf1000) }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Best Performer</span>
+          <span class="summary-value positive">{{ sum.bestTicker }} ({{ fmtReturn(sum.bestReturn) }})</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Worst Performer</span>
+          <span class="summary-value negative">{{ sum.worstTicker }} ({{ fmtReturn(sum.worstReturn) }})</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">S&amp;P 500 Benchmark</span>
+          <span class="summary-value benchmark-links">
+            <a [href]="yahooFinanceUrl()" target="_blank" rel="noopener">Yahoo Finance</a>
+            <a [href]="googleFinanceUrl()" target="_blank" rel="noopener">Google Finance</a>
+          </span>
+        </div>
+      </div>
+    </div>
+  }
+
+  @let pg = pagination();
+  @if (pg) {
+    <app-pagination [page]="page()" [totalPages]="pg.totalPages" [totalItems]="pg.totalItems" (pageChange)="goToPage($event)" />
+  }
+
+  @if (computedAt()) {
+    <p class="computed-at">Snapshot computed: {{ computedAt() }}</p>
+  }
+}

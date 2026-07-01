@@ -194,6 +194,9 @@ internal partial class Program {
                 }
                 return 0;
             }
+            case "--compute-score-snapshots": {
+                return await HandleComputeScoreSnapshotsAsync(args);
+            }
             default: {
                 _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
                 return 3;
@@ -1001,6 +1004,113 @@ internal partial class Program {
 
         _logger.LogInformation("Successfully computed and stored {NumScores} company scores", scores.Count);
         return Result.Success;
+    }
+
+    private static async Task<int> HandleComputeScoreSnapshotsAsync(string[] args) {
+        DateOnly? from = null;
+        DateOnly? to = null;
+        bool showUsage = false;
+
+        for (int i = 1; i < args.Length; i++) {
+            switch (args[i]) {
+                case "--from": {
+                    if (i + 1 < args.Length && DateOnly.TryParse(args[++i], out DateOnly parsedFrom))
+                        from = parsedFrom;
+                    else
+                        showUsage = true;
+                    break;
+                }
+                case "--to": {
+                    if (i + 1 < args.Length && DateOnly.TryParse(args[++i], out DateOnly parsedTo))
+                        to = parsedTo;
+                    else
+                        showUsage = true;
+                    break;
+                }
+                default: {
+                    showUsage = true;
+                    break;
+                }
+            }
+        }
+
+        if (!from.HasValue || !to.HasValue || from.Value > to.Value)
+            showUsage = true;
+
+        if (showUsage) {
+            Console.Error.WriteLine("USAGE: dotnet run --compute-score-snapshots --from <YYYY-MM-DD> --to <YYYY-MM-DD>");
+            Console.Error.WriteLine("Computes point-in-time Graham scores at each month-end date in the range (inclusive).");
+            return 4;
+        }
+
+        Result res = await ComputeAndStoreScoreSnapshotsAsync(from!.Value, to!.Value);
+        if (res.IsFailure) {
+            _logger.LogError("ComputeScoreSnapshots failed: {Error}", res.ErrorMessage);
+            return 2;
+        }
+        return 0;
+    }
+
+    private static async Task<Result> ComputeAndStoreScoreSnapshotsAsync(DateOnly from, DateOnly to) {
+        var scoringService = new Stocks.Persistence.Services.ScoringService(_dbm!, _logger);
+        CancellationToken ct = CancellationToken.None;
+
+        // Enumerate month-end dates within [from, to]
+        var snapshotDates = new List<DateOnly>();
+        var cursor = new DateOnly(from.Year, from.Month, 1);
+        while (cursor <= to) {
+            var monthEnd = new DateOnly(cursor.Year, cursor.Month, DateTime.DaysInMonth(cursor.Year, cursor.Month));
+            if (monthEnd >= from && monthEnd <= to)
+                snapshotDates.Add(monthEnd);
+            cursor = cursor.AddMonths(1);
+        }
+
+        if (snapshotDates.Count == 0)
+            return Result.Failure(ErrorCodes.ValidationError, "No month-end dates in the given range.");
+
+        _logger.LogInformation("Computing score snapshots for {NumDates} month-end dates from {First} to {Last}",
+            snapshotDates.Count, snapshotDates[0], snapshotDates[snapshotDates.Count - 1]);
+
+        int succeeded = 0;
+        int failed = 0;
+        foreach (DateOnly asOfDate in snapshotDates) {
+            DateTime dateStart = DateTime.UtcNow;
+            _logger.LogInformation("Computing scores as of {AsOfDate}...", asOfDate);
+
+            Result<System.Collections.Generic.IReadOnlyCollection<Stocks.DataModels.Scoring.CompanyScoreSummary>> computeResult =
+                await scoringService.ComputeAllScoresAsOf(asOfDate, ct);
+            if (computeResult.IsFailure || computeResult.Value is null) {
+                _logger.LogError("Failed to compute scores as of {AsOfDate}: {Error}", asOfDate, computeResult.ErrorMessage);
+                failed++;
+                continue;
+            }
+
+            List<Stocks.DataModels.Scoring.CompanyScoreSummary> scores = new(computeResult.Value);
+
+            Result deleteResult = await _dbm!.DeleteGrahamScoreSnapshotsByDate(asOfDate, ct);
+            if (deleteResult.IsFailure) {
+                _logger.LogError("Failed to delete existing snapshot for {AsOfDate}: {Error}", asOfDate, deleteResult.ErrorMessage);
+                failed++;
+                continue;
+            }
+
+            Result insertResult = await _dbm.BulkInsertGrahamScoreSnapshots(asOfDate, scores, ct);
+            if (insertResult.IsFailure) {
+                _logger.LogError("Failed to insert snapshot for {AsOfDate}: {Error}", asOfDate, insertResult.ErrorMessage);
+                failed++;
+                continue;
+            }
+
+            succeeded++;
+            double seconds = (DateTime.UtcNow - dateStart).TotalSeconds;
+            _logger.LogInformation("Stored {NumScores} scores as of {AsOfDate} in {Seconds:F1}s ({Done}/{Total})",
+                scores.Count, asOfDate, seconds, succeeded + failed, snapshotDates.Count);
+        }
+
+        _logger.LogInformation("Score snapshot backfill complete: {Succeeded} succeeded, {Failed} failed", succeeded, failed);
+        return failed == 0
+            ? Result.Success
+            : Result.Failure(ErrorCodes.GenericError, $"{failed} of {snapshotDates.Count} snapshot dates failed.");
     }
 
     private static async Task<Result> ComputeAndStoreAllMoatScoresAsync() {

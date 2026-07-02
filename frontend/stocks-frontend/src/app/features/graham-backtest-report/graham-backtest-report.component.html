@@ -21,6 +21,7 @@
       <option [ngValue]="13">13+</option>
     </select>
   </label>
+  <button type="button" class="refresh-btn" (click)="refresh()" [disabled]="loading()">Refresh</button>
 </div>
 
 @if (loading()) {

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { GrahamBacktestReportComponent, buildBacktestChart } from './graham-backtest-report.component';
@@ -126,6 +126,51 @@ describe('GrahamBacktestReportComponent', () => {
 
     const error = fixture.nativeElement.querySelector('.error');
     expect(error?.textContent).toContain('Failed to load backtest report');
+  });
+
+  it('should refetch when the refresh button is clicked', () => {
+    const fixture = TestBed.createComponent(GrahamBacktestReportComponent);
+    fixture.detectChanges();
+    flushRequest();
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('.refresh-btn') as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+
+    flushRequest();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(false);
+  });
+
+  it('should restore the interval from query params', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [GrahamBacktestReportComponent],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { queryParamMap: convertToParamMap({ interval: 'weekly', minScore: '14' }) }
+          }
+        }
+      ]
+    }).compileComponents();
+    httpMock = TestBed.inject(HttpTestingController);
+
+    const fixture = TestBed.createComponent(GrahamBacktestReportComponent);
+    fixture.detectChanges();
+
+    const req = httpMock.expectOne(r =>
+      r.url.startsWith('/api/reports/graham-backtest') && r.url.includes('interval=weekly') && r.url.includes('minScore=14'));
+    req.flush(makeReport());
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.interval).toBe('weekly');
+    expect(fixture.componentInstance.minScore).toBe(14);
   });
 
   it('should show the backfill hint on 404', () => {

@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
   ApiService,
@@ -49,13 +49,34 @@ export class GrahamBacktestReportComponent implements OnInit {
   readonly fmtInvested = (val: number | null | undefined) => fmtInvestedFn(val, '');
   readonly returnClass = returnClassFn;
 
-  constructor(private api: ApiService) {}
+  constructor(
+    private api: ApiService,
+    private route: ActivatedRoute,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
+    const params = this.route.snapshot.queryParamMap;
+    if (params.get('interval') === 'weekly') {
+      this.interval = 'weekly';
+    }
+    const minScoreParam = Number(params.get('minScore'));
+    if (minScoreParam >= 13 && minScoreParam <= 15) {
+      this.minScore = minScoreParam;
+    }
     this.fetchBacktest();
   }
 
   onFilterChange(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { interval: this.interval, minScore: this.minScore },
+      replaceUrl: true
+    });
+    this.fetchBacktest();
+  }
+
+  refresh(): void {
     this.fetchBacktest();
   }
 

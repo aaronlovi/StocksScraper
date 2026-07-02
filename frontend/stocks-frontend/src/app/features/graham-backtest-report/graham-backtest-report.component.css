@@ -5,6 +5,28 @@
   max-width: 68ch;
 }
 
+.refresh-btn {
+  align-self: flex-end;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--accent, #1a5c6b);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent, #1a5c6b);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: var(--accent, #1a5c6b);
+  color: #fff;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .chart-card {
   background: var(--surface, #fff);
   border: 1px solid var(--border, #ddd);

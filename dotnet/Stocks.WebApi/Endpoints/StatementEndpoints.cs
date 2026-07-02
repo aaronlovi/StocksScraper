@@ -36,9 +36,9 @@ public static class StatementEndpoints {
 
                 int taxonomyYear = matchedSub.ReportDate.Year;
                 Result<TaxonomyTypeInfo> taxResult =
-                    await dbm.GetTaxonomyTypeByNameVersion("us-gaap", taxonomyYear, ct);
+                    await dbm.GetTaxonomyTypeByNameVersionAtOrBefore("us-gaap", taxonomyYear, ct);
                 if (taxResult.IsFailure)
-                    return Results.NotFound(new { error = $"No taxonomy found for year {taxonomyYear}." });
+                    return Results.NotFound(new { error = $"No taxonomy found for year {taxonomyYear} or earlier." });
 
                 Result<IReadOnlyCollection<StatementListItem>> listResult =
                     await sds.ListStatementsForSubmission(
@@ -78,9 +78,9 @@ public static class StatementEndpoints {
 
                 int resolvedTaxYear = taxonomyYear ?? matchedSub.ReportDate.Year;
                 Result<TaxonomyTypeInfo> taxResult =
-                    await dbm.GetTaxonomyTypeByNameVersion("us-gaap", resolvedTaxYear, ct);
+                    await dbm.GetTaxonomyTypeByNameVersionAtOrBefore("us-gaap", resolvedTaxYear, ct);
                 if (taxResult.IsFailure)
-                    return Results.NotFound(new { error = $"No taxonomy found for year {resolvedTaxYear}." });
+                    return Results.NotFound(new { error = $"No taxonomy found for year {resolvedTaxYear} or earlier." });
 
                 int taxonomyTypeId = taxResult.Value!.TaxonomyTypeId;
                 int depth = maxDepth ?? 10;

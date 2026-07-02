@@ -640,6 +640,20 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
+    public async Task<Result<TaxonomyTypeInfo>> GetTaxonomyTypeByNameVersionAtOrBefore(string name, int version, CancellationToken ct) {
+        var stmt = new GetTaxonomyTypeByNameVersionAtOrBeforeStmt(name, version);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess && stmt.TaxonomyType is not null) {
+            _logger.LogInformation("GetTaxonomyTypeByNameVersionAtOrBefore success - Name: {Name}, Requested: {Version}, Resolved: {Resolved}",
+                name, version, stmt.TaxonomyType.TaxonomyTypeVersion);
+            return Result<TaxonomyTypeInfo>.Success(stmt.TaxonomyType);
+        } else {
+            string error = res.IsFailure ? res.ErrorMessage : "Taxonomy type not found";
+            _logger.LogWarning("GetTaxonomyTypeByNameVersionAtOrBefore failed - Name: {Name}, Version: {Version}, Error: {Error}", name, version, error);
+            return Result<TaxonomyTypeInfo>.Failure(ErrorCodes.NotFound, error);
+        }
+    }
+
     public async Task<Result<TaxonomyTypeInfo>> EnsureTaxonomyType(string name, int version, CancellationToken ct) {
         Result<TaxonomyTypeInfo> existing = await GetTaxonomyTypeByNameVersion(name, version, ct);
         if (existing.IsSuccess)

@@ -347,6 +347,22 @@ public sealed class DbmInMemoryData {
             return _taxonomyTypes.TryGetValue(key, out TaxonomyTypeInfo? value) ? value : null;
     }
 
+    public TaxonomyTypeInfo? GetTaxonomyTypeAtOrBefore(string name, int version) {
+        lock (_mutex) {
+            TaxonomyTypeInfo? best = null;
+            foreach (KeyValuePair<string, TaxonomyTypeInfo> entry in _taxonomyTypes) {
+                TaxonomyTypeInfo candidate = entry.Value;
+                if (!string.Equals(candidate.TaxonomyTypeName, name, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (candidate.TaxonomyTypeVersion > version)
+                    continue;
+                if (best is null || candidate.TaxonomyTypeVersion > best.TaxonomyTypeVersion)
+                    best = candidate;
+            }
+            return best;
+        }
+    }
+
     public TaxonomyTypeInfo AddTaxonomyType(string name, int version) {
         string key = BuildTaxonomyKey(name, version);
         lock (_mutex) {

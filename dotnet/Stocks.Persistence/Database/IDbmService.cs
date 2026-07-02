@@ -136,6 +136,10 @@ public interface IDbmService {
     // Taxonomy types
 
     Task<Result<TaxonomyTypeInfo>> GetTaxonomyTypeByNameVersion(string name, int version, CancellationToken ct);
+
+    // Latest available version at or before the requested one (e.g. 2026 filings fall back
+    // to the 2025 taxonomy until the 2026 taxonomy is published and imported)
+    Task<Result<TaxonomyTypeInfo>> GetTaxonomyTypeByNameVersionAtOrBefore(string name, int version, CancellationToken ct);
     Task<Result<TaxonomyTypeInfo>> EnsureTaxonomyType(string name, int version, CancellationToken ct);
     Task<Result<int>> GetTaxonomyConceptCountByType(int taxonomyTypeId, CancellationToken ct);
     Task<Result<int>> GetTaxonomyPresentationCountByType(int taxonomyTypeId, CancellationToken ct);

@@ -217,10 +217,10 @@ internal partial class Program {
         }
 
         int taxonomyYear = parsed.TaxonomyYear ?? parsed.Date.Year;
-        Result<TaxonomyTypeInfo> taxonomyTypeResult = await _dbm!.GetTaxonomyTypeByNameVersion("us-gaap", taxonomyYear, CancellationToken.None);
+        Result<TaxonomyTypeInfo> taxonomyTypeResult = await _dbm!.GetTaxonomyTypeByNameVersionAtOrBefore("us-gaap", taxonomyYear, CancellationToken.None);
         if (taxonomyTypeResult.IsFailure || taxonomyTypeResult.Value is null) {
-            _logger.LogError("Could not find taxonomy type for us-gaap {Year}", taxonomyYear);
-            Console.Error.WriteLine($"ERROR: Could not find taxonomy type for us-gaap {taxonomyYear}.");
+            _logger.LogError("Could not find taxonomy type for us-gaap {Year} or earlier", taxonomyYear);
+            Console.Error.WriteLine($"ERROR: Could not find taxonomy type for us-gaap {taxonomyYear} or earlier.");
             return 2;
         }
         int taxonomyTypeId = taxonomyTypeResult.Value.TaxonomyTypeId;

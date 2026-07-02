@@ -144,6 +144,13 @@ public sealed class DbmInMemoryService : IDbmService {
         return Task.FromResult(Result<TaxonomyTypeInfo>.Success(existing));
     }
 
+    public Task<Result<TaxonomyTypeInfo>> GetTaxonomyTypeByNameVersionAtOrBefore(string name, int version, CancellationToken ct) {
+        TaxonomyTypeInfo? existing = _data.GetTaxonomyTypeAtOrBefore(name, version);
+        if (existing is null)
+            return Task.FromResult(Result<TaxonomyTypeInfo>.Failure(ErrorCodes.NotFound, "Taxonomy type not found"));
+        return Task.FromResult(Result<TaxonomyTypeInfo>.Success(existing));
+    }
+
     public Task<Result<TaxonomyTypeInfo>> EnsureTaxonomyType(string name, int version, CancellationToken ct) {
         TaxonomyTypeInfo created = _data.AddTaxonomyType(name, version);
         return Task.FromResult(Result<TaxonomyTypeInfo>.Success(created));

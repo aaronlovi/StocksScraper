@@ -179,7 +179,7 @@ public class GrahamBacktestTests {
         await SeedBacktestScenario();
         var service = new GrahamBacktestService(_dbm);
 
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
         Assert.True(result.IsSuccess);
 
         GrahamBacktestReport report = result.Value!;
@@ -209,7 +209,7 @@ public class GrahamBacktestTests {
         await SeedBacktestScenario();
         var service = new GrahamBacktestService(_dbm);
 
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
         Assert.True(result.IsSuccess);
 
         var firstByTicker = new Dictionary<string, GrahamBacktestConstituent>();
@@ -244,7 +244,7 @@ public class GrahamBacktestTests {
         ], _ct);
 
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
         Assert.True(result.IsSuccess);
 
         // AAA +20%, DDD 0% -> equal weight +10%
@@ -262,7 +262,7 @@ public class GrahamBacktestTests {
         ], _ct);
 
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
         Assert.True(result.IsSuccess);
 
         GrahamBacktestPeriod period = Assert.Single(result.Value!.Periods);
@@ -272,9 +272,35 @@ public class GrahamBacktestTests {
     }
 
     [Fact]
+    public async Task GetBacktest_IntervalFiltersSnapshotDateGrid() {
+        var friday = new DateOnly(2026, 6, 26);   // a Friday, not a month-end
+        var monthEnd = new DateOnly(2026, 6, 30); // a month-end, not a Friday
+
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(friday, [MakeScore(1, "111", "Alpha", "AAA", 15, 100m, friday)], _ct);
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(monthEnd, [MakeScore(1, "111", "Alpha", "AAA", 15, 101m, monthEnd)], _ct);
+
+        await _dbm.BulkInsertPrices([
+            new PriceRow(1, 111, "AAA", "NYSE", "aaa.us", friday, 100m, 100m, 100m, 100m, 1000),
+            new PriceRow(2, 111, "AAA", "NYSE", "aaa.us", monthEnd, 101m, 101m, 101m, 101m, 1000),
+        ], _ct);
+
+        var service = new GrahamBacktestService(_dbm);
+
+        Result<GrahamBacktestReport> monthly = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
+        Assert.True(monthly.IsSuccess);
+        GrahamBacktestPeriod monthlyPeriod = Assert.Single(monthly.Value!.Periods);
+        Assert.Equal(monthEnd, monthlyPeriod.StartDate);
+
+        Result<GrahamBacktestReport> weekly = await service.GetBacktest(15, GrahamBacktestInterval.Weekly, _ct);
+        Assert.True(weekly.IsSuccess);
+        GrahamBacktestPeriod weeklyPeriod = Assert.Single(weekly.Value!.Periods);
+        Assert.Equal(friday, weeklyPeriod.StartDate);
+    }
+
+    [Fact]
     public async Task GetBacktest_FailsWhenNoSnapshotsExist() {
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
         Assert.True(result.IsFailure);
     }
 }

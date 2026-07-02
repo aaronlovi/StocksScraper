@@ -424,9 +424,10 @@ export class ApiService {
     );
   }
 
-  getGrahamBacktest(minScore: number | null): Observable<GrahamBacktestReport> {
-    const suffix = minScore != null ? `?minScore=${minScore}` : '';
-    return this.http.get<GrahamBacktestReport>(`/api/reports/graham-backtest${suffix}`);
+  getGrahamBacktest(minScore: number | null, interval: 'monthly' | 'weekly' = 'monthly'): Observable<GrahamBacktestReport> {
+    const parts: string[] = [`interval=${interval}`];
+    if (minScore != null) parts.push(`minScore=${minScore}`);
+    return this.http.get<GrahamBacktestReport>(`/api/reports/graham-backtest?${parts.join('&')}`);
   }
 
   getBuffettReturns(params: ReturnsReportParams): Observable<PaginatedResponse<CompanyScoreReturnSummary>> {

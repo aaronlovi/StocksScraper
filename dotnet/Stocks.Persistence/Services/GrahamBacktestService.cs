@@ -25,16 +25,21 @@ public sealed class GrahamBacktestService {
         _dbm = dbm;
     }
 
-    public async Task<Result<GrahamBacktestReport>> GetBacktest(int minScore, CancellationToken ct) {
+    public async Task<Result<GrahamBacktestReport>> GetBacktest(
+        int minScore, GrahamBacktestInterval interval, CancellationToken ct) {
         Result<IReadOnlyCollection<DateOnly>> datesResult = await _dbm.GetGrahamScoreSnapshotDates(ct);
         if (datesResult.IsFailure || datesResult.Value is null)
             return Result<GrahamBacktestReport>.Failure(ErrorCodes.GenericError, datesResult.ErrorMessage);
 
-        var dates = new List<DateOnly>(datesResult.Value);
+        var dates = new List<DateOnly>();
+        foreach (DateOnly d in datesResult.Value) {
+            if (MatchesInterval(d, interval))
+                dates.Add(d);
+        }
         dates.Sort();
         if (dates.Count == 0)
             return Result<GrahamBacktestReport>.Failure(ErrorCodes.NotFound,
-                "No score snapshots found. Run the --compute-score-snapshots backfill first.");
+                $"No {(interval == GrahamBacktestInterval.Weekly ? "weekly (Friday)" : "monthly (month-end)")} score snapshots found. Run the --compute-score-snapshots backfill first.");
 
         Result<IReadOnlyCollection<GrahamSnapshotConstituent>> constituentsResult =
             await _dbm.GetGrahamSnapshotConstituents(minScore, ct);
@@ -177,6 +182,12 @@ public sealed class GrahamBacktestService {
             BenchmarkTicker, minScore);
 
         return Result<GrahamBacktestReport>.Success(new GrahamBacktestReport(summary, periods));
+    }
+
+    private static bool MatchesInterval(DateOnly date, GrahamBacktestInterval interval) {
+        return interval == GrahamBacktestInterval.Weekly
+            ? date.DayOfWeek == DayOfWeek.Friday
+            : date.Day == DateTime.DaysInMonth(date.Year, date.Month);
     }
 
     private static Dictionary<string, LatestPrice> ToTickerMap(Result<IReadOnlyCollection<LatestPrice>> pricesResult) {

@@ -1,11 +1,18 @@
 <h2>Graham Backtest</h2>
 <p class="page-subtitle">
-  Monthly-rebalanced simulation: at each month-end, buy every company that scored
-  {{ minScore }}/15 on that day (using only information available back then), hold one
-  month, then roll into the new list. Compared against SPY.
+  Rebalanced simulation: at each {{ interval === 'weekly' ? 'Friday' : 'month-end' }}, buy every
+  company that scored {{ minScore }}/15 on that day (using only information available back then),
+  hold until the next rebalance, then roll into the new list. Compared against SPY.
 </p>
 
 <div class="filters">
+  <label>
+    Rebalance
+    <select [(ngModel)]="interval" (ngModelChange)="onFilterChange()">
+      <option value="monthly">Monthly (month-ends)</option>
+      <option value="weekly">Weekly (Fridays)</option>
+    </select>
+  </label>
   <label>
     Min Score
     <select [(ngModel)]="minScore" (ngModelChange)="onFilterChange()">

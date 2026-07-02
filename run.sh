@@ -234,10 +234,12 @@ while true; do
             read -p "To date [$DEFAULT_TO]: " SNAP_TO
             SNAP_FROM=${SNAP_FROM:-$DEFAULT_FROM}
             SNAP_TO=${SNAP_TO:-$DEFAULT_TO}
-            echo "Computing Graham score snapshots at each month-end from $SNAP_FROM to $SNAP_TO..."
+            read -p "Interval (monthly/weekly) [monthly]: " SNAP_INTERVAL
+            SNAP_INTERVAL=${SNAP_INTERVAL:-monthly}
+            echo "Computing Graham score snapshots ($SNAP_INTERVAL) from $SNAP_FROM to $SNAP_TO..."
             echo "(Run this LAST after reloading data: it needs EDGAR filings, tickers, prices, and inline XBRL shares.)"
             pushd $WORKING_DIR > /dev/null
-            dotnet run --project Stocks.EDGARScraper.csproj -- --compute-score-snapshots --from "$SNAP_FROM" --to "$SNAP_TO"
+            dotnet run --project Stocks.EDGARScraper.csproj -- --compute-score-snapshots --from "$SNAP_FROM" --to "$SNAP_TO" --interval "$SNAP_INTERVAL"
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             fi

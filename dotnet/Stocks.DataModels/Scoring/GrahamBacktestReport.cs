@@ -4,6 +4,15 @@ using System.Collections.Generic;
 namespace Stocks.DataModels.Scoring;
 
 /// <summary>
+/// Which snapshot-date grid the backtest chains over: month-end dates or Friday dates.
+/// Both grids can coexist in graham_score_snapshots.
+/// </summary>
+public enum GrahamBacktestInterval {
+    Monthly = 0,
+    Weekly = 1,
+}
+
+/// <summary>
 /// One holding during one backtest period. Entered means the company was not in the
 /// previous period's portfolio; Left means it is not in the next period's portfolio.
 /// </summary>

@@ -35,6 +35,7 @@ export interface BacktestChart {
 })
 export class GrahamBacktestReportComponent implements OnInit {
   minScore = 15;
+  interval: 'monthly' | 'weekly' = 'monthly';
 
   report = signal<GrahamBacktestReport | null>(null);
   loading = signal(true);
@@ -77,7 +78,7 @@ export class GrahamBacktestReportComponent implements OnInit {
     this.error.set(null);
     this.expanded.set(new Set());
 
-    this.api.getGrahamBacktest(this.minScore).subscribe({
+    this.api.getGrahamBacktest(this.minScore, this.interval).subscribe({
       next: data => {
         this.report.set(data);
         this.loading.set(false);

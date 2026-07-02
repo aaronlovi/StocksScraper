@@ -1009,6 +1009,7 @@ internal partial class Program {
     private static async Task<int> HandleComputeScoreSnapshotsAsync(string[] args) {
         DateOnly? from = null;
         DateOnly? to = null;
+        bool weekly = false;
         bool showUsage = false;
 
         for (int i = 1; i < args.Length; i++) {
@@ -1027,6 +1028,18 @@ internal partial class Program {
                         showUsage = true;
                     break;
                 }
+                case "--interval": {
+                    if (i + 1 < args.Length) {
+                        string interval = args[++i].ToLowerInvariant();
+                        if (interval == "weekly")
+                            weekly = true;
+                        else if (interval != "monthly")
+                            showUsage = true;
+                    } else {
+                        showUsage = true;
+                    }
+                    break;
+                }
                 default: {
                     showUsage = true;
                     break;
@@ -1038,12 +1051,12 @@ internal partial class Program {
             showUsage = true;
 
         if (showUsage) {
-            Console.Error.WriteLine("USAGE: dotnet run --compute-score-snapshots --from <YYYY-MM-DD> --to <YYYY-MM-DD>");
-            Console.Error.WriteLine("Computes point-in-time Graham scores at each month-end date in the range (inclusive).");
+            Console.Error.WriteLine("USAGE: dotnet run --compute-score-snapshots --from <YYYY-MM-DD> --to <YYYY-MM-DD> [--interval monthly|weekly]");
+            Console.Error.WriteLine("Computes point-in-time Graham scores at each month-end (default) or each Friday in the range (inclusive).");
             return 4;
         }
 
-        Result res = await ComputeAndStoreScoreSnapshotsAsync(from!.Value, to!.Value);
+        Result res = await ComputeAndStoreScoreSnapshotsAsync(from!.Value, to!.Value, weekly);
         if (res.IsFailure) {
             _logger.LogError("ComputeScoreSnapshots failed: {Error}", res.ErrorMessage);
             return 2;
@@ -1051,18 +1064,28 @@ internal partial class Program {
         return 0;
     }
 
-    private static async Task<Result> ComputeAndStoreScoreSnapshotsAsync(DateOnly from, DateOnly to) {
+    private static async Task<Result> ComputeAndStoreScoreSnapshotsAsync(DateOnly from, DateOnly to, bool weekly) {
         var scoringService = new Stocks.Persistence.Services.ScoringService(_dbm!, _logger);
         CancellationToken ct = CancellationToken.None;
 
-        // Enumerate month-end dates within [from, to]
+        // Enumerate snapshot dates within [from, to]: every Friday, or every month-end
         var snapshotDates = new List<DateOnly>();
-        var cursor = new DateOnly(from.Year, from.Month, 1);
-        while (cursor <= to) {
-            var monthEnd = new DateOnly(cursor.Year, cursor.Month, DateTime.DaysInMonth(cursor.Year, cursor.Month));
-            if (monthEnd >= from && monthEnd <= to)
-                snapshotDates.Add(monthEnd);
-            cursor = cursor.AddMonths(1);
+        if (weekly) {
+            DateOnly cursor = from;
+            while (cursor.DayOfWeek != DayOfWeek.Friday)
+                cursor = cursor.AddDays(1);
+            while (cursor <= to) {
+                snapshotDates.Add(cursor);
+                cursor = cursor.AddDays(7);
+            }
+        } else {
+            var cursor = new DateOnly(from.Year, from.Month, 1);
+            while (cursor <= to) {
+                var monthEnd = new DateOnly(cursor.Year, cursor.Month, DateTime.DaysInMonth(cursor.Year, cursor.Month));
+                if (monthEnd >= from && monthEnd <= to)
+                    snapshotDates.Add(monthEnd);
+                cursor = cursor.AddMonths(1);
+            }
         }
 
         if (snapshotDates.Count == 0)

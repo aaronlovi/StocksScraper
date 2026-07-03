@@ -3,9 +3,12 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
   ApiService,
+  GrahamBacktestPeriod,
   GrahamBacktestReport
 } from '../../core/services/api.service';
 import { LoadingOverlayComponent } from '../../shared/components/loading-overlay/loading-overlay.component';
+import { CsvExportButtonComponent } from '../../shared/components/csv-export-button/csv-export-button.component';
+import { CsvColumn } from '../../shared/csv.utils';
 import {
   fmtPrice as fmtPriceFn,
   fmtReturn as fmtReturnFn,
@@ -25,7 +28,7 @@ export interface BacktestChart {
 @Component({
   selector: 'app-graham-backtest-report',
   standalone: true,
-  imports: [RouterLink, FormsModule, LoadingOverlayComponent],
+  imports: [RouterLink, FormsModule, LoadingOverlayComponent, CsvExportButtonComponent],
   templateUrl: './graham-backtest-report.component.html',
   styleUrls: [
     './graham-backtest-report.component.css',
@@ -45,6 +48,43 @@ export class GrahamBacktestReportComponent implements OnInit {
   expanded = signal<Set<number>>(new Set());
 
   chart = computed<BacktestChart | null>(() => buildBacktestChart(this.report()));
+
+  // One flat row per holding per period, for CSV export
+  holdingsRows = computed<Record<string, unknown>[]>(() => {
+    const rpt = this.report();
+    if (!rpt) return [];
+    const rows: Record<string, unknown>[] = [];
+    for (const period of rpt.periods) {
+      for (const c of period.constituents) {
+        rows.push({
+          periodStart: period.startDate,
+          periodEnd: period.endDate,
+          ticker: c.ticker,
+          companyName: c.companyName,
+          cik: c.cik,
+          exchange: c.exchange,
+          buyPrice: c.startPrice,
+          sellPrice: c.endPrice,
+          periodReturnPct: c.periodReturnPct,
+          entered: c.entered,
+          enteredTrigger: c.enteredTrigger,
+          left: c.left,
+          leftTrigger: c.leftTrigger
+        });
+      }
+    }
+    return rows;
+  });
+
+  readonly periodsCsvColumns: CsvColumn[] = [
+    { header: 'startDate', value: (p: GrahamBacktestPeriod) => p.startDate },
+    { header: 'endDate', value: (p: GrahamBacktestPeriod) => p.endDate },
+    { header: 'holdings', value: (p: GrahamBacktestPeriod) => p.constituentCount },
+    { header: 'portfolioReturnPct', value: (p: GrahamBacktestPeriod) => p.portfolioReturnPct },
+    { header: 'cumulativeValue', value: (p: GrahamBacktestPeriod) => p.cumulativeValue },
+    { header: 'benchmarkReturnPct', value: (p: GrahamBacktestPeriod) => p.benchmarkReturnPct },
+    { header: 'benchmarkCumulativeValue', value: (p: GrahamBacktestPeriod) => p.benchmarkCumulativeValue }
+  ];
 
   readonly fmtPrice = (val: number | null | undefined) => fmtPriceFn(val, '');
   readonly fmtReturn = (val: number | null | undefined) => fmtReturnFn(val, '');

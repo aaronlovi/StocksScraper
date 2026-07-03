@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
@@ -7,6 +7,7 @@ import {
   PortfolioRecommendation
 } from '../../core/services/api.service';
 import { LoadingOverlayComponent } from '../../shared/components/loading-overlay/loading-overlay.component';
+import { CsvExportButtonComponent } from '../../shared/components/csv-export-button/csv-export-button.component';
 import {
   fmtPrice as fmtPriceFn,
   scoreBadgeClass as scoreBadgeClassFn
@@ -31,7 +32,7 @@ export function parseTickers(input: string): string[] {
 @Component({
   selector: 'app-portfolio-advisor',
   standalone: true,
-  imports: [RouterLink, FormsModule, LoadingOverlayComponent],
+  imports: [RouterLink, FormsModule, LoadingOverlayComponent, CsvExportButtonComponent],
   templateUrl: './portfolio-advisor.component.html',
   styleUrls: [
     './portfolio-advisor.component.css',
@@ -44,6 +45,13 @@ export class PortfolioAdvisorComponent implements OnInit {
   report = signal<PortfolioAdvisorReport | null>(null);
   loading = signal(false);
   error = signal<string | null>(null);
+
+  // All groups flattened for CSV export, action column included per row
+  allRecommendations = computed<PortfolioRecommendation[]>(() => {
+    const rpt = this.report();
+    if (!rpt) return [];
+    return [...rpt.sells, ...rpt.buys, ...rpt.holds, ...rpt.unknowns];
+  });
 
   readonly fmtPrice = (val: number | null | undefined) => fmtPriceFn(val, '');
   readonly scoreBadgeClass = scoreBadgeClassFn;

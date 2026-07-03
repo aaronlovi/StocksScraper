@@ -7,6 +7,7 @@ import {
   PaginationResponse
 } from '../../core/services/api.service';
 import { LoadingOverlayComponent } from '../../shared/components/loading-overlay/loading-overlay.component';
+import { CsvExportButtonComponent } from '../../shared/components/csv-export-button/csv-export-button.component';
 import { PaginationComponent } from '../../shared/components/pagination/pagination.component';
 import {
   ReturnsSummary,
@@ -41,7 +42,7 @@ const SCORE_PRESETS: ScorePreset[] = [
 @Component({
   selector: 'app-buffett-returns-report',
   standalone: true,
-  imports: [RouterLink, FormsModule, LoadingOverlayComponent, PaginationComponent],
+  imports: [RouterLink, FormsModule, LoadingOverlayComponent, PaginationComponent, CsvExportButtonComponent],
   templateUrl: './buffett-returns-report.component.html',
   styleUrls: [
     './buffett-returns-report.component.css',

@@ -36,6 +36,13 @@
   <button type="button" class="refresh-btn" (click)="refresh()" [disabled]="loading()">Refresh</button>
 </div>
 
+<div class="export-row">
+  <app-csv-export-button [rows]="report()?.periods ?? null" [columns]="periodsCsvColumns"
+    filename="graham-backtest-periods" label="Export periods CSV" />
+  <app-csv-export-button [rows]="holdingsRows()"
+    filename="graham-backtest-holdings" label="Export holdings CSV" />
+</div>
+
 @if (loading()) {
   <app-loading-overlay />
 } @else if (error()) {

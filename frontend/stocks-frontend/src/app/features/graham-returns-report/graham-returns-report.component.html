@@ -36,6 +36,8 @@
   </label>
 </div>
 
+<app-csv-export-button [rows]="items()" filename="graham-returns" />
+
 @if (loading()) {
   <app-loading-overlay />
 } @else if (error()) {

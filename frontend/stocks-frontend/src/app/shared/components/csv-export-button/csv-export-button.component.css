@@ -1,0 +1,21 @@
+.csv-export-btn {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 4px;
+  background: var(--surface, #fff);
+  color: var(--text, #333);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.csv-export-btn:hover:not(:disabled) {
+  border-color: var(--accent, #1a5c6b);
+  color: var(--accent, #1a5c6b);
+}
+
+.csv-export-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

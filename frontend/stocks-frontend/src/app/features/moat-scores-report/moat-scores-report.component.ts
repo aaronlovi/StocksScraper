@@ -7,6 +7,7 @@ import {
   PaginationResponse
 } from '../../core/services/api.service';
 import { LoadingOverlayComponent } from '../../shared/components/loading-overlay/loading-overlay.component';
+import { CsvExportButtonComponent } from '../../shared/components/csv-export-button/csv-export-button.component';
 import { PaginationComponent } from '../../shared/components/pagination/pagination.component';
 import {
   fmtCurrency as fmtCurrencyFn,
@@ -20,7 +21,7 @@ import { SortState } from '../../shared/sort.utils';
 @Component({
   selector: 'app-moat-scores-report',
   standalone: true,
-  imports: [RouterLink, FormsModule, LoadingOverlayComponent, PaginationComponent],
+  imports: [RouterLink, FormsModule, LoadingOverlayComponent, PaginationComponent, CsvExportButtonComponent],
   templateUrl: './moat-scores-report.component.html',
   styleUrls: ['../../shared/styles/report-table.css']
 })

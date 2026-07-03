@@ -7,6 +7,7 @@ import {
   PaginationResponse
 } from '../../core/services/api.service';
 import { LoadingOverlayComponent } from '../../shared/components/loading-overlay/loading-overlay.component';
+import { CsvExportButtonComponent } from '../../shared/components/csv-export-button/csv-export-button.component';
 import { PaginationComponent } from '../../shared/components/pagination/pagination.component';
 import {
   ReturnsSummary,
@@ -27,7 +28,7 @@ import { SortState } from '../../shared/sort.utils';
 @Component({
   selector: 'app-graham-snapshot-report',
   standalone: true,
-  imports: [RouterLink, FormsModule, LoadingOverlayComponent, PaginationComponent],
+  imports: [RouterLink, FormsModule, LoadingOverlayComponent, PaginationComponent, CsvExportButtonComponent],
   templateUrl: './graham-snapshot-report.component.html',
   styleUrls: [
     './graham-snapshot-report.component.css',

@@ -13,6 +13,7 @@
     placeholder="AAPL&#10;PIPR&#10;TOL 150 shares  # quantity is ignored"
     spellcheck="false"></textarea>
   <button type="button" class="refresh-btn" (click)="analyze()" [disabled]="loading()">Analyze</button>
+  <app-csv-export-button [rows]="allRecommendations()" filename="portfolio-advice" />
 </div>
 
 @if (loading()) {

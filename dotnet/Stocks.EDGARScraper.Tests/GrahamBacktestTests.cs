@@ -21,9 +21,9 @@ public class GrahamBacktestTests {
 
     private static CompanyScoreSummary MakeScore(
         ulong companyId, string cik, string? name, string? ticker, int score,
-        decimal? price, DateOnly? priceDate) =>
+        decimal? price, DateOnly? priceDate, decimal? bookValue = null) =>
         new(companyId, cik, name, ticker, "NYSE", score, 15, 5,
-            null, null, null, null, null, null, null, null, null, null, null, null,
+            bookValue, null, null, null, null, null, null, null, null, null, null, null,
             price, priceDate, null, null, null, null, DateTime.UtcNow);
 
     // --- As-of scoring data cutoff ---
@@ -226,6 +226,44 @@ public class GrahamBacktestTests {
 
         Assert.False(secondByTicker["AAA"].Entered);
         Assert.True(secondByTicker["CCC"].Entered); // CCC is new in February
+
+        // CCC had no January snapshot at all -> appearing in the universe is a filing event
+        Assert.Equal("filing", secondByTicker["CCC"].EnteredTrigger);
+        Assert.Null(secondByTicker["AAA"].EnteredTrigger);
+        // BBB left after January but has no February snapshot -> also a filing event
+        Assert.Equal("filing", firstByTicker["BBB"].LeftTrigger);
+    }
+
+    [Fact]
+    public async Task GetBacktest_AttributesEnteredTriggerToPriceOrFiling() {
+        var jan = new DateOnly(2026, 1, 31);
+        var feb = new DateOnly(2026, 2, 28);
+
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(jan, [
+            MakeScore(1, "111", "Anchor", "AAA", 15, 100m, jan, 500m),
+            MakeScore(2, "222", "PriceFlip", "PPP", 14, 50m, jan, 300m),
+            MakeScore(3, "333", "FilingFlip", "FFF", 14, 20m, jan, 100m),
+        ], _ct);
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(feb, [
+            MakeScore(1, "111", "Anchor", "AAA", 15, 100m, feb, 500m),
+            // Same fundamentals as January: only the price pushed it over the line
+            MakeScore(2, "222", "PriceFlip", "PPP", 15, 40m, feb, 300m),
+            // Book value changed: a new filing changed the inputs
+            MakeScore(3, "333", "FilingFlip", "FFF", 15, 20m, feb, 200m),
+        ], _ct);
+
+        var service = new GrahamBacktestService(_dbm);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
+        Assert.True(result.IsSuccess);
+
+        var febByTicker = new Dictionary<string, GrahamBacktestConstituent>();
+        foreach (GrahamBacktestConstituent c in result.Value!.Periods[1].Constituents)
+            febByTicker[c.Ticker!] = c;
+
+        Assert.True(febByTicker["PPP"].Entered);
+        Assert.Equal("price", febByTicker["PPP"].EnteredTrigger);
+        Assert.True(febByTicker["FFF"].Entered);
+        Assert.Equal("filing", febByTicker["FFF"].EnteredTrigger);
     }
 
     [Fact]

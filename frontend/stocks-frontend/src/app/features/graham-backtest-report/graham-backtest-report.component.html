@@ -135,8 +135,16 @@
                         </td>
                         <td>{{ c.ticker ?? '' }}</td>
                         <td class="badges">
-                          @if (c.entered) { <span class="flow-badge entered">new</span> }
-                          @if (c.left) { <span class="flow-badge left">out next</span> }
+                          @if (c.entered) {
+                            <span class="flow-badge entered" [class.trigger-price]="c.enteredTrigger === 'price'">
+                              new{{ c.enteredTrigger ? ' · ' + c.enteredTrigger : '' }}
+                            </span>
+                          }
+                          @if (c.left) {
+                            <span class="flow-badge left" [class.trigger-price]="c.leftTrigger === 'price'">
+                              out next{{ c.leftTrigger ? ' · ' + c.leftTrigger : '' }}
+                            </span>
+                          }
                         </td>
                         <td class="num">{{ fmtPrice(c.startPrice) }}</td>
                         <td class="num">{{ fmtPrice(c.endPrice) }}</td>
@@ -154,7 +162,12 @@
   </table>
 
   <p class="computed-at">
-    Simulation assumes equal-weight buys at each month-end close, no trading costs or taxes.
+    Badge triggers: <strong>· filing</strong> = the company's fundamentals changed between snapshots
+    (a new 10-K/10-Q arrived) — an information-driven change; <strong>· price</strong> = identical
+    fundamentals, only the price crossed a scoring threshold — likely noise, prone to flickering back.
+  </p>
+  <p class="computed-at">
+    Simulation assumes equal-weight buys at each rebalance close, no trading costs or taxes.
     Holdings without a newer price are carried flat. Survivorship and split effects may skew
     older periods — treat this as a rough proof of concept, not investment advice.
   </p>

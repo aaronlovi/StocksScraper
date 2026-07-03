@@ -138,3 +138,9 @@
   background: rgba(160, 82, 45, 0.12);
   color: #a0522d;
 }
+
+.flow-badge.trigger-price {
+  background: transparent;
+  border: 1px dashed currentColor;
+  opacity: 0.65;
+}

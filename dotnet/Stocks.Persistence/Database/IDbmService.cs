@@ -104,6 +104,8 @@ public interface IDbmService {
         DateOnly asOfDate, PaginationRequest pagination, ScoresFilter? filter, CancellationToken ct);
     Task<Result<IReadOnlyCollection<GrahamSnapshotConstituent>>> GetGrahamSnapshotConstituents(
         int minScore, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<GrahamSnapshotFundamentals>>> GetGrahamSnapshotFundamentals(
+        IReadOnlyCollection<ulong> companyIds, CancellationToken ct);
 
     // Company moat scores persistence
     Task<Result> TruncateCompanyMoatScores(CancellationToken ct);

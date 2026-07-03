@@ -265,6 +265,11 @@ public sealed class DbmInMemoryService : IDbmService {
         Task.FromResult(Result<IReadOnlyCollection<GrahamSnapshotConstituent>>.Success(
             _data.GetGrahamSnapshotConstituents(minScore)));
 
+    public Task<Result<IReadOnlyCollection<GrahamSnapshotFundamentals>>> GetGrahamSnapshotFundamentals(
+        IReadOnlyCollection<ulong> companyIds, CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<GrahamSnapshotFundamentals>>.Success(
+            _data.GetGrahamSnapshotFundamentals(companyIds)));
+
     public Task<Result> TruncateCompanyScores(CancellationToken ct) {
         _data.TruncateCompanyScores();
         return Task.FromResult(Result.Success);

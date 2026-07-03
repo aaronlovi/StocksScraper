@@ -847,6 +847,26 @@ public sealed class DbmInMemoryData {
         return results;
     }
 
+    public IReadOnlyCollection<GrahamSnapshotFundamentals> GetGrahamSnapshotFundamentals(
+        IReadOnlyCollection<ulong> companyIds) {
+        var idSet = new HashSet<ulong>(companyIds);
+        var results = new List<GrahamSnapshotFundamentals>();
+        lock (_mutex) {
+            foreach (GrahamSnapshotRow row in _grahamScoreSnapshots) {
+                CompanyScoreSummary s = row.Score;
+                if (!idSet.Contains(s.CompanyId))
+                    continue;
+                results.Add(new GrahamSnapshotFundamentals(
+                    row.AsOfDate, s.CompanyId, s.YearsOfData,
+                    s.BookValue, s.DebtToEquityRatio,
+                    s.AverageNetCashFlow, s.AverageOwnerEarnings,
+                    s.AdjustedRetainedEarnings, s.AverageRoeCF, s.AverageRoeOE,
+                    s.SharesOutstanding));
+            }
+        }
+        return results;
+    }
+
     // Company moat scores
 
     private readonly List<CompanyMoatScoreSummary> _companyMoatScores = [];

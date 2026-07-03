@@ -22,12 +22,12 @@ function makeReport(): GrahamBacktestReport {
           {
             companyId: 1, cik: '320193', companyName: 'Apple Inc', ticker: 'AAPL', exchange: 'NASDAQ',
             startPrice: 100, startPriceDate: '2025-10-31', endPrice: 110, endPriceDate: '2025-11-28',
-            periodReturnPct: 10, entered: false, left: false
+            periodReturnPct: 10, entered: false, left: false, enteredTrigger: null, leftTrigger: null
           },
           {
             companyId: 2, cik: '789019', companyName: 'Microsoft Corp', ticker: 'MSFT', exchange: 'NASDAQ',
             startPrice: 400, startPriceDate: '2025-10-31', endPrice: 400, endPriceDate: '2025-11-28',
-            periodReturnPct: 0, entered: false, left: true
+            periodReturnPct: 0, entered: false, left: true, enteredTrigger: null, leftTrigger: 'price'
           }
         ]
       },
@@ -39,7 +39,7 @@ function makeReport(): GrahamBacktestReport {
           {
             companyId: 1, cik: '320193', companyName: 'Apple Inc', ticker: 'AAPL', exchange: 'NASDAQ',
             startPrice: 110, startPriceDate: '2025-11-28', endPrice: 115.5, endPriceDate: '2026-06-25',
-            periodReturnPct: 5, entered: false, left: false
+            periodReturnPct: 5, entered: false, left: false, enteredTrigger: null, leftTrigger: null
           }
         ]
       }
@@ -104,6 +104,20 @@ describe('GrahamBacktestReportComponent', () => {
     const constituentRows = fixture.nativeElement.querySelectorAll('.constituents-table tbody tr');
     expect(constituentRows.length).toBe(2);
     expect(fixture.nativeElement.textContent).toContain('Apple Inc');
+  });
+
+  it('should show the trigger on flow badges', () => {
+    const fixture = TestBed.createComponent(GrahamBacktestReportComponent);
+    fixture.detectChanges();
+    flushRequest();
+    fixture.detectChanges();
+
+    fixture.componentInstance.toggleExpand(0);
+    fixture.detectChanges();
+
+    const leftBadge = fixture.nativeElement.querySelector('.flow-badge.left') as HTMLElement;
+    expect(leftBadge.textContent).toContain('out next · price');
+    expect(leftBadge.classList.contains('trigger-price')).toBe(true);
   });
 
   it('should render the chart with strategy and benchmark lines', () => {

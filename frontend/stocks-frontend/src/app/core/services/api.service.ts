@@ -276,6 +276,8 @@ export interface GrahamBacktestConstituent {
   periodReturnPct: number | null;
   entered: boolean;
   left: boolean;
+  enteredTrigger: 'filing' | 'price' | null;
+  leftTrigger: 'filing' | 'price' | null;
 }
 
 export interface GrahamBacktestPeriod {

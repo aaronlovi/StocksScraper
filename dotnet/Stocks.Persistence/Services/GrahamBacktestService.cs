@@ -56,11 +56,31 @@ public sealed class GrahamBacktestService {
         }
 
         var companyIdsByDate = new Dictionary<DateOnly, HashSet<ulong>>();
+        var allConstituentIds = new HashSet<ulong>();
         foreach (KeyValuePair<DateOnly, List<GrahamSnapshotConstituent>> entry in byDate) {
             var ids = new HashSet<ulong>();
-            foreach (GrahamSnapshotConstituent c in entry.Value)
+            foreach (GrahamSnapshotConstituent c in entry.Value) {
                 _ = ids.Add(c.CompanyId);
+                _ = allConstituentIds.Add(c.CompanyId);
+            }
             companyIdsByDate[entry.Key] = ids;
+        }
+
+        // Fundamentals per constituent per date, used to attribute entered/left changes
+        // to a new filing vs a pure price move
+        var fundamentalsByCompany = new Dictionary<ulong, Dictionary<DateOnly, GrahamSnapshotFundamentals>>();
+        if (allConstituentIds.Count > 0) {
+            Result<IReadOnlyCollection<GrahamSnapshotFundamentals>> fundamentalsResult =
+                await _dbm.GetGrahamSnapshotFundamentals(allConstituentIds, ct);
+            if (fundamentalsResult.IsSuccess && fundamentalsResult.Value is not null) {
+                foreach (GrahamSnapshotFundamentals f in fundamentalsResult.Value) {
+                    if (!fundamentalsByCompany.TryGetValue(f.CompanyId, out Dictionary<DateOnly, GrahamSnapshotFundamentals>? byFundDate)) {
+                        byFundDate = [];
+                        fundamentalsByCompany[f.CompanyId] = byFundDate;
+                    }
+                    byFundDate[f.AsOfDate] = f;
+                }
+            }
         }
 
         DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -124,11 +144,18 @@ public sealed class GrahamBacktestService {
                 bool entered = i > 0 && previousIds is not null && !previousIds.Contains(c.CompanyId);
                 bool left = nextIds is not null && !nextIds.Contains(c.CompanyId);
 
+                string? enteredTrigger = entered
+                    ? ResolveTrigger(fundamentalsByCompany, c.CompanyId, dates[i - 1], startDate)
+                    : null;
+                string? leftTrigger = left
+                    ? ResolveTrigger(fundamentalsByCompany, c.CompanyId, startDate, dates[i + 1])
+                    : null;
+
                 periodConstituents.Add(new GrahamBacktestConstituent(
                     c.CompanyId, c.Cik, c.CompanyName, c.Ticker, c.Exchange,
                     startPrice?.Close, startPrice?.PriceDate,
                     endPrice?.Close, endPrice?.PriceDate,
-                    periodReturnPct, entered, left));
+                    periodReturnPct, entered, left, enteredTrigger, leftTrigger));
             }
 
             // Equal weight across priced holdings; an empty month sits in cash (0%)
@@ -182,6 +209,39 @@ public sealed class GrahamBacktestService {
             BenchmarkTicker, minScore);
 
         return Result<GrahamBacktestReport>.Success(new GrahamBacktestReport(summary, periods));
+    }
+
+    private const string TriggerFiling = "filing";
+    private const string TriggerPrice = "price";
+
+    /// <summary>
+    /// Attributes a membership change between two adjacent snapshots: identical
+    /// price-independent fundamentals mean only the price moved; any difference (or a
+    /// company appearing in / vanishing from the scored universe) means a filing changed
+    /// the inputs.
+    /// </summary>
+    private static string ResolveTrigger(
+        Dictionary<ulong, Dictionary<DateOnly, GrahamSnapshotFundamentals>> fundamentalsByCompany,
+        ulong companyId, DateOnly fromDate, DateOnly toDate) {
+
+        if (!fundamentalsByCompany.TryGetValue(companyId, out Dictionary<DateOnly, GrahamSnapshotFundamentals>? byFundDate))
+            return TriggerFiling;
+        if (!byFundDate.TryGetValue(fromDate, out GrahamSnapshotFundamentals? before))
+            return TriggerFiling;
+        if (!byFundDate.TryGetValue(toDate, out GrahamSnapshotFundamentals? after))
+            return TriggerFiling;
+
+        bool unchanged = before.YearsOfData == after.YearsOfData
+            && before.BookValue == after.BookValue
+            && before.DebtToEquityRatio == after.DebtToEquityRatio
+            && before.AverageNetCashFlow == after.AverageNetCashFlow
+            && before.AverageOwnerEarnings == after.AverageOwnerEarnings
+            && before.AdjustedRetainedEarnings == after.AdjustedRetainedEarnings
+            && before.AverageRoeCF == after.AverageRoeCF
+            && before.AverageRoeOE == after.AverageRoeOE
+            && before.SharesOutstanding == after.SharesOutstanding;
+
+        return unchanged ? TriggerPrice : TriggerFiling;
     }
 
     private static bool MatchesInterval(DateOnly date, GrahamBacktestInterval interval) {

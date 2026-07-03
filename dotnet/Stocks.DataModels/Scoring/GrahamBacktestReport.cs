@@ -15,6 +15,9 @@ public enum GrahamBacktestInterval {
 /// <summary>
 /// One holding during one backtest period. Entered means the company was not in the
 /// previous period's portfolio; Left means it is not in the next period's portfolio.
+/// EnteredTrigger/LeftTrigger say what caused the change: "filing" (fundamentals inputs
+/// changed between the adjacent snapshots) or "price" (identical fundamentals, only the
+/// price crossed a threshold). Null when the corresponding flag is false.
 /// </summary>
 public record GrahamBacktestConstituent(
     ulong CompanyId,
@@ -28,7 +31,9 @@ public record GrahamBacktestConstituent(
     DateOnly? EndPriceDate,
     decimal? PeriodReturnPct,
     bool Entered,
-    bool Left);
+    bool Left,
+    string? EnteredTrigger,
+    string? LeftTrigger);
 
 /// <summary>
 /// One rebalance period: buy the qualifying list at StartDate, hold until EndDate.

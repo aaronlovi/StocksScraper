@@ -590,6 +590,19 @@ public sealed class DbmService : IDisposable, IDbmService {
         }
     }
 
+    public async Task<Result<IReadOnlyCollection<GrahamSnapshotFundamentals>>> GetGrahamSnapshotFundamentals(
+        IReadOnlyCollection<ulong> companyIds, CancellationToken ct) {
+        var stmt = new GetGrahamSnapshotFundamentalsStmt(companyIds);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetGrahamSnapshotFundamentals success - Num results: {NumResults}", stmt.Results.Count);
+            return Result<IReadOnlyCollection<GrahamSnapshotFundamentals>>.Success(stmt.Results);
+        } else {
+            _logger.LogWarning("GetGrahamSnapshotFundamentals failed with error {Error}", res.ErrorMessage);
+            return Result<IReadOnlyCollection<GrahamSnapshotFundamentals>>.Failure(res);
+        }
+    }
+
     public async Task<Result> TruncateCompanyMoatScores(CancellationToken ct) {
         var stmt = new TruncateCompanyMoatScoresStmt();
         DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);

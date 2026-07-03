@@ -57,6 +57,7 @@ public static class GrahamBacktestEndpoints {
         _ = app.MapGet("/api/reports/graham-backtest",
             async (int? minScore,
                    string? interval,
+                   string? policy,
                    GrahamBacktestService service,
                    CancellationToken ct) => {
 
@@ -68,7 +69,13 @@ public static class GrahamBacktestEndpoints {
                     ? GrahamBacktestInterval.Weekly
                     : GrahamBacktestInterval.Monthly;
 
-                Result<GrahamBacktestReport> result = await service.GetBacktest(min, grid, ct);
+                GrahamBacktestPolicy tradePolicy = GrahamBacktestPolicy.All;
+                if (string.Equals(policy, "filing", StringComparison.OrdinalIgnoreCase))
+                    tradePolicy = GrahamBacktestPolicy.FilingOnly;
+                else if (string.Equals(policy, "price", StringComparison.OrdinalIgnoreCase))
+                    tradePolicy = GrahamBacktestPolicy.PriceOnly;
+
+                Result<GrahamBacktestReport> result = await service.GetBacktest(min, grid, tradePolicy, ct);
                 return result.ToHttpResult();
             });
     }

@@ -426,8 +426,12 @@ export class ApiService {
     );
   }
 
-  getGrahamBacktest(minScore: number | null, interval: 'monthly' | 'weekly' = 'monthly'): Observable<GrahamBacktestReport> {
-    const parts: string[] = [`interval=${interval}`];
+  getGrahamBacktest(
+    minScore: number | null,
+    interval: 'monthly' | 'weekly' = 'monthly',
+    policy: 'all' | 'filing' | 'price' = 'all'
+  ): Observable<GrahamBacktestReport> {
+    const parts: string[] = [`interval=${interval}`, `policy=${policy}`];
     if (minScore != null) parts.push(`minScore=${minScore}`);
     return this.http.get<GrahamBacktestReport>(`/api/reports/graham-backtest?${parts.join('&')}`);
   }

@@ -10,14 +10,19 @@ using Stocks.Shared.Models;
 namespace Stocks.Persistence.Services;
 
 /// <summary>
-/// Simulates a monthly-rebalanced portfolio of the top-scoring Graham companies using the
-/// stored point-in-time snapshots: at each snapshot date, buy the qualifying list
-/// equal-weighted; hold until the next snapshot date (or today for the last one).
-/// A holding with no newer price is carried at its last known price (0% for the period).
+/// Simulates a rebalanced portfolio of the top-scoring Graham companies using the stored
+/// point-in-time snapshots. At each snapshot date the portfolio reacts to membership
+/// changes according to the trade policy (all changes / filing-driven only / price-driven
+/// only), holds equal-weighted until the next snapshot date (or today for the last one),
+/// and chains the returns. A holding with no newer price is carried at its last known
+/// price (0% for the period).
 /// </summary>
 public sealed class GrahamBacktestService {
     private const string BenchmarkTicker = "SPY";
     private const decimal StartingValue = 1000m;
+
+    private const string TriggerFiling = "filing";
+    private const string TriggerPrice = "price";
 
     private readonly IDbmService _dbm;
 
@@ -26,7 +31,7 @@ public sealed class GrahamBacktestService {
     }
 
     public async Task<Result<GrahamBacktestReport>> GetBacktest(
-        int minScore, GrahamBacktestInterval interval, CancellationToken ct) {
+        int minScore, GrahamBacktestInterval interval, GrahamBacktestPolicy policy, CancellationToken ct) {
         Result<IReadOnlyCollection<DateOnly>> datesResult = await _dbm.GetGrahamScoreSnapshotDates(ct);
         if (datesResult.IsFailure || datesResult.Value is null)
             return Result<GrahamBacktestReport>.Failure(ErrorCodes.GenericError, datesResult.ErrorMessage);
@@ -46,27 +51,18 @@ public sealed class GrahamBacktestService {
         if (constituentsResult.IsFailure || constituentsResult.Value is null)
             return Result<GrahamBacktestReport>.Failure(ErrorCodes.GenericError, constituentsResult.ErrorMessage);
 
-        var byDate = new Dictionary<DateOnly, List<GrahamSnapshotConstituent>>();
-        foreach (GrahamSnapshotConstituent c in constituentsResult.Value) {
-            if (!byDate.TryGetValue(c.AsOfDate, out List<GrahamSnapshotConstituent>? list)) {
-                list = [];
-                byDate[c.AsOfDate] = list;
-            }
-            list.Add(c);
-        }
-
-        var companyIdsByDate = new Dictionary<DateOnly, HashSet<ulong>>();
+        var byDate = new Dictionary<DateOnly, Dictionary<ulong, GrahamSnapshotConstituent>>();
         var allConstituentIds = new HashSet<ulong>();
-        foreach (KeyValuePair<DateOnly, List<GrahamSnapshotConstituent>> entry in byDate) {
-            var ids = new HashSet<ulong>();
-            foreach (GrahamSnapshotConstituent c in entry.Value) {
-                _ = ids.Add(c.CompanyId);
-                _ = allConstituentIds.Add(c.CompanyId);
+        foreach (GrahamSnapshotConstituent c in constituentsResult.Value) {
+            if (!byDate.TryGetValue(c.AsOfDate, out Dictionary<ulong, GrahamSnapshotConstituent>? qualifying)) {
+                qualifying = [];
+                byDate[c.AsOfDate] = qualifying;
             }
-            companyIdsByDate[entry.Key] = ids;
+            qualifying[c.CompanyId] = c;
+            _ = allConstituentIds.Add(c.CompanyId);
         }
 
-        // Fundamentals per constituent per date, used to attribute entered/left changes
+        // Fundamentals per constituent per date, used to attribute membership changes
         // to a new filing vs a pure price move
         var fundamentalsByCompany = new Dictionary<ulong, Dictionary<DateOnly, GrahamSnapshotFundamentals>>();
         if (allConstituentIds.Count > 0) {
@@ -83,6 +79,60 @@ public sealed class GrahamBacktestService {
             }
         }
 
+        // Pass 1: simulate the positions timeline. At each date, sell held companies that
+        // no longer qualify and buy qualifying companies not yet held — but only when the
+        // change's trigger matches the trade policy. Under FilingOnly, a price-driven
+        // dropout is held until the next filing confirms it (at most ~a quarter), and a
+        // price-driven qualifier is bought when a filing confirms it still qualifies.
+        var heldByPeriod = new List<Dictionary<ulong, GrahamSnapshotConstituent>>(dates.Count);
+        var entryTriggersByPeriod = new List<Dictionary<ulong, string>>(dates.Count);
+        var exitTriggersAtDate = new List<Dictionary<ulong, string>>(dates.Count);
+
+        var held = new Dictionary<ulong, GrahamSnapshotConstituent>();
+        for (int i = 0; i < dates.Count; i++) {
+            var entryTriggers = new Dictionary<ulong, string>();
+            var exitTriggers = new Dictionary<ulong, string>();
+
+            Dictionary<ulong, GrahamSnapshotConstituent> qualifying =
+                byDate.TryGetValue(dates[i], out Dictionary<ulong, GrahamSnapshotConstituent>? q) ? q : [];
+
+            if (i == 0) {
+                // Every policy starts from the same portfolio: the full qualifying list
+                foreach (KeyValuePair<ulong, GrahamSnapshotConstituent> entry in qualifying)
+                    held[entry.Key] = entry.Value;
+            } else {
+                var toSell = new List<ulong>();
+                foreach (KeyValuePair<ulong, GrahamSnapshotConstituent> position in held) {
+                    if (qualifying.ContainsKey(position.Key))
+                        continue;
+                    string trigger = ResolveTrigger(fundamentalsByCompany, position.Key, dates[i - 1], dates[i]);
+                    if (PolicyActsOn(policy, trigger)) {
+                        toSell.Add(position.Key);
+                        exitTriggers[position.Key] = trigger;
+                    }
+                }
+                foreach (ulong companyId in toSell)
+                    _ = held.Remove(companyId);
+
+                foreach (KeyValuePair<ulong, GrahamSnapshotConstituent> candidate in qualifying) {
+                    if (held.ContainsKey(candidate.Key)) {
+                        held[candidate.Key] = candidate.Value; // refresh name/ticker info
+                        continue;
+                    }
+                    string trigger = ResolveTrigger(fundamentalsByCompany, candidate.Key, dates[i - 1], dates[i]);
+                    if (PolicyActsOn(policy, trigger)) {
+                        held[candidate.Key] = candidate.Value;
+                        entryTriggers[candidate.Key] = trigger;
+                    }
+                }
+            }
+
+            heldByPeriod.Add(new Dictionary<ulong, GrahamSnapshotConstituent>(held));
+            entryTriggersByPeriod.Add(entryTriggers);
+            exitTriggersAtDate.Add(exitTriggers);
+        }
+
+        // Pass 2: price each period's portfolio and chain the returns
         DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         decimal cumulative = StartingValue;
@@ -96,13 +146,15 @@ public sealed class GrahamBacktestService {
             DateOnly startDate = dates[i];
             DateOnly endDate = i + 1 < dates.Count ? dates[i + 1] : today;
 
-            List<GrahamSnapshotConstituent> constituents =
-                byDate.TryGetValue(startDate, out List<GrahamSnapshotConstituent>? list) ? list : [];
+            Dictionary<ulong, GrahamSnapshotConstituent> portfolio = heldByPeriod[i];
+            Dictionary<ulong, string> entryTriggers = entryTriggersByPeriod[i];
+            Dictionary<ulong, string>? nextExitTriggers = i + 1 < dates.Count ? exitTriggersAtDate[i + 1] : null;
+            Dictionary<ulong, GrahamSnapshotConstituent>? nextPortfolio = i + 1 < dates.Count ? heldByPeriod[i + 1] : null;
 
             var tickers = new List<string> { BenchmarkTicker };
-            foreach (GrahamSnapshotConstituent c in constituents) {
-                if (!string.IsNullOrWhiteSpace(c.Ticker))
-                    tickers.Add(c.Ticker);
+            foreach (KeyValuePair<ulong, GrahamSnapshotConstituent> position in portfolio) {
+                if (!string.IsNullOrWhiteSpace(position.Value.Ticker))
+                    tickers.Add(position.Value.Ticker);
             }
             string[] tickerArray = [.. tickers];
 
@@ -115,14 +167,12 @@ public sealed class GrahamBacktestService {
             Dictionary<string, LatestPrice> startPrices = ToTickerMap(startPricesTask.Result);
             Dictionary<string, LatestPrice> endPrices = ToTickerMap(endPricesTask.Result);
 
-            HashSet<ulong>? previousIds = i > 0 && companyIdsByDate.TryGetValue(dates[i - 1], out HashSet<ulong>? prev) ? prev : null;
-            HashSet<ulong>? nextIds = i + 1 < dates.Count && companyIdsByDate.TryGetValue(dates[i + 1], out HashSet<ulong>? next) ? next : null;
-
             decimal returnSum = 0m;
             int returnCount = 0;
-            var periodConstituents = new List<GrahamBacktestConstituent>(constituents.Count);
+            var periodConstituents = new List<GrahamBacktestConstituent>(portfolio.Count);
 
-            foreach (GrahamSnapshotConstituent c in constituents) {
+            foreach (KeyValuePair<ulong, GrahamSnapshotConstituent> position in portfolio) {
+                GrahamSnapshotConstituent c = position.Value;
                 LatestPrice? startPrice = null;
                 LatestPrice? endPrice = null;
                 if (c.Ticker is not null) {
@@ -141,14 +191,12 @@ public sealed class GrahamBacktestService {
                     returnCount++;
                 }
 
-                bool entered = i > 0 && previousIds is not null && !previousIds.Contains(c.CompanyId);
-                bool left = nextIds is not null && !nextIds.Contains(c.CompanyId);
+                bool entered = entryTriggers.ContainsKey(c.CompanyId);
+                bool left = nextPortfolio is not null && !nextPortfolio.ContainsKey(c.CompanyId);
 
-                string? enteredTrigger = entered
-                    ? ResolveTrigger(fundamentalsByCompany, c.CompanyId, dates[i - 1], startDate)
-                    : null;
-                string? leftTrigger = left
-                    ? ResolveTrigger(fundamentalsByCompany, c.CompanyId, startDate, dates[i + 1])
+                string? enteredTrigger = entered ? entryTriggers[c.CompanyId] : null;
+                string? leftTrigger = left && nextExitTriggers is not null && nextExitTriggers.TryGetValue(c.CompanyId, out string? exitTrigger)
+                    ? exitTrigger
                     : null;
 
                 periodConstituents.Add(new GrahamBacktestConstituent(
@@ -157,6 +205,8 @@ public sealed class GrahamBacktestService {
                     endPrice?.Close, endPrice?.PriceDate,
                     periodReturnPct, entered, left, enteredTrigger, leftTrigger));
             }
+
+            SortByTicker(periodConstituents);
 
             // Equal weight across priced holdings; an empty month sits in cash (0%)
             decimal portfolioReturn = returnCount > 0 ? returnSum / returnCount : 0m;
@@ -175,10 +225,10 @@ public sealed class GrahamBacktestService {
                 benchmarkComplete = false;
             }
 
-            totalConstituents += constituents.Count;
+            totalConstituents += portfolio.Count;
 
             periods.Add(new GrahamBacktestPeriod(
-                startDate, endDate, constituents.Count,
+                startDate, endDate, portfolio.Count,
                 Math.Round(portfolioReturn * 100m, 2),
                 Math.Round(cumulative, 2),
                 benchmarkReturnPct, benchmarkCumulativeOut,
@@ -211,8 +261,13 @@ public sealed class GrahamBacktestService {
         return Result<GrahamBacktestReport>.Success(new GrahamBacktestReport(summary, periods));
     }
 
-    private const string TriggerFiling = "filing";
-    private const string TriggerPrice = "price";
+    private static bool PolicyActsOn(GrahamBacktestPolicy policy, string trigger) {
+        return policy switch {
+            GrahamBacktestPolicy.FilingOnly => trigger == TriggerFiling,
+            GrahamBacktestPolicy.PriceOnly => trigger == TriggerPrice,
+            _ => true,
+        };
+    }
 
     /// <summary>
     /// Attributes a membership change between two adjacent snapshots: identical
@@ -242,6 +297,15 @@ public sealed class GrahamBacktestService {
             && before.SharesOutstanding == after.SharesOutstanding;
 
         return unchanged ? TriggerPrice : TriggerFiling;
+    }
+
+    private static void SortByTicker(List<GrahamBacktestConstituent> constituents) {
+        constituents.Sort((a, b) => {
+            int cmp = string.Compare(a.Ticker, b.Ticker, StringComparison.OrdinalIgnoreCase);
+            if (cmp == 0)
+                cmp = a.CompanyId.CompareTo(b.CompanyId);
+            return cmp;
+        });
     }
 
     private static bool MatchesInterval(DateOnly date, GrahamBacktestInterval interval) {

@@ -14,6 +14,14 @@
     </select>
   </label>
   <label>
+    Trade on
+    <select [(ngModel)]="policy" (ngModelChange)="onFilterChange()">
+      <option value="all">All changes (15/15 signal)</option>
+      <option value="filing">New filings only</option>
+      <option value="price">Price moves only</option>
+    </select>
+  </label>
+  <label>
     Min Score
     <select [(ngModel)]="minScore" (ngModelChange)="onFilterChange()">
       <option [ngValue]="15">15</option>
@@ -165,6 +173,13 @@
     Badge triggers: <strong>· filing</strong> = the company's fundamentals changed between snapshots
     (a new 10-K/10-Q arrived) — an information-driven change; <strong>· price</strong> = identical
     fundamentals, only the price crossed a scoring threshold — likely noise, prone to flickering back.
+  </p>
+  <p class="computed-at">
+    Trade policy: <strong>All changes</strong> holds exactly the qualifying list each period.
+    <strong>New filings only</strong> trades a company only when new fundamentals arrive — a
+    price-driven qualifier is bought once its next filing confirms it, and a price-driven dropout
+    is held until a filing confirms the exit. <strong>Price moves only</strong> is the mirror
+    image: it acts only on changes not backed by new information.
   </p>
   <p class="computed-at">
     Simulation assumes equal-weight buys at each rebalance close, no trading costs or taxes.

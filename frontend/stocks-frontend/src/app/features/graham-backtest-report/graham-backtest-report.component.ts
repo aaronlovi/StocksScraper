@@ -36,6 +36,7 @@ export interface BacktestChart {
 export class GrahamBacktestReportComponent implements OnInit {
   minScore = 15;
   interval: 'monthly' | 'weekly' = 'monthly';
+  policy: 'all' | 'filing' | 'price' = 'all';
 
   report = signal<GrahamBacktestReport | null>(null);
   loading = signal(true);
@@ -60,6 +61,10 @@ export class GrahamBacktestReportComponent implements OnInit {
     if (params.get('interval') === 'weekly') {
       this.interval = 'weekly';
     }
+    const policyParam = params.get('policy');
+    if (policyParam === 'filing' || policyParam === 'price') {
+      this.policy = policyParam;
+    }
     const minScoreParam = Number(params.get('minScore'));
     if (minScoreParam >= 13 && minScoreParam <= 15) {
       this.minScore = minScoreParam;
@@ -70,7 +75,7 @@ export class GrahamBacktestReportComponent implements OnInit {
   onFilterChange(): void {
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { interval: this.interval, minScore: this.minScore },
+      queryParams: { interval: this.interval, policy: this.policy, minScore: this.minScore },
       replaceUrl: true
     });
     this.fetchBacktest();
@@ -99,7 +104,7 @@ export class GrahamBacktestReportComponent implements OnInit {
     this.error.set(null);
     this.expanded.set(new Set());
 
-    this.api.getGrahamBacktest(this.minScore, this.interval).subscribe({
+    this.api.getGrahamBacktest(this.minScore, this.interval, this.policy).subscribe({
       next: data => {
         this.report.set(data);
         this.loading.set(false);

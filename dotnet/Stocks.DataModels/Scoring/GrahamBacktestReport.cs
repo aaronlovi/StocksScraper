@@ -13,6 +13,19 @@ public enum GrahamBacktestInterval {
 }
 
 /// <summary>
+/// Which membership changes the simulated portfolio acts on. All = act on every change
+/// (portfolio always equals the qualifying list). FilingOnly = trade a company only when
+/// its fundamentals changed between adjacent snapshots (a new filing); pure price
+/// flicker is ignored until the next filing confirms it. PriceOnly = the mirror image:
+/// act only on changes with unchanged fundamentals.
+/// </summary>
+public enum GrahamBacktestPolicy {
+    All = 0,
+    FilingOnly = 1,
+    PriceOnly = 2,
+}
+
+/// <summary>
 /// One holding during one backtest period. Entered means the company was not in the
 /// previous period's portfolio; Left means it is not in the next period's portfolio.
 /// EnteredTrigger/LeftTrigger say what caused the change: "filing" (fundamentals inputs

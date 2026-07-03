@@ -179,7 +179,7 @@ public class GrahamBacktestTests {
         await SeedBacktestScenario();
         var service = new GrahamBacktestService(_dbm);
 
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
         Assert.True(result.IsSuccess);
 
         GrahamBacktestReport report = result.Value!;
@@ -209,7 +209,7 @@ public class GrahamBacktestTests {
         await SeedBacktestScenario();
         var service = new GrahamBacktestService(_dbm);
 
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
         Assert.True(result.IsSuccess);
 
         var firstByTicker = new Dictionary<string, GrahamBacktestConstituent>();
@@ -253,7 +253,7 @@ public class GrahamBacktestTests {
         ], _ct);
 
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
         Assert.True(result.IsSuccess);
 
         var febByTicker = new Dictionary<string, GrahamBacktestConstituent>();
@@ -282,7 +282,7 @@ public class GrahamBacktestTests {
         ], _ct);
 
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
         Assert.True(result.IsSuccess);
 
         // AAA +20%, DDD 0% -> equal weight +10%
@@ -300,7 +300,7 @@ public class GrahamBacktestTests {
         ], _ct);
 
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
         Assert.True(result.IsSuccess);
 
         GrahamBacktestPeriod period = Assert.Single(result.Value!.Periods);
@@ -324,21 +324,122 @@ public class GrahamBacktestTests {
 
         var service = new GrahamBacktestService(_dbm);
 
-        Result<GrahamBacktestReport> monthly = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
+        Result<GrahamBacktestReport> monthly = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
         Assert.True(monthly.IsSuccess);
         GrahamBacktestPeriod monthlyPeriod = Assert.Single(monthly.Value!.Periods);
         Assert.Equal(monthEnd, monthlyPeriod.StartDate);
 
-        Result<GrahamBacktestReport> weekly = await service.GetBacktest(15, GrahamBacktestInterval.Weekly, _ct);
+        Result<GrahamBacktestReport> weekly = await service.GetBacktest(15, GrahamBacktestInterval.Weekly, GrahamBacktestPolicy.All, _ct);
         Assert.True(weekly.IsSuccess);
         GrahamBacktestPeriod weeklyPeriod = Assert.Single(weekly.Value!.Periods);
         Assert.Equal(friday, weeklyPeriod.StartDate);
     }
 
+    // Three-date scenario for trade policies:
+    // A: anchor, 15/15 throughout with constant fundamentals.
+    // P: qualifies at feb on price alone (same fundamentals), filing at mar confirms.
+    // D: disqualifies at feb on price alone (same fundamentals), filing at mar confirms.
+    private async Task SeedPolicyScenario() {
+        var jan = new DateOnly(2026, 1, 31);
+        var feb = new DateOnly(2026, 2, 28);
+        var mar = new DateOnly(2026, 3, 31);
+
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(jan, [
+            MakeScore(1, "111", "Anchor", "AAA", 15, 100m, jan, 500m),
+            MakeScore(2, "222", "PriceIn", "PPP", 14, 50m, jan, 300m),
+            MakeScore(3, "333", "PriceOut", "DDD", 15, 20m, jan, 100m),
+        ], _ct);
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(feb, [
+            MakeScore(1, "111", "Anchor", "AAA", 15, 100m, feb, 500m),
+            MakeScore(2, "222", "PriceIn", "PPP", 15, 40m, feb, 300m),
+            MakeScore(3, "333", "PriceOut", "DDD", 14, 25m, feb, 100m),
+        ], _ct);
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(mar, [
+            MakeScore(1, "111", "Anchor", "AAA", 15, 100m, mar, 500m),
+            MakeScore(2, "222", "PriceIn", "PPP", 15, 41m, mar, 350m),
+            MakeScore(3, "333", "PriceOut", "DDD", 14, 26m, mar, 90m),
+        ], _ct);
+    }
+
+    private static Dictionary<string, GrahamBacktestConstituent> ByTicker(GrahamBacktestPeriod period) {
+        var map = new Dictionary<string, GrahamBacktestConstituent>();
+        foreach (GrahamBacktestConstituent c in period.Constituents)
+            map[c.Ticker!] = c;
+        return map;
+    }
+
+    [Fact]
+    public async Task GetBacktest_FilingOnlyPolicy_DefersPriceDrivenChangesUntilNextFiling() {
+        await SeedPolicyScenario();
+        var service = new GrahamBacktestService(_dbm);
+
+        Result<GrahamBacktestReport> result =
+            await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.FilingOnly, _ct);
+        Assert.True(result.IsSuccess);
+
+        IReadOnlyList<GrahamBacktestPeriod> periods = result.Value!.Periods;
+        Assert.Equal(3, periods.Count);
+
+        // February: P's price-driven entry is skipped, D's price-driven exit is skipped
+        Dictionary<string, GrahamBacktestConstituent> feb = ByTicker(periods[1]);
+        Assert.Equal(2, periods[1].ConstituentCount);
+        Assert.False(feb.ContainsKey("PPP"));
+        Assert.True(feb.ContainsKey("DDD")); // still held despite disqualifying on price
+        Assert.True(feb["DDD"].Left);        // sold at March when the filing confirms
+        Assert.Equal("filing", feb["DDD"].LeftTrigger);
+
+        // March: filings arrive — P is bought, D is gone
+        Dictionary<string, GrahamBacktestConstituent> mar = ByTicker(periods[2]);
+        Assert.Equal(2, periods[2].ConstituentCount);
+        Assert.True(mar.ContainsKey("PPP"));
+        Assert.True(mar["PPP"].Entered);
+        Assert.Equal("filing", mar["PPP"].EnteredTrigger);
+        Assert.False(mar.ContainsKey("DDD"));
+    }
+
+    [Fact]
+    public async Task GetBacktest_PriceOnlyPolicy_ActsOnPriceDrivenChangesImmediately() {
+        await SeedPolicyScenario();
+        var service = new GrahamBacktestService(_dbm);
+
+        Result<GrahamBacktestReport> result =
+            await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.PriceOnly, _ct);
+        Assert.True(result.IsSuccess);
+
+        IReadOnlyList<GrahamBacktestPeriod> periods = result.Value!.Periods;
+
+        // January: D leaves at February on a price move
+        Dictionary<string, GrahamBacktestConstituent> jan = ByTicker(periods[0]);
+        Assert.True(jan["DDD"].Left);
+        Assert.Equal("price", jan["DDD"].LeftTrigger);
+
+        // February: P bought on its price-driven entry, D sold
+        Dictionary<string, GrahamBacktestConstituent> feb = ByTicker(periods[1]);
+        Assert.True(feb.ContainsKey("PPP"));
+        Assert.Equal("price", feb["PPP"].EnteredTrigger);
+        Assert.False(feb.ContainsKey("DDD"));
+    }
+
+    [Fact]
+    public async Task GetBacktest_AllPolicy_MatchesQualifyingListEachPeriod() {
+        await SeedPolicyScenario();
+        var service = new GrahamBacktestService(_dbm);
+
+        Result<GrahamBacktestReport> result =
+            await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
+        Assert.True(result.IsSuccess);
+
+        IReadOnlyList<GrahamBacktestPeriod> periods = result.Value!.Periods;
+        Assert.Equal(2, periods[0].ConstituentCount); // AAA, DDD
+        Assert.Equal(2, periods[1].ConstituentCount); // AAA, PPP
+        Assert.True(ByTicker(periods[1]).ContainsKey("PPP"));
+        Assert.False(ByTicker(periods[1]).ContainsKey("DDD"));
+    }
+
     [Fact]
     public async Task GetBacktest_FailsWhenNoSnapshotsExist() {
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
         Assert.True(result.IsFailure);
     }
 }

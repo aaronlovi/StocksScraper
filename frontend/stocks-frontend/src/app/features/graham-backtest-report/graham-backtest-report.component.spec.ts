@@ -168,7 +168,7 @@ describe('GrahamBacktestReportComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            snapshot: { queryParamMap: convertToParamMap({ interval: 'weekly', minScore: '14' }) }
+            snapshot: { queryParamMap: convertToParamMap({ interval: 'weekly', policy: 'filing', minScore: '14' }) }
           }
         }
       ]
@@ -179,11 +179,13 @@ describe('GrahamBacktestReportComponent', () => {
     fixture.detectChanges();
 
     const req = httpMock.expectOne(r =>
-      r.url.startsWith('/api/reports/graham-backtest') && r.url.includes('interval=weekly') && r.url.includes('minScore=14'));
+      r.url.startsWith('/api/reports/graham-backtest') && r.url.includes('interval=weekly')
+      && r.url.includes('policy=filing') && r.url.includes('minScore=14'));
     req.flush(makeReport());
     fixture.detectChanges();
 
     expect(fixture.componentInstance.interval).toBe('weekly');
+    expect(fixture.componentInstance.policy).toBe('filing');
     expect(fixture.componentInstance.minScore).toBe(14);
   });
 

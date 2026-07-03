@@ -58,6 +58,7 @@ public static class GrahamBacktestEndpoints {
             async (int? minScore,
                    string? interval,
                    string? policy,
+                   bool? confirm,
                    GrahamBacktestService service,
                    CancellationToken ct) => {
 
@@ -75,7 +76,7 @@ public static class GrahamBacktestEndpoints {
                 else if (string.Equals(policy, "price", StringComparison.OrdinalIgnoreCase))
                     tradePolicy = GrahamBacktestPolicy.PriceOnly;
 
-                Result<GrahamBacktestReport> result = await service.GetBacktest(min, grid, tradePolicy, ct);
+                Result<GrahamBacktestReport> result = await service.GetBacktest(min, grid, tradePolicy, confirm ?? false, ct);
                 return result.ToHttpResult();
             });
     }

@@ -311,6 +311,29 @@ export interface GrahamBacktestReport {
   periods: GrahamBacktestPeriod[];
 }
 
+export interface PortfolioRecommendation {
+  ticker: string;
+  companyId: number;
+  cik: string;
+  companyName: string | null;
+  action: 'buy' | 'sell' | 'hold' | 'unknown';
+  overallScore: number | null;
+  computableChecks: number | null;
+  pricePerShare: number | null;
+  priceDate: string | null;
+  trigger: 'filing' | 'price' | null;
+  reasons: string[];
+}
+
+export interface PortfolioAdvisorReport {
+  scoresComputedAt: string | null;
+  baselineSnapshotDate: string | null;
+  sells: PortfolioRecommendation[];
+  buys: PortfolioRecommendation[];
+  holds: PortfolioRecommendation[];
+  unknowns: PortfolioRecommendation[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   constructor(private http: HttpClient) {}
@@ -429,11 +452,16 @@ export class ApiService {
   getGrahamBacktest(
     minScore: number | null,
     interval: 'monthly' | 'weekly' = 'monthly',
-    policy: 'all' | 'filing' | 'price' = 'all'
+    policy: 'all' | 'filing' | 'price' = 'all',
+    confirm = false
   ): Observable<GrahamBacktestReport> {
-    const parts: string[] = [`interval=${interval}`, `policy=${policy}`];
+    const parts: string[] = [`interval=${interval}`, `policy=${policy}`, `confirm=${confirm}`];
     if (minScore != null) parts.push(`minScore=${minScore}`);
     return this.http.get<GrahamBacktestReport>(`/api/reports/graham-backtest?${parts.join('&')}`);
+  }
+
+  getPortfolioAdvice(tickers: string[]): Observable<PortfolioAdvisorReport> {
+    return this.http.post<PortfolioAdvisorReport>(`/api/reports/portfolio-advisor`, { tickers });
   }
 
   getBuffettReturns(params: ReturnsReportParams): Observable<PaginatedResponse<CompanyScoreReturnSummary>> {

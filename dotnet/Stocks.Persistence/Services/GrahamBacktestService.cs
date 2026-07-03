@@ -31,7 +31,8 @@ public sealed class GrahamBacktestService {
     }
 
     public async Task<Result<GrahamBacktestReport>> GetBacktest(
-        int minScore, GrahamBacktestInterval interval, GrahamBacktestPolicy policy, CancellationToken ct) {
+        int minScore, GrahamBacktestInterval interval, GrahamBacktestPolicy policy,
+        bool confirmChanges, CancellationToken ct) {
         Result<IReadOnlyCollection<DateOnly>> datesResult = await _dbm.GetGrahamScoreSnapshotDates(ct);
         if (datesResult.IsFailure || datesResult.Value is null)
             return Result<GrahamBacktestReport>.Failure(ErrorCodes.GenericError, datesResult.ErrorMessage);
@@ -84,6 +85,8 @@ public sealed class GrahamBacktestService {
         // change's trigger matches the trade policy. Under FilingOnly, a price-driven
         // dropout is held until the next filing confirms it (at most ~a quarter), and a
         // price-driven qualifier is bought when a filing confirms it still qualifies.
+        // With confirmChanges (hysteresis), a change must persist for two consecutive
+        // snapshots before it is acted on, so one-period threshold flicker never trades.
         var heldByPeriod = new List<Dictionary<ulong, GrahamSnapshotConstituent>>(dates.Count);
         var entryTriggersByPeriod = new List<Dictionary<ulong, string>>(dates.Count);
         var exitTriggersAtDate = new List<Dictionary<ulong, string>>(dates.Count);
@@ -101,11 +104,19 @@ public sealed class GrahamBacktestService {
                 foreach (KeyValuePair<ulong, GrahamSnapshotConstituent> entry in qualifying)
                     held[entry.Key] = entry.Value;
             } else {
+                Dictionary<ulong, GrahamSnapshotConstituent> prevQualifying =
+                    byDate.TryGetValue(dates[i - 1], out Dictionary<ulong, GrahamSnapshotConstituent>? pq) ? pq : [];
+
+                // Triggers span the whole window a confirmed change covers
+                int triggerFromIndex = confirmChanges ? Math.Max(0, i - 2) : i - 1;
+
                 var toSell = new List<ulong>();
                 foreach (KeyValuePair<ulong, GrahamSnapshotConstituent> position in held) {
                     if (qualifying.ContainsKey(position.Key))
                         continue;
-                    string trigger = ResolveTrigger(fundamentalsByCompany, position.Key, dates[i - 1], dates[i]);
+                    if (confirmChanges && prevQualifying.ContainsKey(position.Key))
+                        continue; // first miss: wait for confirmation
+                    string trigger = ResolveTrigger(fundamentalsByCompany, position.Key, dates[triggerFromIndex], dates[i]);
                     if (PolicyActsOn(policy, trigger)) {
                         toSell.Add(position.Key);
                         exitTriggers[position.Key] = trigger;
@@ -119,7 +130,9 @@ public sealed class GrahamBacktestService {
                         held[candidate.Key] = candidate.Value; // refresh name/ticker info
                         continue;
                     }
-                    string trigger = ResolveTrigger(fundamentalsByCompany, candidate.Key, dates[i - 1], dates[i]);
+                    if (confirmChanges && !prevQualifying.ContainsKey(candidate.Key))
+                        continue; // first qualification: wait for confirmation
+                    string trigger = ResolveTrigger(fundamentalsByCompany, candidate.Key, dates[triggerFromIndex], dates[i]);
                     if (PolicyActsOn(policy, trigger)) {
                         held[candidate.Key] = candidate.Value;
                         entryTriggers[candidate.Key] = trigger;

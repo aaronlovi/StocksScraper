@@ -51,6 +51,12 @@ export const routes: Routes = [
       import('./features/graham-backtest-report/graham-backtest-report.component').then(m => m.GrahamBacktestReportComponent)
   },
   {
+    path: 'portfolio-advisor',
+    title: 'Stocks - Portfolio Advisor',
+    loadComponent: () =>
+      import('./features/portfolio-advisor/portfolio-advisor.component').then(m => m.PortfolioAdvisorComponent)
+  },
+  {
     path: 'company/:cik',
     loadComponent: () =>
       import('./features/company/company.component').then(m => m.CompanyComponent)

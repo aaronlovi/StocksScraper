@@ -1,0 +1,99 @@
+.page-subtitle {
+  margin: -0.5rem 0 1rem;
+  color: var(--text-muted, #666);
+  font-size: 0.9rem;
+  max-width: 68ch;
+}
+
+.advisor-input {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.advisor-input textarea {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9rem;
+  min-width: 26ch;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  resize: vertical;
+}
+
+.refresh-btn {
+  padding: 0.45rem 1.1rem;
+  border: 1px solid var(--accent, #1a5c6b);
+  border-radius: 4px;
+  background: var(--accent, #1a5c6b);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.group-heading {
+  margin-top: 1.75rem;
+}
+
+.action-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+}
+
+.action-sell {
+  background: rgba(160, 45, 45, 0.12);
+  color: #a02d2d;
+}
+
+.action-buy {
+  background: rgba(26, 107, 60, 0.12);
+  color: #1a6b3c;
+}
+
+.action-hold {
+  background: rgba(26, 92, 107, 0.12);
+  color: var(--accent, #1a5c6b);
+}
+
+.flow-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(26, 92, 107, 0.12);
+  color: var(--accent, #1a5c6b);
+}
+
+.flow-badge.trigger-price {
+  background: transparent;
+  border: 1px dashed currentColor;
+  opacity: 0.65;
+}
+
+.reasons {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
+
+.reasons li + li {
+  margin-top: 0.2rem;
+}

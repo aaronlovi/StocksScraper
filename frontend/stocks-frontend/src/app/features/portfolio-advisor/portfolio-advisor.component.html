@@ -1,0 +1,129 @@
+<h2>Portfolio Advisor</h2>
+<p class="page-subtitle">
+  Paste your current holdings (one ticker per line — extra text after the symbol and
+  <code>#</code>-comment lines are ignored). Recommendations use the Graham 15-point scores:
+  sell what no longer scores 15/15, buy what newly does, with the specific checks that flipped
+  and whether a filing or a price move drove the change.
+</p>
+
+<div class="advisor-input">
+  <textarea
+    [(ngModel)]="tickersInput"
+    rows="10"
+    placeholder="AAPL&#10;PIPR&#10;TOL 150 shares  # quantity is ignored"
+    spellcheck="false"></textarea>
+  <button type="button" class="refresh-btn" (click)="analyze()" [disabled]="loading()">Analyze</button>
+</div>
+
+@if (loading()) {
+  <app-loading-overlay />
+} @else if (error()) {
+  <p class="error">{{ error() }}</p>
+} @else if (report(); as rpt) {
+
+  <h3 class="group-heading sell-heading">Sell ({{ rpt.sells.length }})</h3>
+  @if (rpt.sells.length === 0) {
+    <p class="no-results">Nothing to sell — every holding still scores 15/15.</p>
+  } @else {
+    <table>
+      <thead>
+        <tr><th>Action</th><th>Ticker</th><th>Company</th><th>Score</th><th class="num">Price</th><th></th><th>Reasons</th></tr>
+      </thead>
+      <tbody>
+        @for (rec of rpt.sells; track rec.ticker) {
+          <tr>
+            <td><span [class]="actionClass(rec)">SELL</span></td>
+            <td>{{ rec.ticker }}</td>
+            <td><a [routerLink]="['/company', rec.cik, 'scoring']" target="_blank">{{ rec.companyName ?? ('CIK ' + rec.cik) }}</a></td>
+            <td><span class="score-badge" [class]="scoreBadgeClass(rec.overallScore ?? 0)">{{ rec.overallScore }}/{{ rec.computableChecks }}</span></td>
+            <td class="num">{{ fmtPrice(rec.pricePerShare) }}</td>
+            <td>
+              @if (rec.trigger) {
+                <span class="flow-badge" [class.trigger-price]="rec.trigger === 'price'">{{ rec.trigger }}</span>
+              }
+            </td>
+            <td><ul class="reasons">@for (r of rec.reasons; track r) { <li>{{ r }}</li> }</ul></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <h3 class="group-heading buy-heading">Buy ({{ rpt.buys.length }})</h3>
+  @if (rpt.buys.length === 0) {
+    <p class="no-results">No 15/15 companies outside your portfolio right now.</p>
+  } @else {
+    <table>
+      <thead>
+        <tr><th>Action</th><th>Ticker</th><th>Company</th><th>Score</th><th class="num">Price</th><th></th><th>Reasons</th></tr>
+      </thead>
+      <tbody>
+        @for (rec of rpt.buys; track rec.ticker) {
+          <tr>
+            <td><span [class]="actionClass(rec)">BUY</span></td>
+            <td>{{ rec.ticker }}</td>
+            <td><a [routerLink]="['/company', rec.cik, 'scoring']" target="_blank">{{ rec.companyName ?? ('CIK ' + rec.cik) }}</a></td>
+            <td><span class="score-badge" [class]="scoreBadgeClass(rec.overallScore ?? 0)">{{ rec.overallScore }}/{{ rec.computableChecks }}</span></td>
+            <td class="num">{{ fmtPrice(rec.pricePerShare) }}</td>
+            <td>
+              @if (rec.trigger) {
+                <span class="flow-badge" [class.trigger-price]="rec.trigger === 'price'">{{ rec.trigger }}</span>
+              }
+            </td>
+            <td><ul class="reasons">@for (r of rec.reasons; track r) { <li>{{ r }}</li> }</ul></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <h3 class="group-heading">Hold ({{ rpt.holds.length }})</h3>
+  @if (rpt.holds.length === 0) {
+    <p class="no-results">None of your holdings currently score 15/15.</p>
+  } @else {
+    <table>
+      <thead>
+        <tr><th>Action</th><th>Ticker</th><th>Company</th><th>Score</th><th class="num">Price</th><th></th><th>Reasons</th></tr>
+      </thead>
+      <tbody>
+        @for (rec of rpt.holds; track rec.ticker) {
+          <tr>
+            <td><span [class]="actionClass(rec)">HOLD</span></td>
+            <td>{{ rec.ticker }}</td>
+            <td><a [routerLink]="['/company', rec.cik, 'scoring']" target="_blank">{{ rec.companyName ?? ('CIK ' + rec.cik) }}</a></td>
+            <td><span class="score-badge" [class]="scoreBadgeClass(rec.overallScore ?? 0)">{{ rec.overallScore }}/{{ rec.computableChecks }}</span></td>
+            <td class="num">{{ fmtPrice(rec.pricePerShare) }}</td>
+            <td></td>
+            <td><ul class="reasons">@for (r of rec.reasons; track r) { <li>{{ r }}</li> }</ul></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  @if (rpt.unknowns.length > 0) {
+    <h3 class="group-heading">Unrecognized ({{ rpt.unknowns.length }})</h3>
+    <table>
+      <thead>
+        <tr><th>Ticker</th><th>Reasons</th></tr>
+      </thead>
+      <tbody>
+        @for (rec of rpt.unknowns; track rec.ticker) {
+          <tr>
+            <td>{{ rec.ticker }}</td>
+            <td><ul class="reasons">@for (r of rec.reasons; track r) { <li>{{ r }}</li> }</ul></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <p class="computed-at">
+    Scores computed: {{ rpt.scoresComputedAt ?? 'n/a' }} · Change baseline: snapshot of
+    {{ rpt.baselineSnapshotDate ?? 'none available' }}. Refresh EDGAR + Stooq data and re-run
+    --compute-all-scores (run.sh option 8) before relying on this. Trigger badges:
+    <strong>filing</strong> = fundamentals changed since the baseline; <strong>price</strong> =
+    only the price moved across a threshold (historically these dip-entries carried most of the
+    backtest edge, but they can flicker — consider confirming over two snapshots). Not investment advice.
+  </p>
+}

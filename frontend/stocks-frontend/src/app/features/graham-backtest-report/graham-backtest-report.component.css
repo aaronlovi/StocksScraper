@@ -5,6 +5,16 @@
   max-width: 68ch;
 }
 
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-end;
+  padding-bottom: 0.35rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .refresh-btn {
   align-self: flex-end;
   padding: 0.35rem 0.9rem;

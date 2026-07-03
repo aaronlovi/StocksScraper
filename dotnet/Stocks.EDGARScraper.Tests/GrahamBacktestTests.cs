@@ -179,7 +179,7 @@ public class GrahamBacktestTests {
         await SeedBacktestScenario();
         var service = new GrahamBacktestService(_dbm);
 
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, _ct);
         Assert.True(result.IsSuccess);
 
         GrahamBacktestReport report = result.Value!;
@@ -209,7 +209,7 @@ public class GrahamBacktestTests {
         await SeedBacktestScenario();
         var service = new GrahamBacktestService(_dbm);
 
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, _ct);
         Assert.True(result.IsSuccess);
 
         var firstByTicker = new Dictionary<string, GrahamBacktestConstituent>();
@@ -253,7 +253,7 @@ public class GrahamBacktestTests {
         ], _ct);
 
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, _ct);
         Assert.True(result.IsSuccess);
 
         var febByTicker = new Dictionary<string, GrahamBacktestConstituent>();
@@ -282,7 +282,7 @@ public class GrahamBacktestTests {
         ], _ct);
 
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, _ct);
         Assert.True(result.IsSuccess);
 
         // AAA +20%, DDD 0% -> equal weight +10%
@@ -300,7 +300,7 @@ public class GrahamBacktestTests {
         ], _ct);
 
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, _ct);
         Assert.True(result.IsSuccess);
 
         GrahamBacktestPeriod period = Assert.Single(result.Value!.Periods);
@@ -324,12 +324,12 @@ public class GrahamBacktestTests {
 
         var service = new GrahamBacktestService(_dbm);
 
-        Result<GrahamBacktestReport> monthly = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
+        Result<GrahamBacktestReport> monthly = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, _ct);
         Assert.True(monthly.IsSuccess);
         GrahamBacktestPeriod monthlyPeriod = Assert.Single(monthly.Value!.Periods);
         Assert.Equal(monthEnd, monthlyPeriod.StartDate);
 
-        Result<GrahamBacktestReport> weekly = await service.GetBacktest(15, GrahamBacktestInterval.Weekly, GrahamBacktestPolicy.All, _ct);
+        Result<GrahamBacktestReport> weekly = await service.GetBacktest(15, GrahamBacktestInterval.Weekly, GrahamBacktestPolicy.All, false, _ct);
         Assert.True(weekly.IsSuccess);
         GrahamBacktestPeriod weeklyPeriod = Assert.Single(weekly.Value!.Periods);
         Assert.Equal(friday, weeklyPeriod.StartDate);
@@ -374,7 +374,7 @@ public class GrahamBacktestTests {
         var service = new GrahamBacktestService(_dbm);
 
         Result<GrahamBacktestReport> result =
-            await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.FilingOnly, _ct);
+            await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.FilingOnly, false, _ct);
         Assert.True(result.IsSuccess);
 
         IReadOnlyList<GrahamBacktestPeriod> periods = result.Value!.Periods;
@@ -403,7 +403,7 @@ public class GrahamBacktestTests {
         var service = new GrahamBacktestService(_dbm);
 
         Result<GrahamBacktestReport> result =
-            await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.PriceOnly, _ct);
+            await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.PriceOnly, false, _ct);
         Assert.True(result.IsSuccess);
 
         IReadOnlyList<GrahamBacktestPeriod> periods = result.Value!.Periods;
@@ -426,7 +426,7 @@ public class GrahamBacktestTests {
         var service = new GrahamBacktestService(_dbm);
 
         Result<GrahamBacktestReport> result =
-            await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
+            await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, _ct);
         Assert.True(result.IsSuccess);
 
         IReadOnlyList<GrahamBacktestPeriod> periods = result.Value!.Periods;
@@ -437,9 +437,55 @@ public class GrahamBacktestTests {
     }
 
     [Fact]
+    public async Task GetBacktest_ConfirmChanges_SkipsOnePeriodFlicker() {
+        var jan = new DateOnly(2026, 1, 31);
+        var feb = new DateOnly(2026, 2, 28);
+        var mar = new DateOnly(2026, 3, 31);
+
+        // F flickers out for one period only; G drops out and stays out; H flickers in for one period only
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(jan, [
+            MakeScore(1, "111", "Flicker", "FFF", 15, 29m, jan, 600m),
+            MakeScore(2, "222", "Gone", "GGG", 15, 10m, jan, 200m),
+            MakeScore(3, "333", "Hop", "HHH", 14, 5m, jan, 50m),
+        ], _ct);
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(feb, [
+            MakeScore(1, "111", "Flicker", "FFF", 14, 26m, feb, 600m),
+            MakeScore(2, "222", "Gone", "GGG", 14, 9m, feb, 200m),
+            MakeScore(3, "333", "Hop", "HHH", 15, 6m, feb, 50m),
+        ], _ct);
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(mar, [
+            MakeScore(1, "111", "Flicker", "FFF", 15, 28m, mar, 600m),
+            MakeScore(2, "222", "Gone", "GGG", 14, 8m, mar, 200m),
+            MakeScore(3, "333", "Hop", "HHH", 14, 5m, mar, 50m),
+        ], _ct);
+
+        var service = new GrahamBacktestService(_dbm);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(
+            15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, true, _ct);
+        Assert.True(result.IsSuccess);
+
+        IReadOnlyList<GrahamBacktestPeriod> periods = result.Value!.Periods;
+
+        // FFF's one-period dip is never traded: held throughout
+        Assert.True(ByTicker(periods[0]).ContainsKey("FFF"));
+        Assert.True(ByTicker(periods[1]).ContainsKey("FFF"));
+        Assert.True(ByTicker(periods[2]).ContainsKey("FFF"));
+        Assert.False(ByTicker(periods[1])["FFF"].Left);
+
+        // GGG's dropout persists (feb + mar): sold at March
+        Assert.True(ByTicker(periods[1]).ContainsKey("GGG"));
+        Assert.True(ByTicker(periods[1])["GGG"].Left);
+        Assert.False(ByTicker(periods[2]).ContainsKey("GGG"));
+
+        // HHH qualified for one period only: never bought
+        Assert.False(ByTicker(periods[1]).ContainsKey("HHH"));
+        Assert.False(ByTicker(periods[2]).ContainsKey("HHH"));
+    }
+
+    [Fact]
     public async Task GetBacktest_FailsWhenNoSnapshotsExist() {
         var service = new GrahamBacktestService(_dbm);
-        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, _ct);
+        Result<GrahamBacktestReport> result = await service.GetBacktest(15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, _ct);
         Assert.True(result.IsFailure);
     }
 }

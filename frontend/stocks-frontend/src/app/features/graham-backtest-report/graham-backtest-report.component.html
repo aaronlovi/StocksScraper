@@ -29,6 +29,10 @@
       <option [ngValue]="13">13+</option>
     </select>
   </label>
+  <label class="checkbox-label" title="Hysteresis: a change must persist for two consecutive snapshots before it is traded, so one-period threshold flicker never trades">
+    <input type="checkbox" [(ngModel)]="confirm" (ngModelChange)="onFilterChange()" />
+    Confirm changes (2 periods)
+  </label>
   <button type="button" class="refresh-btn" (click)="refresh()" [disabled]="loading()">Refresh</button>
 </div>
 

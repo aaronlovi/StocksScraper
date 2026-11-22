@@ -1320,6 +1320,8 @@ public class ScoringService {
         DateOnly latestAnnualDate = DateOnly.MinValue;
         DateOnly oldestDate = DateOnly.MaxValue;
 
+        Dictionary<DateOnly, int> annualYearKeys = BuildAnnualYearKeys(values);
+
         foreach (ScoringConceptValue v in values) {
             if (v.ReportDate > mostRecentDate)
                 mostRecentDate = v.ReportDate;
@@ -1334,7 +1336,7 @@ public class ScoringService {
             if (v.FilingTypeId == (int)FilingType.TenK) {
                 if (v.ReportDate > latestAnnualDate)
                     latestAnnualDate = v.ReportDate;
-                int year = v.ReportDate.Year;
+                int year = annualYearKeys[v.ReportDate];
                 if (!annualByYear.ContainsKey(year))
                     annualByYear[year] = new Dictionary<string, decimal>(StringComparer.Ordinal);
 
@@ -1382,6 +1384,33 @@ public class ScoringService {
         }
 
         return new GroupedScoringData(annualByYear, balanceTypes, mostRecentSnapshot, oldestRetainedEarnings);
+    }
+
+    /// <summary>
+    /// Gives each distinct 10-K report date its own annual year key. The newest date keys to
+    /// its calendar year; each older date to min(its calendar year, the next newer key − 1).
+    /// So two annual reports in one calendar year (a fiscal-year change, or 52/53-week years
+    /// ending in early January) are both kept, and a run of early-January year ends shifts
+    /// down in a cascade. A real gap year is kept. The DEI fiscal year would be better but is
+    /// not in the database (plan E7).
+    /// </summary>
+    internal static Dictionary<DateOnly, int> BuildAnnualYearKeys(IReadOnlyCollection<ScoringConceptValue> values) {
+        var dates = new List<DateOnly>();
+        var seen = new HashSet<DateOnly>();
+        foreach (ScoringConceptValue v in values) {
+            if (v.FilingTypeId == (int)FilingType.TenK && seen.Add(v.ReportDate))
+                dates.Add(v.ReportDate);
+        }
+        dates.Sort((a, b) => b.CompareTo(a));
+
+        var keys = new Dictionary<DateOnly, int>(dates.Count);
+        int? newerKey = null;
+        foreach (DateOnly date in dates) {
+            int key = newerKey.HasValue ? Math.Min(date.Year, newerKey.Value - 1) : date.Year;
+            keys[date] = key;
+            newerKey = key;
+        }
+        return keys;
     }
 
     /// <summary>

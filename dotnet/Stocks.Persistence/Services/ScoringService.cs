@@ -195,18 +195,37 @@ public class ScoringService {
 
     private static readonly Dictionary<string, TaxonomyBalanceTypes> EmptyBalanceTypes = new(StringComparer.Ordinal);
 
-    public Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScores(CancellationToken ct) =>
-        ComputeAllScoresCore(null, ct);
+    public async Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScores(CancellationToken ct) =>
+        ToSummaries(await ComputeAllScoresCore(null, ct));
 
     /// <summary>
     /// Computes scores for all companies as of a historical date: only filings publicly
     /// available (accepted) by that date, and the price at/just before that date, are used.
     /// </summary>
-    public Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScoresAsOf(
+    public async Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScoresAsOf(
         DateOnly asOfDate, CancellationToken ct) =>
-        ComputeAllScoresCore(asOfDate, ct);
+        ToSummaries(await ComputeAllScoresCore(asOfDate, ct));
 
-    private async Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScoresCore(
+    /// <summary>
+    /// Computes scores for all companies (latest data) and returns each summary together
+    /// with its individual check results. Reads only; nothing is written.
+    /// </summary>
+    public Task<Result<IReadOnlyCollection<CompanyScoreDetail>>> ComputeAllScoreDetails(CancellationToken ct) =>
+        ComputeAllScoresCore(null, ct);
+
+    private static Result<IReadOnlyCollection<CompanyScoreSummary>> ToSummaries(
+        Result<IReadOnlyCollection<CompanyScoreDetail>> detailsResult) {
+        if (detailsResult.IsFailure || detailsResult.Value is null)
+            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+                ErrorCodes.GenericError, detailsResult.ErrorMessage);
+
+        var summaries = new List<CompanyScoreSummary>(detailsResult.Value.Count);
+        foreach (CompanyScoreDetail detail in detailsResult.Value)
+            summaries.Add(detail.Summary);
+        return Result<IReadOnlyCollection<CompanyScoreSummary>>.Success(summaries);
+    }
+
+    private async Task<Result<IReadOnlyCollection<CompanyScoreDetail>>> ComputeAllScoresCore(
         DateOnly? asOfDate, CancellationToken ct) {
         // 1. Fetch all scoring data points in one query
         _logger?.LogInformation("Fetching scoring data points (as of {AsOfDate})...", asOfDate?.ToString() ?? "now");
@@ -214,7 +233,7 @@ public class ScoringService {
             ? await _dbmService.GetAllScoringDataPointsAsOf(AllConceptNames, asOfDate.Value, ct)
             : await _dbmService.GetAllScoringDataPoints(AllConceptNames, ct);
         if (dataResult.IsFailure || dataResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch batch scoring data points.");
         _logger?.LogInformation("Fetched {Count} scoring data points", dataResult.Value.Count);
 
@@ -224,7 +243,7 @@ public class ScoringService {
             ? await _dbmService.GetAllPricesNearDate(asOfDate.Value, ct)
             : await _dbmService.GetAllLatestPrices(ct);
         if (pricesResult.IsFailure || pricesResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch prices.");
         _logger?.LogInformation("Fetched {Count} prices", pricesResult.Value.Count);
 
@@ -233,7 +252,7 @@ public class ScoringService {
         Result<IReadOnlyCollection<CompanyTicker>> tickersResult =
             await _dbmService.GetAllCompanyTickers(ct);
         if (tickersResult.IsFailure || tickersResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch company tickers.");
         _logger?.LogInformation("Fetched {Count} company tickers", tickersResult.Value.Count);
 
@@ -242,7 +261,7 @@ public class ScoringService {
         Result<IReadOnlyCollection<CompanyName>> namesResult =
             await _dbmService.GetAllCompanyNames(ct);
         if (namesResult.IsFailure || namesResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch company names.");
         _logger?.LogInformation("Fetched {Count} company names", namesResult.Value.Count);
 
@@ -251,7 +270,7 @@ public class ScoringService {
         Result<IReadOnlyCollection<Company>> companiesResult =
             await _dbmService.GetAllCompaniesByDataSource("EDGAR", ct);
         if (companiesResult.IsFailure || companiesResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch companies.");
         _logger?.LogInformation("Fetched {Count} companies", companiesResult.Value.Count);
 
@@ -291,7 +310,7 @@ public class ScoringService {
         // 7. Compute scores for each company
         _logger?.LogInformation("Scoring {Count} companies...", dataByCompany.Count);
         DateTime now = DateTime.UtcNow;
-        var results = new List<CompanyScoreSummary>(dataByCompany.Count);
+        var results = new List<CompanyScoreDetail>(dataByCompany.Count);
         int scored = 0;
         int logInterval = Math.Max(dataByCompany.Count / 10, 1);
 
@@ -363,7 +382,7 @@ public class ScoringService {
                 sharesOutstanding);
             decimal? percentageUpside = ComputePercentageUpside(maxBuyPrice, pricePerShare);
 
-            results.Add(new CompanyScoreSummary(
+            results.Add(new CompanyScoreDetail(new CompanyScoreSummary(
                 companyId, cik, companyName, ticker, exchange,
                 overallScore, computableChecks, yearsOfData,
                 metrics.BookValue, metrics.MarketCap,
@@ -372,7 +391,7 @@ public class ScoringService {
                 metrics.AverageOwnerEarnings, metrics.AverageRoeCF, metrics.AverageRoeOE,
                 metrics.EstimatedReturnCF, metrics.EstimatedReturnOE,
                 pricePerShare, priceDate, sharesOutstanding,
-                metrics.CurrentDividendsPaid, maxBuyPrice, percentageUpside, now));
+                metrics.CurrentDividendsPaid, maxBuyPrice, percentageUpside, now), scorecard));
 
             scored++;
             if (scored % logInterval == 0)
@@ -380,7 +399,7 @@ public class ScoringService {
         }
 
         _logger?.LogInformation("Finished scoring {Count} companies", results.Count);
-        return Result<IReadOnlyCollection<CompanyScoreSummary>>.Success(results);
+        return Result<IReadOnlyCollection<CompanyScoreDetail>>.Success(results);
     }
 
     public async Task<Result<ScoringResult>> ComputeScore(ulong companyId, CancellationToken ct) {

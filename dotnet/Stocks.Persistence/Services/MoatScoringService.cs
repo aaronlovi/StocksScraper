@@ -502,12 +502,28 @@ public class MoatScoringService {
     }
 
     public async Task<Result<IReadOnlyCollection<CompanyMoatScoreSummary>>> ComputeAllMoatScores(CancellationToken ct) {
+        Result<IReadOnlyCollection<CompanyMoatScoreDetail>> detailsResult = await ComputeAllMoatScoreDetails(ct);
+        if (detailsResult.IsFailure || detailsResult.Value is null)
+            return Result<IReadOnlyCollection<CompanyMoatScoreSummary>>.Failure(
+                ErrorCodes.GenericError, detailsResult.ErrorMessage);
+
+        var summaries = new List<CompanyMoatScoreSummary>(detailsResult.Value.Count);
+        foreach (CompanyMoatScoreDetail detail in detailsResult.Value)
+            summaries.Add(detail.Summary);
+        return Result<IReadOnlyCollection<CompanyMoatScoreSummary>>.Success(summaries);
+    }
+
+    /// <summary>
+    /// Computes moat scores for all companies and returns each summary together with its
+    /// individual check results. Reads only; nothing is written.
+    /// </summary>
+    public async Task<Result<IReadOnlyCollection<CompanyMoatScoreDetail>>> ComputeAllMoatScoreDetails(CancellationToken ct) {
         // 1. Fetch all scoring data points (8-year window)
         _logger?.LogInformation("Fetching moat scoring data points...");
         Result<IReadOnlyCollection<BatchScoringConceptValue>> dataResult =
             await _dbmService.GetAllScoringDataPoints(MoatConceptNames, 8, ct);
         if (dataResult.IsFailure || dataResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyMoatScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyMoatScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch batch scoring data points.");
         _logger?.LogInformation("Fetched {Count} moat scoring data points", dataResult.Value.Count);
 
@@ -516,7 +532,7 @@ public class MoatScoringService {
         Result<IReadOnlyCollection<LatestPrice>> pricesResult =
             await _dbmService.GetAllLatestPrices(ct);
         if (pricesResult.IsFailure || pricesResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyMoatScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyMoatScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch latest prices.");
         _logger?.LogInformation("Fetched {Count} latest prices", pricesResult.Value.Count);
 
@@ -525,7 +541,7 @@ public class MoatScoringService {
         Result<IReadOnlyCollection<CompanyTicker>> tickersResult =
             await _dbmService.GetAllCompanyTickers(ct);
         if (tickersResult.IsFailure || tickersResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyMoatScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyMoatScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch company tickers.");
         _logger?.LogInformation("Fetched {Count} company tickers", tickersResult.Value.Count);
 
@@ -534,7 +550,7 @@ public class MoatScoringService {
         Result<IReadOnlyCollection<CompanyName>> namesResult =
             await _dbmService.GetAllCompanyNames(ct);
         if (namesResult.IsFailure || namesResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyMoatScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyMoatScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch company names.");
         _logger?.LogInformation("Fetched {Count} company names", namesResult.Value.Count);
 
@@ -543,7 +559,7 @@ public class MoatScoringService {
         Result<IReadOnlyCollection<Company>> companiesResult =
             await _dbmService.GetAllCompaniesByDataSource("EDGAR", ct);
         if (companiesResult.IsFailure || companiesResult.Value is null)
-            return Result<IReadOnlyCollection<CompanyMoatScoreSummary>>.Failure(
+            return Result<IReadOnlyCollection<CompanyMoatScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch companies.");
         _logger?.LogInformation("Fetched {Count} companies", companiesResult.Value.Count);
 
@@ -583,7 +599,7 @@ public class MoatScoringService {
         // 7. Compute moat scores for each company
         _logger?.LogInformation("Scoring {Count} companies for moat...", dataByCompany.Count);
         DateTime now = DateTime.UtcNow;
-        var results = new List<CompanyMoatScoreSummary>(dataByCompany.Count);
+        var results = new List<CompanyMoatScoreDetail>(dataByCompany.Count);
         int scored = 0;
         int logInterval = Math.Max(dataByCompany.Count / 10, 1);
 
@@ -642,7 +658,7 @@ public class MoatScoringService {
 
             companyNameLookup.TryGetValue(companyId, out string? companyName);
 
-            results.Add(new CompanyMoatScoreSummary(
+            results.Add(new CompanyMoatScoreDetail(new CompanyMoatScoreSummary(
                 companyId, cik, companyName, ticker, exchange,
                 overallScore, computableChecks, yearsOfData,
                 metrics.AverageGrossMargin, metrics.AverageOperatingMargin,
@@ -650,7 +666,7 @@ public class MoatScoringService {
                 metrics.EstimatedReturnOE, metrics.RevenueCagr,
                 metrics.CapexRatio, metrics.InterestCoverage,
                 metrics.DebtToEquityRatio, pricePerShare, priceDate,
-                sharesOutstanding, now));
+                sharesOutstanding, now), scorecard));
 
             scored++;
             if (scored % logInterval == 0)
@@ -658,6 +674,6 @@ public class MoatScoringService {
         }
 
         _logger?.LogInformation("Finished moat scoring {Count} companies", results.Count);
-        return Result<IReadOnlyCollection<CompanyMoatScoreSummary>>.Success(results);
+        return Result<IReadOnlyCollection<CompanyMoatScoreDetail>>.Success(results);
     }
 }

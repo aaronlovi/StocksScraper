@@ -197,6 +197,14 @@ internal partial class Program {
             case "--compute-score-snapshots": {
                 return await HandleComputeScoreSnapshotsAsync(args);
             }
+            case "--snapshot-scores": {
+                Result res = await HandleSnapshotScoresAsync(args);
+                if (res.IsFailure) {
+                    _logger.LogError("SnapshotScores failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
             default: {
                 _logger.LogError("Invalid command-line switch. Please use --get-full-cik-list, or --parse-bulk-xbrl-archive");
                 return 3;
@@ -1134,6 +1142,51 @@ internal partial class Program {
         return failed == 0
             ? Result.Success
             : Result.Failure(ErrorCodes.GenericError, $"{failed} of {snapshotDates.Count} snapshot dates failed.");
+    }
+
+    /// <summary>
+    /// Read-only: computes value and moat scores for every company and writes them to
+    /// &lt;prefix&gt;-value.csv and &lt;prefix&gt;-moat.csv. Writes nothing to the database.
+    /// Usage: --snapshot-scores --out &lt;prefix&gt;
+    /// </summary>
+    private static async Task<Result> HandleSnapshotScoresAsync(string[] args) {
+        string? prefix = null;
+        for (int i = 1; i < args.Length; i++) {
+            if (args[i] == "--out" && i + 1 < args.Length)
+                prefix = args[++i];
+        }
+        if (string.IsNullOrWhiteSpace(prefix))
+            return Result.Failure(ErrorCodes.ValidationError, "Usage: --snapshot-scores --out <prefix>");
+
+        CancellationToken ct = CancellationToken.None;
+
+        var scoringService = new Stocks.Persistence.Services.ScoringService(_dbm!, _logger);
+        Result<IReadOnlyCollection<Stocks.DataModels.Scoring.CompanyScoreDetail>> valueResult =
+            await scoringService.ComputeAllScoreDetails(ct);
+        if (valueResult.IsFailure || valueResult.Value is null)
+            return Result.Failure(ErrorCodes.GenericError, valueResult.ErrorMessage);
+
+        string valuePath = prefix + "-value.csv";
+        var valueLines = new List<string>(valueResult.Value.Count + 1) { ScoreSnapshotCsv.ValueHeader() };
+        foreach (Stocks.DataModels.Scoring.CompanyScoreDetail detail in valueResult.Value)
+            valueLines.Add(ScoreSnapshotCsv.FormatValueRow(detail));
+        await File.WriteAllLinesAsync(valuePath, valueLines, ct);
+        _logger.LogInformation("Wrote {Count} value score rows to {Path}", valueResult.Value.Count, valuePath);
+
+        var moatService = new Stocks.Persistence.Services.MoatScoringService(_dbm!, _logger);
+        Result<IReadOnlyCollection<Stocks.DataModels.Scoring.CompanyMoatScoreDetail>> moatResult =
+            await moatService.ComputeAllMoatScoreDetails(ct);
+        if (moatResult.IsFailure || moatResult.Value is null)
+            return Result.Failure(ErrorCodes.GenericError, moatResult.ErrorMessage);
+
+        string moatPath = prefix + "-moat.csv";
+        var moatLines = new List<string>(moatResult.Value.Count + 1) { ScoreSnapshotCsv.MoatHeader() };
+        foreach (Stocks.DataModels.Scoring.CompanyMoatScoreDetail detail in moatResult.Value)
+            moatLines.Add(ScoreSnapshotCsv.FormatMoatRow(detail));
+        await File.WriteAllLinesAsync(moatPath, moatLines, ct);
+        _logger.LogInformation("Wrote {Count} moat score rows to {Path}", moatResult.Value.Count, moatPath);
+
+        return Result.Success;
     }
 
     private static async Task<Result> ComputeAndStoreAllMoatScoresAsync() {

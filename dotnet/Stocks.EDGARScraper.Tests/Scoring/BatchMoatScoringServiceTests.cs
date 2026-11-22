@@ -161,4 +161,38 @@ public class BatchMoatScoringServiceTests {
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Value!.Count);
     }
+
+    [Fact]
+    public async Task ComputeAllMoatScoreDetails_MatchesComputeAllMoatScores() {
+        await SeedTaxonomyConcepts();
+        await SeedCompanyWithMoatData(1, 320193, "Apple Inc", "AAPL", "NASDAQ", 8);
+        await SeedCompanyWithMoatData(2, 789019, "Microsoft", "MSFT", "NASDAQ", 5);
+        await SeedPrices("AAPL", "NASDAQ", 250m);
+
+        var service = new MoatScoringService(_dbm);
+        Result<IReadOnlyCollection<CompanyMoatScoreSummary>> summaries = await service.ComputeAllMoatScores(_ct);
+        Result<IReadOnlyCollection<CompanyMoatScoreDetail>> details = await service.ComputeAllMoatScoreDetails(_ct);
+
+        Assert.True(summaries.IsSuccess);
+        Assert.True(details.IsSuccess);
+        Assert.Equal(summaries.Value!.Count, details.Value!.Count);
+
+        var summaryById = new Dictionary<ulong, CompanyMoatScoreSummary>();
+        foreach (CompanyMoatScoreSummary s in summaries.Value)
+            summaryById[s.CompanyId] = s;
+
+        foreach (CompanyMoatScoreDetail d in details.Value) {
+            CompanyMoatScoreSummary expected = summaryById[d.Summary.CompanyId];
+            Assert.Equal(expected with { ComputedAt = d.Summary.ComputedAt }, d.Summary);
+            Assert.Equal(13, d.Checks.Count);
+            int passes = 0;
+            int computable = 0;
+            foreach (ScoringCheck check in d.Checks) {
+                if (check.Result != ScoringCheckResult.NotAvailable) computable++;
+                if (check.Result == ScoringCheckResult.Pass) passes++;
+            }
+            Assert.Equal(d.Summary.OverallScore, passes);
+            Assert.Equal(d.Summary.ComputableChecks, computable);
+        }
+    }
 }

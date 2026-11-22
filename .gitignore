@@ -4,3 +4,4 @@
 *.trx
 .venv-taxonomy/
 tsx-aggregator/
+snapshots/

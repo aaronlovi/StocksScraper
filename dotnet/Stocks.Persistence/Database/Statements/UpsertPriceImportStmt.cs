@@ -24,7 +24,7 @@ DO UPDATE SET last_imported_utc = EXCLUDED.last_imported_utc;
         [
             new NpgsqlParameter<long>("cik", (long)_status.Cik),
             new NpgsqlParameter<string>("ticker", _status.Ticker),
-            new NpgsqlParameter<string?>("exchange", _status.Exchange),
+            new NpgsqlParameter<string>("exchange", PriceExchangeColumn.ToDb(_status.Exchange)),
             new NpgsqlParameter("last_imported_utc", NpgsqlDbType.TimestampTz) { Value = _status.LastImportedUtc }
         ];
 }

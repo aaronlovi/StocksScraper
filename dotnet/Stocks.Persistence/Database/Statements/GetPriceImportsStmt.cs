@@ -41,7 +41,7 @@ FROM price_imports;
     protected override bool ProcessCurrentRow(NpgsqlDataReader reader) {
         ulong cik = (ulong)reader.GetInt64(_cikIndex);
         string ticker = reader.GetString(_tickerIndex);
-        string? exchange = reader.GetNullableRefType<string>(_exchangeIndex);
+        string? exchange = PriceExchangeColumn.FromDb(reader.GetNullableRefType<string>(_exchangeIndex));
         var lastImportedUtc = reader.GetDateTime(_lastImportedIndex);
         _imports.Add(new PriceImportStatus(cik, ticker, exchange, lastImportedUtc));
         return true;

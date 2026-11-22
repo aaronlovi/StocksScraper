@@ -188,10 +188,10 @@ public class ScoringServiceTests {
 
     #endregion
 
-    #region ResolveDepletionAndAmortization tests
+    #region ResolveTotalDa tests (formerly ResolveDepletionAndAmortization)
 
     [Fact]
-    public void ResolveDepletionAndAmortization_UsesDirectConceptsWhenPresent() {
+    public void ResolveTotalDa_PrefersCombinedOverComponents() {
         var data = new Dictionary<string, decimal> {
             ["Depletion"] = 1_000_000m,
             ["AmortizationOfIntangibleAssets"] = 2_000_000m,
@@ -199,44 +199,27 @@ public class ScoringServiceTests {
             ["Depreciation"] = 8_000_000m,
         };
 
-        decimal result = ScoringService.ResolveDepletionAndAmortization(data);
-
-        Assert.Equal(3_000_000m, result); // 1M + 2M, NOT DDA-Depreciation
+        Assert.Equal(11_000_000m, ScoringService.ResolveTotalDa(data));
     }
 
     [Fact]
-    public void ResolveDepletionAndAmortization_FallsBackToDdaMinusDepreciation() {
+    public void ResolveTotalDa_CombinedIncludesDepreciation() {
         var data = new Dictionary<string, decimal> {
             ["DepreciationDepletionAndAmortization"] = 11_700_000_000m,
             ["Depreciation"] = 8_000_000_000m,
         };
 
-        decimal result = ScoringService.ResolveDepletionAndAmortization(data);
-
-        Assert.Equal(3_700_000_000m, result); // 11.7B - 8B
+        Assert.Equal(11_700_000_000m, ScoringService.ResolveTotalDa(data));
     }
 
     [Fact]
-    public void ResolveDepletionAndAmortization_UsesPartialDirectConcepts() {
-        // Only amortization is tagged, no depletion
+    public void ResolveTotalDa_ComponentsWithoutCombined() {
         var data = new Dictionary<string, decimal> {
             ["AmortizationOfIntangibleAssets"] = 2_000_000m,
-            ["DepreciationDepletionAndAmortization"] = 11_000_000m,
             ["Depreciation"] = 8_000_000m,
         };
 
-        decimal result = ScoringService.ResolveDepletionAndAmortization(data);
-
-        Assert.Equal(2_000_000m, result); // Only amortization, depletion defaults to 0
-    }
-
-    [Fact]
-    public void ResolveDepletionAndAmortization_ReturnsZeroWhenNothingAvailable() {
-        var data = new Dictionary<string, decimal>();
-
-        decimal result = ScoringService.ResolveDepletionAndAmortization(data);
-
-        Assert.Equal(0m, result);
+        Assert.Equal(10_000_000m, ScoringService.ResolveTotalDa(data));
     }
 
     #endregion
@@ -1132,9 +1115,10 @@ public class ScoringServiceTests {
 
         DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
-        // OE = 30 + (8-5) + 0 + 0 - 2 + 0 = 31M  (DDA fallback: D&A - Depreciation)
+        // OE = 30 + 8 (D&A, depreciation included) - 2 = 36M. Before E1 the add-back was
+        // D&A - depreciation (3M): depreciation was never added back.
         Assert.NotNull(metrics.AverageOwnerEarnings);
-        Assert.Equal(31_000_000m, metrics.AverageOwnerEarnings!.Value);
+        Assert.Equal(36_000_000m, metrics.AverageOwnerEarnings!.Value);
     }
 
     [Fact]
@@ -2414,7 +2398,8 @@ public class ScoringServiceTests {
         var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
             ["NetIncomeLoss"] = 100m, ["DepreciationDepletionAndAmortization"] = 30m, [capexConcept] = 40m,
         });
-        Assert.Equal(60m, CallComputeDerivedMetrics(rawData, null, null).AverageOwnerEarnings);
+        // 100 + 30 D&A - 40 capex
+        Assert.Equal(90m, CallComputeDerivedMetrics(rawData, null, null).AverageOwnerEarnings);
     }
 
     [Fact]
@@ -2484,6 +2469,61 @@ public class ScoringServiceTests {
     [Fact]
     public void ResolveTotalDa_NothingReported_IsZero() {
         Assert.Equal(0m, ScoringService.ResolveTotalDa(new Dictionary<string, decimal>()));
+    }
+
+    #endregion
+
+    #region Depreciation add-back (E1) tests
+
+    private static decimal? OwnerEarningsOf(Dictionary<string, decimal> data) =>
+        CallComputeDerivedMetrics(MakeSingleYearData(2024, data), null, null).AverageOwnerEarnings;
+
+    [Fact]
+    public void DepreciationAddBack_MaintenanceCapexEqualToDepreciation_OwnerEarningsEqualsNetIncome() {
+        var data = new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["Depreciation"] = 20m,
+            ["PaymentsToAcquirePropertyPlantAndEquipment"] = 20m,
+        };
+        Assert.Equal(100m, OwnerEarningsOf(data));
+    }
+
+    [Fact]
+    public void DepreciationAddBack_OnlyCombinedDdaReported() {
+        var data = new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["DepreciationDepletionAndAmortization"] = 20m,
+            ["PaymentsToAcquirePropertyPlantAndEquipment"] = 20m,
+        };
+        Assert.Equal(100m, OwnerEarningsOf(data));
+    }
+
+    [Fact]
+    public void DepreciationAddBack_DaPlusDepletion() {
+        var data = new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["DepreciationAndAmortization"] = 20m, ["Depletion"] = 5m,
+            ["PaymentsToAcquirePropertyPlantAndEquipment"] = 10m,
+        };
+        Assert.Equal(115m, OwnerEarningsOf(data));
+    }
+
+    [Fact]
+    public void DepreciationAddBack_DaWithAmortization_NotDoubleCounted() {
+        // DepreciationAndAmortization already includes amortization.
+        var data = new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["DepreciationAndAmortization"] = 20m,
+            ["AmortizationOfIntangibleAssets"] = 5m,
+            ["PaymentsToAcquirePropertyPlantAndEquipment"] = 10m,
+        };
+        Assert.Equal(110m, OwnerEarningsOf(data));
+    }
+
+    [Fact]
+    public void DepreciationAddBack_DepreciationAmortizationAndDepletionSummed() {
+        var data = new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["Depreciation"] = 10m,
+            ["AmortizationOfIntangibleAssets"] = 5m, ["Depletion"] = 3m,
+            ["PaymentsToAcquirePropertyPlantAndEquipment"] = 10m,
+        };
+        Assert.Equal(108m, OwnerEarningsOf(data));
     }
 
     #endregion

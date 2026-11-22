@@ -192,7 +192,6 @@ public class ScoringService {
     internal static readonly string[] DeferredTaxChain = ["DeferredIncomeTaxExpenseBenefit", "DeferredIncomeTaxesAndTaxCredits"];
     internal static readonly string[] DepletionChain = ["Depletion"];
     internal static readonly string[] AmortizationChain = ["AmortizationOfIntangibleAssets"];
-    internal static readonly string[] DDAChain = ["DepreciationDepletionAndAmortization", "DepreciationAndAmortization"];
     internal static readonly string[] DepreciationChain = ["Depreciation"];
     internal static readonly string[] DeferredTaxFederalChain = ["DeferredFederalIncomeTaxExpenseBenefit"];
     internal static readonly string[] DeferredTaxForeignChain = ["DeferredForeignIncomeTaxExpenseBenefit"];
@@ -580,27 +579,6 @@ public class ScoringService {
         return ResolveField(yearData, EquityChain, null);
     }
 
-    /// <summary>
-    /// Fix F: Resolve depletion + amortization with computed fallback.
-    /// 1. If Depletion or AmortizationOfIntangibleAssets is found, use them (0 for missing).
-    /// 2. Otherwise, compute DepreciationDepletionAndAmortization - Depreciation.
-    /// 3. If that's not possible, return 0.
-    /// </summary>
-    internal static decimal ResolveDepletionAndAmortization(IReadOnlyDictionary<string, decimal> yearData) {
-        decimal? depletion = ResolveField(yearData, DepletionChain, null);
-        decimal? amortization = ResolveField(yearData, AmortizationChain, null);
-
-        if (depletion.HasValue || amortization.HasValue)
-            return (depletion ?? 0m) + (amortization ?? 0m);
-
-        // Fallback: DDA - Depreciation = depletion + amortization
-        decimal? dda = ResolveField(yearData, DDAChain, null);
-        decimal? depreciation = ResolveField(yearData, DepreciationChain, null);
-        if (dda.HasValue && depreciation.HasValue)
-            return dda.Value - depreciation.Value;
-
-        return 0m;
-    }
 
     /// <summary>
     /// Total depreciation, depletion and amortization:
@@ -623,7 +601,8 @@ public class ScoringService {
 
     /// <summary>
     /// Owner earnings for one year, shared by the value and moat scores:
-    /// NI + depletion and amortization + deferred tax + other non-cash - capex + WC change.
+    /// NI + total D&amp;A + deferred tax + other non-cash - capex + WC change. Capex is gross,
+    /// so depreciation is added back with the rest of D&amp;A (it does not cancel).
     /// Null when the year has no net income, or when it has D&amp;A but no capex tag: its capex
     /// is unknown, not zero, so the year leaves every owner-earnings average. A year with
     /// neither capex nor D&amp;A keeps capex 0.
@@ -639,14 +618,13 @@ public class ScoringService {
         if (!capEx.HasValue && ResolveTotalDa(yearData) > 0m)
             return null;
 
-        decimal depletionAndAmortization = ResolveDepletionAndAmortization(yearData);
+        decimal totalDa = ResolveTotalDa(yearData);
         decimal deferredTax = ResolveDeferredTax(yearData);
         decimal otherNonCash = ResolveOtherNonCash(yearData);
         decimal workingCapitalChange = ResolveWorkingCapitalChange(yearData, balanceTypes);
 
-        // Simplified OE formula (Depreciation cancels out)
         return netIncome.Value
-            + depletionAndAmortization + deferredTax + otherNonCash
+            + totalDa + deferredTax + otherNonCash
             - (capEx ?? 0m) + workingCapitalChange;
     }
 

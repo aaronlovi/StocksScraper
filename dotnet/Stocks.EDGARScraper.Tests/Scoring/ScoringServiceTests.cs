@@ -2178,4 +2178,39 @@ public class ScoringServiceTests {
     }
 
     #endregion
+
+    #region Other payables as a sibling (E8) tests
+
+    [Fact]
+    public void OtherPayables_SummedWithAccountsPayableAndAccrued() {
+        // IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities is a sibling of AP and
+        // accrued under the combined concept, so all three count.
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayable"] = 1000m,
+            ["IncreaseDecreaseInAccruedLiabilities"] = 500m,
+            ["IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities"] = 300m,
+        };
+        Assert.Equal(1800m, ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes));
+    }
+
+    [Fact]
+    public void OtherPayables_WithAccountsPayableOnly_BothCount() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayableTrade"] = 1000m,
+            ["IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities"] = -300m,
+        };
+        Assert.Equal(700m, ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes));
+    }
+
+    [Fact]
+    public void OtherPayables_CombinedTotalPresent_UsedAlone() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"] = 2000m,
+            ["IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities"] = 300m,
+            ["IncreaseDecreaseInAccountsPayable"] = 1000m,
+        };
+        Assert.Equal(2000m, ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes));
+    }
+
+    #endregion
 }

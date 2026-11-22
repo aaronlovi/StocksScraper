@@ -692,11 +692,13 @@ public class ScoringService {
             // Still pick up AP separately since this combined concept doesn't include AP
             AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], ref sum, ref foundAny);
         } else {
+            // The combined AP + accrued total, else its children: AP, accrued, and "other AP and
+            // accrued" (a sibling of the two, not an alternative total).
             if (!AccumulateWcField(yearData, balanceTypes, [
-                    "IncreaseDecreaseInAccountsPayableAndAccruedLiabilities",
-                    "IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities"], ref sum, ref foundAny)) {
+                    "IncreaseDecreaseInAccountsPayableAndAccruedLiabilities"], ref sum, ref foundAny)) {
                 AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccountsPayable", "IncreaseDecreaseInAccountsPayableTrade"], ref sum, ref foundAny);
                 AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInAccruedLiabilities", "IncreaseDecreaseInOtherAccruedLiabilities"], ref sum, ref foundAny);
+                AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities"], ref sum, ref foundAny);
             }
         }
 

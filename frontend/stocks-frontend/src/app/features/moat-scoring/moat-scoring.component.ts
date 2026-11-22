@@ -179,18 +179,18 @@ export class MoatScoringComponent implements OnInit {
     const m = s.metrics;
     const n = s.yearsOfData;
     return {
-      1: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeCF),
-      2: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeOE),
+      1: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs; fails if any year has equity ≤ 0) = ' + fmtPct(m.averageRoeCF),
+      2: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs; fails if any year has equity ≤ 0) = ' + fmtPct(m.averageRoeOE),
       3: 'Avg annual: Gross Profit / Revenue (' + n + ' yrs) = ' + fmtPct(m.averageGrossMargin),
       4: 'Avg annual: Operating Income / Revenue (' + n + ' yrs) = ' + fmtPct(m.averageOperatingMargin),
       5: 'CAGR: (Latest Rev / Oldest Rev)^(1/' + n + ') − 1 = ' + fmtPct(m.revenueCagr),
       6: 'Owner Earnings > 0 in ' + m.positiveOeYears + ' of ' + m.totalOeYears + ' years',
-      7: 'Avg CapEx / Avg Owner Earnings = ' + fmtPct(m.capexRatio),
+      7: 'Avg CapEx / Avg Owner Earnings = ' + fmtPct(m.capexRatio) + ' (fails when avg owner earnings ≤ 0)',
       8: 'Dividends or buybacks in ' + m.capitalReturnYears + ' of ' + m.totalCapitalReturnYears + ' years',
-      9: 'Debt / Equity = ' + fmtRatio(m.debtToEquityRatio),
-      10: 'Operating Income / Interest Expense = ' + (m.interestCoverage != null ? m.interestCoverage.toFixed(2) + 'x' : 'N/A'),
+      9: 'Debt / Equity = ' + fmtRatio(m.debtToEquityRatio) + ' (fails when equity ≤ 0)',
+      10: 'Operating Income / Interest Expense = ' + (m.interestCoverage != null ? m.interestCoverage.toFixed(2) + 'x' : 'N/A') + ' (debt-free: passes when operating income > 0)',
       11: n + ' years of annual financial data available',
-      12: '(Avg OE − Dividends) / Market Cap = ' + fmtPct(m.estimatedReturnOE),
+      12: 'Avg OE / Market Cap = ' + fmtPct(m.estimatedReturnOE),
       13: 'Same as #12 — checks return isn\'t unrealistically high',
     };
   });
@@ -210,7 +210,7 @@ export class MoatScoringComponent implements OnInit {
       { label: 'CapEx Ratio', display: fmtPct(m.capexRatio), tooltip: 'Avg CapEx / Avg Owner Earnings' },
       { label: 'Interest Coverage', display: m.interestCoverage != null ? m.interestCoverage.toFixed(2) + 'x' : 'N/A', tooltip: 'Operating Income / Interest Expense (latest year)' },
       { label: 'Debt / Equity', display: fmtRatio(m.debtToEquityRatio), tooltip: 'Total Debt / Stockholders\' Equity' },
-      { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE), tooltip: '(Avg OE − Dividends) / Market Cap' },
+      { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE), tooltip: 'Avg OE / Market Cap (OE is before dividends)' },
       { label: 'Market Cap', display: fmtCurrency(m.marketCap), tooltip: 'Price × Shares = ' + fmtPrice(m.pricePerShare) + ' × ' + shares },
       { label: 'Current Dividends Paid', display: fmtCurrency(m.currentDividendsPaid), tooltip: 'Dividends from most recent fiscal year' },
       { label: 'Positive OE Years', display: m.positiveOeYears + ' / ' + m.totalOeYears, tooltip: 'Years where Owner Earnings > 0' },

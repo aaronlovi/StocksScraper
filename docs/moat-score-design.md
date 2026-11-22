@@ -49,8 +49,12 @@ All margin and return checks that reference an "average" compute the metric per 
 - **Gross margin (per year)**: `Gross Profit / Revenue * 100`. Gross Profit is resolved directly from the `GrossProfit` concept if reported; otherwise derived as `Revenue - COGS`. Revenue and COGS each use fallback chains (see section 5.2). If neither Gross Profit nor COGS is available for a year, that year is excluded from the average. The check returns `NotAvailable` if no years have computable gross margin.
 - **Operating margin (per year)**: `Operating Income / Revenue * 100`. Same averaging and fallback pattern. This deliberately uses `OperatingIncomeLoss` rather than `NetIncomeLoss` because net income is subject to manipulation in individual years through timing of asset sales/write-downs, tax provision adjustments, one-time restructuring charges, and interest expense from financing decisions. Operating income captures core business profitability before these distortions.
 - **Revenue CAGR**: `(Revenue_latest / Revenue_oldest) ^ (1 / years) - 1`, using the oldest and most recent fiscal years with revenue data.
-- **CapEx ratio**: `Average annual CapEx / Average annual Owner Earnings * 100`, using the same CapEx and Owner Earnings values already computed by the Value Score.
-- **Interest coverage**: `Operating Income / Interest Expense`, using the most recent fiscal year.
+- **Owner earnings (per year)**: `Net Income + total D&A + Deferred Tax + Other Non-Cash − CapEx + Working Capital Change`, the same per-year function as the Value Score. Total D&A includes depreciation (capex is gross). A year with D&A but no capex tag has unknown capex: it leaves the owner-earnings average, ROE (OE), the positive-OE count and the capex ratio (ADR 0013).
+- **CapEx ratio**: `Average annual CapEx / Average annual Owner Earnings * 100`. CapEx is averaged over years with known owner earnings and a capex tag. Average owner earnings ≤ 0 fails the check (sign rule).
+- **Interest coverage**: `Operating Income / Interest Expense`, using the most recent fiscal year. Without an interest figure, a debt-free company (no long-term, current, short-term, notes, credit-line or combined debt tag is non-zero on the latest balance sheet) passes when operating income is > 0 and fails when it is ≤ 0; otherwise the check is not available.
+- **Debt-to-equity**: latest balance sheet; gaps in a newer 10-Q are filled from the latest 10-K. Equity ≤ 0 fails the check (sign rule).
+- **ROE (CF and OE)**: average of yearly ratios; any year in the average with equity ≤ 0 fails the check.
+- **Estimated return (OE)**: `Average Owner Earnings / Market Cap * 100`. Owner earnings are before dividends, so dividends are not subtracted.
 
 ### 3.2. Scoring Checks - Check Table
 
@@ -62,10 +66,10 @@ All margin and return checks that reference an "average" compute the metric per 
 | 4 | Operating margin avg | >= 15% | Efficient operations — not just high prices but cost discipline |
 | 5 | Revenue growth | CAGR > 3% over available years | A moat should defend and expand market share |
 | 6 | Positive owner earnings every year | 0 failing years | A true franchise doesn't lose money |
-| 7 | Low capex ratio | CapEx / Owner Earnings < 50% | Capital-light businesses retain more earnings |
+| 7 | Low capex ratio | CapEx / Owner Earnings < 50% (fails when owner earnings ≤ 0) | Capital-light businesses retain more earnings |
 | 8 | Consistent dividend or buyback | Returned capital in >= 75% of years | Management returning excess cash to owners |
-| 9 | Debt-to-equity | < 1.0 | Still prudent on debt, but more permissive than the value score's 0.5 |
-| 10 | Interest coverage | Operating Income / Interest Expense > 5x | Can easily service debt from operations |
+| 9 | Debt-to-equity | < 1.0 (fails when equity ≤ 0) | Still prudent on debt, but more permissive than the value score's 0.5 |
+| 10 | Interest coverage | Operating Income / Interest Expense > 5x; debt-free: operating income > 0 | Can easily service debt from operations |
 | 11 | History | >= 7 years | Longer track record — moats are proven over time |
 | 12 | Estimated return (OE) | > 3% | Lower floor — paying up for quality is acceptable |
 | 13 | Estimated return (OE) | < 40% | Same sanity cap — avoid distressed/anomalous situations |

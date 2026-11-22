@@ -18,3 +18,4 @@ This folder contains Architecture Decision Records for the StocksScraper solutio
 | 10 | Folder Structure for ADRs | Accepted | 2025-06-14 | [0010-folder-structure-for-adrs.md](0010-folder-structure-for-adrs.md) |
 | 11 | Multi-Year Taxonomy Strategy | Accepted | 2026-02-16 | [0011-multi-year-taxonomy-strategy.md](0011-multi-year-taxonomy-strategy.md) |
 | 12 | Graham Score Snapshots for Backtesting | Accepted | 2026-07-01 | [0012-graham-score-snapshots-for-backtesting.md](0012-graham-score-snapshots-for-backtesting.md) |
+| 13 | Scoring Data Rules | Accepted | 2026-11-22 | [0013-scoring-data-rules.md](0013-scoring-data-rules.md) |

@@ -1,0 +1,102 @@
+# 13. Scoring Data Rules
+
+## Status
+Accepted (2026-11-22)
+
+## Context
+The value score (`ScoringService`, 15 checks) and the moat score (`MoatScoringService`, 13 checks) were ported from tsx-aggregator before tsx fixed a series of data-handling defects. A review of the 2026-08-23 load found that the ports still carried those defects and that EDGAR's XBRL tags added some of their own:
+
+- ratios over a negative denominator passed checks (D/E, P/B, D/B, ROE, capex ratio);
+- aggregate tags were used with the wrong sign, and "other, net" tags replaced the components they sit beside;
+- financing and capex chains took the first tag found, though co-reported tags are often separate lines;
+- a missing capex tag counted as zero;
+- owner earnings never added back depreciation;
+- dividends were subtracted twice in the estimated returns and the max buy price;
+- a sparse latest 10-Q hid 10-K balances (CAT: $30.7B of debt read as 0);
+- debt-free companies got n/a on interest coverage.
+
+These change what the scores mean, so the rules are recorded here. The full analysis, measurements and per-fix specs are in the Obsidian note *EDGAR Scoring Bug Fix Plan* (Stocks Research / Edgar Scraper Notes).
+
+## Decision
+
+### Three-state checks
+Every check is Pass, Fail or NotAvailable; the score counts Pass only, and `computable_checks` counts Pass + Fail. A missing input is `null` end to end, never a sentinel. Fail and NotAvailable score the same; they differ in `computable_checks` and in the display.
+
+### Sign rule (non-positive denominators)
+A ratio over a denominator ≤ 0 **fails** its check. The rule lives in the check, not the division, so the displayed ratio stays honest (a negative D/E still shows).
+- Value checks 1 (D/E, equity ≤ 0), 3 (P/B, book value ≤ 0 with a market cap) and 10 (D/B, book value ≤ 0); moat check 9 (D/E).
+- Moat check 7 (capex ratio) fails when average owner earnings ≤ 0.
+- ROE (value 14/15, moat 1/2): a year in the average with equity ≤ 0 gives no credit, so the check fails. CF and OE carry separate flags because their year sets differ. The displayed average is unchanged.
+
+### Missing versus zero, per field
+| Field | Missing means |
+|---|---|
+| Debt (`DebtChain`) | 0 for D/E and D/B (unchanged; see E4 in the plan) |
+| Debt-free (interest coverage) | no long-term or other debt concept (current, short-term, notes, credit lines, combined) is non-zero |
+| Goodwill, intangibles | 0 |
+| Dividends | 0 when the year has a cash-flow statement |
+| Capex | **unknown** when the year reports D&A: the year leaves the owner-earnings average, ROE (OE), the moat positive-OE count and the capex ratio. With neither capex nor D&A, capex is 0 |
+| Balance sheet in a newer 10-Q | filled from the latest 10-K (below) |
+
+### Latest-10-K fallback for balance-sheet fields
+`GroupAndPartitionData` fills gaps in the most recent snapshot (usually a 10-Q) from the latest 10-K, group by group, never mixing a group across dates:
+- the equity group (assets, liabilities, L&SE, equity and NCI concepts) is replaced whole when equity can't be resolved from the 10-Q;
+- long-term debt (`DebtChain`) and the other debt concepts are two subgroups, each copied when none of it is present;
+- goodwill, intangibles, retained earnings and current assets/liabilities are filled individually.
+
+Shares are **not** filled: a share count up to a year old gave 152 companies, mostly SPACs, a first and stale market cap. Duration concepts are never filled. The as-of path (ADR 0012) shares the code.
+
+### Taxonomy-weight signs
+Signs follow the us-gaap calculation weights in the indirect cash-flow statement. An IncreaseDecrease concept's balance type is its cash-flow direction, not its balance-sheet side: credit (asset increase, liability decrease) reduces operating cash and is negated; debit adds.
+- `IncreaseDecreaseInOperatingCapital` and `OtherNoncashIncomeExpense` (both credit, weight −1) are negated.
+- `IncreaseDecreaseInOtherOperatingCapitalNet` and `IncreaseDecreaseInOtherAccountsPayableAndAccruedLiabilities` are "other" lines: components beside their siblings, not alternative totals.
+- A test checks every IncreaseDecrease concept the code reads against the DB balance types. Filers who used the opposite sign (about 1 in 4 reconciling filings) stay wrong.
+
+### Chain classification and summing
+A chain is either alternatives (first found) or lines to combine:
+- **Alternatives:** equity, dividends, buybacks, D&A totals, capex. The capex chain is PP&E, productive assets, oil and gas P&E, other productive assets, other PP&E, capital improvements. Real-estate development is investment, not capex, and is left out.
+- **Nested, with a parent guard:** debt proceeds and repayments follow the taxonomy tree (senior and convertible under long-term, long-term under the all-debt total). A parent at least the sum of its present children (within 0.1%) contains them; a smaller parent is a separate line, so both count. Equal sibling values are one line tagged twice.
+- **Siblings, summed:** stock issuance and option exercises.
+- **Short-term debt:** net short-term debt, else lines of credit (net, or gross proceeds − repayments), plus net commercial paper. Notes-payable repayments count unless the net short-term figure (their parent) is present.
+
+### Interest coverage for debt-free companies
+Moat check 10: with a coverage figure, the > 5x threshold applies. Without one, a debt-free company passes when its latest operating income is > 0 and fails when it is ≤ 0. Otherwise (debt but no interest tag) it is NotAvailable.
+
+### Owner earnings
+Owner earnings = net income + total D&A + deferred tax + other non-cash − capex + working-capital change.
+- Total D&A is `DepreciationDepletionAndAmortization` outright; else `DepreciationAndAmortization` + depletion; else depreciation + depletion + amortization.
+- Capex is gross, so depreciation does not cancel. The "depreciation cancels out" formula in `.prompts/company-scoring-system-plan/plan.md` (archived) predates this ADR.
+- One shared per-year function serves both scores.
+
+### Dividends in returns
+Net cash flow starts from the change in cash, so it is already after dividends paid; owner earnings are before dividends.
+- Est. return (CF) = (avg NCF + dividends) ÷ market cap.
+- Est. return (OE) = avg OE ÷ market cap, on both scores.
+- Max buy price = min(3 × book, 20 × (avg NCF + dividends), 20 × avg OE) ÷ shares.
+
+## Consequences
+- Measured on the 2026-08-23 load with the read-only `--snapshot-scores` command and `scripts/score_snapshot_diff.py`, baseline → all fixes:
+  - **Value:** 7,750 of 14,018 scores changed; 13+ 171 → 233; 14+ 53 → 107; 15/15 16 → 30.
+  - **Moat:** 11,743 changed; 11+ 64 → 102; 13/13 4 → 3.
+  - Per-fix footprints are in the plan's progress log.
+- **Who moves:**
+  - Banks and dividend payers move up (E2).
+  - Insurers, banks without capex tags, and real-estate companies lose owner-earnings checks to n/a (E3).
+  - Negative-equity buyback compounders fail D/E and ROE (P1).
+  - Profitable debt-free companies pass interest coverage (P4).
+- **Stale until rebuilt:** `company_scores`, `company_moat_scores` and the 61 `graham_score_snapshots` dates keep the old scores until rebuilt (`--compute-all-scores`, `--compute-all-moat-scores`, then `--compute-score-snapshots`, about 2 hours). Backtest and Portfolio Advisor results change after the rebuild.
+- **Portfolio Advisor reasons:** `PortfolioAdvisorService` rebuilds checks from stored score rows, which lack equity and the ROE flags. Its "why it flipped" text therefore can't reflect the sign rule for checks 1, 14 and 15 (display only).
+- **Concept-list side effect:** adding concepts (P3 short-term debt, P4 other debt, E3 capex tags) can move a company's latest eligible filing date. A handful of companies flip unrelated checks for that reason.
+
+## Alternatives Considered
+Footprints are value / moat scores changed, measured against the baseline in a scratch replay unless noted.
+- **NotAvailable instead of Fail for non-positive denominators:** identical scores; rejected to match tsx and to count the check as computable.
+- **ROE: exclude negative-equity years** (3,140 / 3,095): lifts buyback compounders (ADSK FICO FTNT IDXX ORLY) on their few positive-equity years.
+- **ROE: such a year counts as 0%** (3,153 / 3,115).
+- **ROE: Σ numerator ÷ Σ equity** (3,874): really the separate E6 redesign; moves companies both ways.
+- **P2: flip the aggregates but keep "other, net" as a total** (284 / 306): still drops the components in 4,201 company-years.
+- **P3: plain summing** (220 value) or **NCF = Δcash − financing total − dividends** (4,409 / 2,153): the latter also removes bank deposit flows (E5) but changes what NCF means. Deferred with E5.
+- **P4: debt-free on long-term debt alone** (603 moat): passes companies whose debt is current or short-term.
+- **E3: two capex tags only** (measured: 1,184 / 2,485 vs 999 / 2,345): turns known capex at E&Ps and others into "unknown".
+- **E9 with a shares fill** (measured: 418 / 259 vs 268 / 109): stale SPAC market caps.
+- **E4–E7** (debt definition for D/E, financing-total NCF, Σ ÷ Σ ROE, fiscal-period year keys): measured separately for owner decisions (plan sections 4.5–4.8), not adopted here.

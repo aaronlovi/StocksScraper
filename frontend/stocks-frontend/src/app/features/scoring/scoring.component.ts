@@ -112,21 +112,21 @@ export class ScoringComponent implements OnInit {
     const diff = (m.adjustedRetainedEarnings != null && m.oldestRetainedEarnings != null)
       ? fmtCurrency(m.adjustedRetainedEarnings - m.oldestRetainedEarnings) : 'N/A';
     return {
-      1: 'Debt / Equity = ' + fmtRatio(m.debtToEquityRatio),
+      1: 'Debt / Equity = ' + fmtRatio(m.debtToEquityRatio) + ' (fails when equity ≤ 0)',
       2: 'Equity − Goodwill − Intangibles = ' + fmtCurrency(m.bookValue),
-      3: 'Market Cap / Book Value = ' + fmtCurrency(m.marketCap) + ' / ' + fmtCurrency(m.bookValue),
+      3: 'Market Cap / Book Value = ' + fmtCurrency(m.marketCap) + ' / ' + fmtCurrency(m.bookValue) + ' (fails when book value ≤ 0)',
       4: 'Avg annual: Gross CF − Net Debt − Net Stock Issuance (' + n + ' yrs) = ' + fmtCurrency(m.averageNetCashFlow),
-      5: 'Avg annual: Net Income + D&A + Deferred Tax + Non-Cash − CapEx + WC Change (' + n + ' yrs) = ' + fmtCurrency(m.averageOwnerEarnings),
-      6: '(Avg NCF − Dividends) / Market Cap = (' + fmtCurrency(m.averageNetCashFlow) + ' − ' + fmtCurrency(m.currentDividendsPaid) + ') / ' + fmtCurrency(m.marketCap),
-      7: '(Avg OE − Dividends) / Market Cap = (' + fmtCurrency(m.averageOwnerEarnings) + ' − ' + fmtCurrency(m.currentDividendsPaid) + ') / ' + fmtCurrency(m.marketCap),
+      5: 'Avg annual: Net Income + D&A + Deferred Tax + Non-Cash − CapEx + WC Change (' + n + ' yrs; years with D&A but no capex tag excluded) = ' + fmtCurrency(m.averageOwnerEarnings),
+      6: '(Avg NCF + Dividends) / Market Cap = (' + fmtCurrency(m.averageNetCashFlow) + ' + ' + fmtCurrency(m.currentDividendsPaid) + ') / ' + fmtCurrency(m.marketCap),
+      7: 'Avg OE / Market Cap = ' + fmtCurrency(m.averageOwnerEarnings) + ' / ' + fmtCurrency(m.marketCap),
       8: 'Same as #6 — checks return isn\'t unrealistically high',
       9: 'Same as #7 — checks return isn\'t unrealistically high',
-      10: 'Debt / Book Value = ' + fmtRatio(m.debtToBookRatio),
+      10: 'Debt / Book Value = ' + fmtRatio(m.debtToBookRatio) + ' (fails when book value ≤ 0)',
       11: 'Adjusted RE = RE + Dividends − Stock − Preferred Issuance = ' + fmtCurrency(m.adjustedRetainedEarnings),
       12: n + ' years of annual financial data available',
       13: 'Adjusted RE − Oldest RE = ' + fmtCurrency(m.adjustedRetainedEarnings) + ' − ' + fmtCurrency(m.oldestRetainedEarnings) + ' = ' + diff,
-      14: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeCF),
-      15: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs) = ' + fmtPct(m.averageRoeOE),
+      14: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs; fails if any year has equity ≤ 0) = ' + fmtPct(m.averageRoeCF),
+      15: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs; fails if any year has equity ≤ 0) = ' + fmtPct(m.averageRoeOE),
     };
   });
 
@@ -144,14 +144,14 @@ export class ScoringComponent implements OnInit {
       { label: 'Debt / Book', display: fmtRatio(m.debtToBookRatio), tooltip: 'Total Debt / Book Value' },
       { label: 'Adjusted Retained Earnings', display: fmtCurrency(m.adjustedRetainedEarnings), tooltip: 'RE + Total Dividends − Stock Issuance − Preferred Issuance' },
       { label: 'Oldest Retained Earnings', display: fmtCurrency(m.oldestRetainedEarnings), tooltip: 'Retained Earnings from oldest year in dataset' },
-      { label: 'Avg Net Cash Flow', display: fmtCurrency(m.averageNetCashFlow), tooltip: 'Avg annual: Gross CF − Net Debt − Net Stock Issuance (' + n + ' yrs)' },
+      { label: 'Avg Net Cash Flow', display: fmtCurrency(m.averageNetCashFlow), tooltip: 'Avg annual: Change in Cash − Net Debt (incl. short-term) − Net Stock − Net Preferred Issuance (' + n + ' yrs)' },
       { label: 'Avg Owner Earnings', display: fmtCurrency(m.averageOwnerEarnings), tooltip: 'Avg annual: Net Income + D&A + Deferred Tax + Non-Cash − CapEx + WC Change (' + n + ' yrs)' },
       { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF), tooltip: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs)' },
       { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE), tooltip: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs)' },
-      { label: 'Est. Return (CF)', display: fmtPct(m.estimatedReturnCF), tooltip: '(Avg NCF − Dividends) / Market Cap' },
-      { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE), tooltip: '(Avg OE − Dividends) / Market Cap' },
+      { label: 'Est. Return (CF)', display: fmtPct(m.estimatedReturnCF), tooltip: '(Avg NCF + Dividends) / Market Cap (NCF is after dividends paid)' },
+      { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE), tooltip: 'Avg OE / Market Cap (OE is before dividends)' },
       { label: 'Current Dividends Paid', display: fmtCurrency(m.currentDividendsPaid), tooltip: 'Dividends from most recent fiscal year' },
-      { label: 'Max Buy Price', display: fmtPrice(s.maxBuyPrice), tooltip: 'min(3 × Book, 20 × (NCF − Div), 20 × (OE − Div)) / Shares' },
+      { label: 'Max Buy Price', display: fmtPrice(s.maxBuyPrice), tooltip: 'min(3 × Book, 20 × (NCF + Div), 20 × OE) / Shares' },
       { label: '% Upside', display: fmtPct(s.percentageUpside), tooltip: '(Max Buy Price − Current Price) / Current Price' },
     ];
   });

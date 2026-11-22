@@ -31,7 +31,7 @@ A ratio over a denominator ≤ 0 **fails** its check. The rule lives in the chec
 ### Missing versus zero, per field
 | Field | Missing means |
 |---|---|
-| Debt (`DebtChain`) | 0 for D/E and D/B (unchanged; see E4 in the plan) |
+| Debt (D/E, D/B, moat D/E) | long-term chain + current portion + short-term borrowings; each missing tag is 0 (see "Debt for the debt ratios") |
 | Debt-free (interest coverage) | no long-term or other debt concept (current, short-term, notes, credit lines, combined) is non-zero |
 | Goodwill, intangibles | 0 |
 | Dividends | 0 when the year has a cash-flow statement |
@@ -59,6 +59,15 @@ A chain is either alternatives (first found) or lines to combine:
 - **Siblings, summed:** stock issuance and option exercises.
 - **Short-term debt:** net short-term debt, else lines of credit (net, or gross proceeds − repayments), plus net commercial paper. Notes-payable repayments count unless the net short-term figure (their parent) is present.
 
+### Debt for the debt ratios
+Value D/E and D/B and moat D/E use the first long-term chain concept found (`LongTermDebtAndCapitalLeaseObligations`, `LongTermDebt`, `LongTermDebtNoncurrent`), plus `LongTermDebtCurrent`, plus `ShortTermBorrowings` (E4, added 2026-11-22). Per the taxonomy, `LongTermDebt` includes current maturities and the other two are noncurrent. So when `LongTermDebt` is the figure used, the current portion is added only if `LongTermDebt` does not cover noncurrent + current (within 0.1%); with no noncurrent tag to compare against, `LongTermDebt` is taken as the total.
+
+### Annual year keys
+Each distinct 10-K report date gets its own year key (E7, added 2026-11-22). The newest date keys to its calendar year; each older date to min(its calendar year, the next newer key − 1). Two annual reports in one calendar year (a fiscal-year change, or 52/53-week years ending in early January) are both kept, and years of data counts both. The DEI fiscal year (`DocumentFiscalYearFocus`) would be the better key, but it is not in the database: companyfacts carries only numeric dei facts.
+
+### Stored check results
+`company_scores` and `graham_score_snapshots` store the 15 check results as `check_results` (P/F/N in check order; V021, added 2026-11-22). The Portfolio Advisor reads pass/fail from them and re-derives from the metric columns only for rows written before V021.
+
 ### Interest coverage for debt-free companies
 Moat check 10: with a coverage figure, the > 5x threshold applies. Without one, a debt-free company passes when its latest operating income is > 0 and fails when it is ≤ 0. Otherwise (debt but no interest tag) it is NotAvailable.
 
@@ -85,8 +94,8 @@ Net cash flow starts from the change in cash, so it is already after dividends p
   - Negative-equity buyback compounders fail D/E and ROE (P1).
   - Profitable debt-free companies pass interest coverage (P4).
 - **Stale until rebuilt:** `company_scores`, `company_moat_scores` and the 61 `graham_score_snapshots` dates keep the old scores until rebuilt (`--compute-all-scores`, `--compute-all-moat-scores`, then `--compute-score-snapshots`, about 2 hours). Backtest and Portfolio Advisor results change after the rebuild.
-- **Portfolio Advisor reasons:** `PortfolioAdvisorService` rebuilds checks from stored score rows, which lack equity and the ROE flags. Its "why it flipped" text therefore can't reflect the sign rule for checks 1, 14 and 15 (display only).
-- **Concept-list side effect:** adding concepts (P3 short-term debt, P4 other debt, E3 capex tags) can move a company's latest eligible filing date. A handful of companies flip unrelated checks for that reason.
+- **Portfolio Advisor reasons:** until the rebuild fills `check_results`, `PortfolioAdvisorService` falls back to rebuilding checks from the metric columns, which lack equity and the ROE flags, so its "why it flipped" text can't reflect the sign rule for checks 1, 14 and 15. After the rebuild it reads the stored results (display only; scores are unaffected).
+- **Concept-list side effect:** adding concepts (P3, P4, E3, E4) makes a handful of companies flip unrelated checks. Checked 2026-11-22 on the four P4 strays: their eligible dates did not move. The cause is facts tagged in two currencies (USD and CAD or CNY) with the same concept, period and filing. The scoring query does not filter the unit and breaks such ties arbitrarily, so a query-plan change can switch the currency used. Open defect E10 in the plan; not fixed by this ADR.
 
 ## Alternatives Considered
 Footprints are value / moat scores changed, measured against the baseline in a scratch replay unless noted.
@@ -99,4 +108,6 @@ Footprints are value / moat scores changed, measured against the baseline in a s
 - **P4: debt-free on long-term debt alone** (603 moat): passes companies whose debt is current or short-term.
 - **E3: two capex tags only** (measured: 1,184 / 2,485 vs 999 / 2,345): turns known capex at E&Ps and others into "unknown".
 - **E9 with a shares fill** (measured: 418 / 259 vs 268 / 109): stale SPAC market caps.
-- **E4–E7** (debt definition for D/E, financing-total NCF, Σ ÷ Σ ROE, fiscal-period year keys): measured separately for owner decisions (plan sections 4.5–4.8), not adopted here.
+- **E4 without the current-portion guard** (310 / 167 vs adopted 245 / 119): double counts the current portion inside `LongTermDebt`.
+- **E7 with a single shift** (51 / 57, same as adopted on this data): the earlier of two dates moves back one year, but a run of early-January year ends could collide.
+- **E5, E6** (financing-total NCF, Σ ÷ Σ ROE): measured separately (plan sections 4.6–4.7) and deferred until the SIC/financials flag.

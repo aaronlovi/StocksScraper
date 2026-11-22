@@ -61,7 +61,7 @@ public class SecTickerMappingsImporter {
             }
 
             matched++;
-            batch.Add(new CompanyTicker(companyId, mapping.Ticker, mapping.Exchange));
+            batch.Add(new CompanyTicker(companyId, mapping.Ticker, mapping.Exchange, mapping.Title));
 
             if (batch.Count >= batchSize) {
                 Result batchResult = await _dbm.BulkInsertCompanyTickers(batch, ct);

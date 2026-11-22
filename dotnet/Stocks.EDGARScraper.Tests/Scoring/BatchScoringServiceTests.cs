@@ -231,6 +231,21 @@ public class BatchScoringServiceTests {
     }
 
     [Fact]
+    public async Task ComputeAllScores_UsesTickerTitleAsCompanyName() {
+        await SeedTaxonomyConcepts();
+        await SeedCompanyWithScoringData(1, 320193, "Old Name Inc", "AAPL", "NASDAQ", 3);
+        await _dbm.BulkInsertCompanyTickers([new CompanyTicker(1, "AAPL2", "NASDAQ", "Apple Inc.")], _ct);
+
+        var service = new ScoringService(_dbm);
+        Result<IReadOnlyCollection<CompanyScoreSummary>> result = await service.ComputeAllScores(_ct);
+
+        Assert.Equal("Apple Inc.", Assert.Single(result.Value!).CompanyName);
+        var moat = new MoatScoringService(_dbm);
+        Result<IReadOnlyCollection<CompanyMoatScoreSummary>> moatResult = await moat.ComputeAllMoatScores(_ct);
+        Assert.Equal("Apple Inc.", Assert.Single(moatResult.Value!).CompanyName);
+    }
+
+    [Fact]
     public async Task ComputeAllScores_PopulatesCompanyMetadata() {
         await SeedTaxonomyConcepts();
         await SeedCompanyWithScoringData(1, 320193, "Apple Inc", "AAPL", "NASDAQ", 3);

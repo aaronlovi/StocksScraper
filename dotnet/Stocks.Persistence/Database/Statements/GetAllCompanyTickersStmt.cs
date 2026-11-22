@@ -6,7 +6,7 @@ namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class GetAllCompanyTickersStmt : QueryDbStmtBase {
     private const string sql = @"
-SELECT company_id, ticker, exchange
+SELECT company_id, ticker, exchange, title
 FROM company_tickers
 ORDER BY company_id, ticker;
 ";
@@ -16,6 +16,7 @@ ORDER BY company_id, ticker;
     private static int _companyIdIndex = -1;
     private static int _tickerIndex = -1;
     private static int _exchangeIndex = -1;
+    private static int _titleIndex = -1;
 
     public GetAllCompanyTickersStmt() : base(sql, nameof(GetAllCompanyTickersStmt)) {
         _tickers = [];
@@ -32,6 +33,7 @@ ORDER BY company_id, ticker;
         _companyIdIndex = reader.GetOrdinal("company_id");
         _tickerIndex = reader.GetOrdinal("ticker");
         _exchangeIndex = reader.GetOrdinal("exchange");
+        _titleIndex = reader.GetOrdinal("title");
     }
 
     protected override void ClearResults() => _tickers.Clear();
@@ -42,7 +44,8 @@ ORDER BY company_id, ticker;
         var ticker = new CompanyTicker(
             (ulong)reader.GetInt64(_companyIdIndex),
             reader.GetString(_tickerIndex),
-            reader.IsDBNull(_exchangeIndex) ? null : reader.GetString(_exchangeIndex));
+            reader.IsDBNull(_exchangeIndex) ? null : reader.GetString(_exchangeIndex),
+            reader.IsDBNull(_titleIndex) ? null : reader.GetString(_titleIndex));
         _tickers.Add(ticker);
         return true;
     }

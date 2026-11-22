@@ -7,9 +7,9 @@ namespace Stocks.Persistence.Database.Statements;
 
 internal sealed class BulkInsertCompanyTickersStmt : NonQueryBatchedDbStmtBase {
     private const string sql = @"
-INSERT INTO company_tickers (company_id, ticker, exchange)
-VALUES (@company_id, @ticker, @exchange)
-ON CONFLICT (company_id, ticker) DO UPDATE SET exchange = EXCLUDED.exchange;
+INSERT INTO company_tickers (company_id, ticker, exchange, title)
+VALUES (@company_id, @ticker, @exchange, @title)
+ON CONFLICT (company_id, ticker) DO UPDATE SET exchange = EXCLUDED.exchange, title = EXCLUDED.title;
 ";
 
     public BulkInsertCompanyTickersStmt(IReadOnlyCollection<CompanyTicker> tickers)
@@ -21,7 +21,10 @@ ON CONFLICT (company_id, ticker) DO UPDATE SET exchange = EXCLUDED.exchange;
             AddCommandToBatch(sql, [
                 new NpgsqlParameter<long>("company_id", (long)ticker.CompanyId),
                 new NpgsqlParameter<string>("ticker", ticker.Ticker),
-                exchangeParam
+                exchangeParam,
+                new NpgsqlParameter("title", NpgsqlDbType.Varchar) {
+                    Value = ticker.Title is not null ? ticker.Title : System.DBNull.Value
+                }
             ]);
         }
     }

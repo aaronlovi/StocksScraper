@@ -593,11 +593,7 @@ public class MoatScoringService {
         foreach (Company c in companiesResult.Value)
             companyLookup[c.CompanyId] = c;
 
-        var companyNameLookup = new Dictionary<ulong, string>();
-        foreach (CompanyName cn in namesResult.Value) {
-            if (!companyNameLookup.ContainsKey(cn.CompanyId))
-                companyNameLookup[cn.CompanyId] = cn.Name;
-        }
+        Dictionary<ulong, string> companyNameLookup = ScoringService.BuildCompanyNameLookup(namesResult.Value, tickersResult.Value);
 
         var tickerByCompany = new Dictionary<ulong, CompanyTicker>();
         foreach (CompanyTicker ct2 in tickersResult.Value) {

@@ -67,7 +67,11 @@ public static class SecTickerJsonParser {
         if (!string.IsNullOrWhiteSpace(exchange))
             exchange = NormalizeExchange(exchange);
 
-        results.Add(new SecTickerMapping(cik, ticker, exchange));
+        string? title = null;
+        if (TryGetString(element, out string? rawTitle, "title") && !string.IsNullOrWhiteSpace(rawTitle))
+            title = rawTitle.Trim();
+
+        results.Add(new SecTickerMapping(cik, ticker, exchange, title));
     }
 
     private static void TryAddExchangeMapping(
@@ -232,4 +236,5 @@ public static class SecTickerJsonParser {
     }
 }
 
-public record SecTickerMapping(ulong Cik, string Ticker, string? Exchange);
+/// <param name="Title">The SEC's current company name for the CIK (company_tickers.json "title").</param>
+public record SecTickerMapping(ulong Cik, string Ticker, string? Exchange, string? Title = null);

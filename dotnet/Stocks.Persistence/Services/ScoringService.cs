@@ -319,11 +319,7 @@ public class ScoringService {
         foreach (Company c in companiesResult.Value)
             companyLookup[c.CompanyId] = c;
 
-        var companyNameLookup = new Dictionary<ulong, string>();
-        foreach (CompanyName cn in namesResult.Value) {
-            if (!companyNameLookup.ContainsKey(cn.CompanyId))
-                companyNameLookup[cn.CompanyId] = cn.Name;
-        }
+        Dictionary<ulong, string> companyNameLookup = BuildCompanyNameLookup(namesResult.Value, tickersResult.Value);
 
         var tickerByCompany = new Dictionary<ulong, CompanyTicker>();
         foreach (CompanyTicker ct2 in tickersResult.Value) {
@@ -540,6 +536,26 @@ public class ScoringService {
             percentageUpside);
 
         return Result<ScoringResult>.Success(result);
+    }
+
+    /// <summary>
+    /// Display name per company: the SEC's current name from the ticker mappings (title)
+    /// when the company is listed, else the first of its company_names. company_names comes
+    /// from the CIK lookup file, which lists every historical name alphabetically, so its
+    /// first entry is often a former name.
+    /// </summary>
+    internal static Dictionary<ulong, string> BuildCompanyNameLookup(
+        IReadOnlyCollection<CompanyName> names, IReadOnlyCollection<CompanyTicker> tickers) {
+        var lookup = new Dictionary<ulong, string>();
+        foreach (CompanyTicker ticker in tickers) {
+            if (!string.IsNullOrWhiteSpace(ticker.Title) && !lookup.ContainsKey(ticker.CompanyId))
+                lookup[ticker.CompanyId] = ticker.Title;
+        }
+        foreach (CompanyName cn in names) {
+            if (!lookup.ContainsKey(cn.CompanyId))
+                lookup[cn.CompanyId] = cn.Name;
+        }
+        return lookup;
     }
 
     /// <summary>

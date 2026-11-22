@@ -760,4 +760,51 @@ public class MoatScoringServiceTests {
     }
 
     #endregion
+
+    #region Unknown-capex years (E3) tests
+
+    [Fact]
+    public void UnknownCapex_Moat_YearLeavesPositiveOeCountAndCapexRatio() {
+        var annualData = BuildAnnualData(
+            (2023, new Dictionary<string, decimal> { ["NetIncomeLoss"] = -500m, ["Depreciation"] = 40m }),
+            (2024, new Dictionary<string, decimal> {
+                ["NetIncomeLoss"] = 100m, ["PaymentsToAcquirePropertyPlantAndEquipment"] = 20m }));
+
+        var (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(annualData, EmptySnapshot(), null, null, null);
+
+        Assert.Equal(1, metrics.TotalOeYears);
+        Assert.Equal(1, metrics.PositiveOeYears);
+        Assert.Equal(80m, metrics.AverageOwnerEarnings);
+        Assert.Equal(25m, metrics.CapexRatio); // 20 / 80
+    }
+
+    [Fact]
+    public void UnknownCapex_Moat_NoCapexTagYear_LeavesCapexRatio() {
+        // The year with no capex tag (and no D&A) keeps OE with capex 0, but is not a capex-ratio year.
+        var annualData = BuildAnnualData(
+            (2023, new Dictionary<string, decimal> { ["NetIncomeLoss"] = 100m }),
+            (2024, new Dictionary<string, decimal> {
+                ["NetIncomeLoss"] = 100m, ["PaymentsToAcquirePropertyPlantAndEquipment"] = 40m }));
+
+        var (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(annualData, EmptySnapshot(), null, null, null);
+
+        Assert.Equal(80m, metrics.AverageOwnerEarnings); // (100 + 60) / 2
+        Assert.Equal(50m, metrics.CapexRatio);            // 40 / 80
+    }
+
+    [Fact]
+    public void UnknownCapex_Moat_AllYearsExcluded_OwnerEarningsChecksNotAvailable() {
+        var annualData = BuildAnnualData(
+            (2024, new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 1000m, ["NetIncomeLoss"] = 100m, ["AmortizationOfIntangibleAssets"] = 30m }));
+
+        var (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(annualData, EmptySnapshot(), null, 10m, 100);
+        IReadOnlyList<ScoringCheck> checks = MoatScoringService.EvaluateMoatChecks(metrics, 8);
+
+        Assert.Null(metrics.AverageOwnerEarnings);
+        foreach (int number in new[] { 2, 6, 7, 12, 13 })
+            Assert.Equal(ScoringCheckResult.NotAvailable, MoatCheckResult(checks, number));
+    }
+
+    #endregion
 }

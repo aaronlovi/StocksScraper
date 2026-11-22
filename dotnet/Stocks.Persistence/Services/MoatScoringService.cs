@@ -186,22 +186,14 @@ public class MoatScoringService {
                 }
             }
 
-            // Owner Earnings for ROE (OE) — same computation as Value Score
+            // Owner Earnings for ROE (OE) — same computation as Value Score. Null when the
+            // year has no net income or its capex is unknown: it leaves every OE average.
             decimal? roeOePct = null;
-            decimal? netIncome = ScoringService.ResolveField(yearData, ScoringService.NetIncomeChain, null);
-            decimal capEx = ScoringService.ResolveField(yearData, ScoringService.CapExChain, 0m)!.Value;
+            decimal? yearOwnerEarnings = ScoringService.ComputeYearOwnerEarnings(yearData,
+                balanceTypes ?? EmptyBalanceTypes);
 
-            if (netIncome.HasValue) {
-                decimal depletionAndAmortization = ScoringService.ResolveDepletionAndAmortization(yearData);
-                decimal deferredTax = ScoringService.ResolveDeferredTax(yearData);
-                decimal otherNonCash = ScoringService.ResolveOtherNonCash(yearData);
-                decimal workingCapitalChange = ScoringService.ResolveWorkingCapitalChange(yearData,
-                    balanceTypes ?? EmptyBalanceTypes);
-
-                decimal ownerEarnings = netIncome.Value
-                    + depletionAndAmortization + deferredTax + otherNonCash
-                    - capEx + workingCapitalChange;
-
+            if (yearOwnerEarnings.HasValue) {
+                decimal ownerEarnings = yearOwnerEarnings.Value;
                 totalOwnerEarnings += ownerEarnings;
                 yearsWithOE++;
                 totalOeYears++;
@@ -216,12 +208,13 @@ public class MoatScoringService {
                     totalRoeOE += roeOePct.Value;
                     yearsWithRoeOE++;
                 }
-            }
 
-            // CapEx accumulation for ratio
-            if (capEx != 0m || netIncome.HasValue) {
-                totalCapEx += capEx;
-                yearsWithCapEx++;
+                // CapEx ratio years: owner earnings known and a capex tag present
+                decimal? capEx = ScoringService.ResolveField(yearData, ScoringService.CapExChain, null);
+                if (capEx.HasValue) {
+                    totalCapEx += capEx.Value;
+                    yearsWithCapEx++;
+                }
             }
 
             // Revenue tracking for CAGR

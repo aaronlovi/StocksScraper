@@ -1126,13 +1126,15 @@ public class ScoringServiceTests {
             ["NetIncomeLoss"] = 30_000_000m,
             ["DepreciationAndAmortization"] = 8_000_000m, // fallback (no DepreciationDepletionAndAmortization)
             ["Depreciation"] = 5_000_000m,
+            // A capex tag: without one, a year with D&A has unknown capex and leaves the average
+            ["PaymentsToAcquirePropertyPlantAndEquipment"] = 2_000_000m,
         });
 
         DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
-        // OE = 30 + (8-5) + 0 + 0 - 0 + 0 = 33M  (DDA fallback: D&A - Depreciation)
+        // OE = 30 + (8-5) + 0 + 0 - 2 + 0 = 31M  (DDA fallback: D&A - Depreciation)
         Assert.NotNull(metrics.AverageOwnerEarnings);
-        Assert.Equal(33_000_000m, metrics.AverageOwnerEarnings!.Value);
+        Assert.Equal(31_000_000m, metrics.AverageOwnerEarnings!.Value);
     }
 
     [Fact]
@@ -2369,6 +2371,119 @@ public class ScoringServiceTests {
         });
         // 100 + 0 dividends - 6 stock issuance
         Assert.Equal(94m, CallComputeDerivedMetrics(rawData, null, null).AdjustedRetainedEarnings);
+    }
+
+    #endregion
+
+    #region CapEx fallback and unknown-capex years (E3) tests
+
+    [Fact]
+    public void UnknownCapex_DaWithoutCapexTag_OwnerEarningsUnknown() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["AmortizationOfIntangibleAssets"] = 30m,
+        });
+        Assert.Null(CallComputeDerivedMetrics(rawData, null, null).AverageOwnerEarnings);
+    }
+
+    [Fact]
+    public void UnknownCapex_ProductiveAssetsFallbackTagUsed() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["AmortizationOfIntangibleAssets"] = 30m,
+            ["PaymentsToAcquireProductiveAssets"] = 20m,
+        });
+        // 100 + 30 - 20
+        Assert.Equal(110m, CallComputeDerivedMetrics(rawData, null, null).AverageOwnerEarnings);
+    }
+
+    [Fact]
+    public void UnknownCapex_PropertyPlantAndEquipmentPreferredOverProductiveAssets() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m,
+            ["PaymentsToAcquirePropertyPlantAndEquipment"] = 20m,
+            ["PaymentsToAcquireProductiveAssets"] = 25m,
+        });
+        Assert.Equal(80m, CallComputeDerivedMetrics(rawData, null, null).AverageOwnerEarnings);
+    }
+
+    [Theory]
+    [InlineData("PaymentsToAcquireOilAndGasPropertyAndEquipment")]
+    [InlineData("PaymentsToAcquireOtherProductiveAssets")]
+    [InlineData("PaymentsToAcquireOtherPropertyPlantAndEquipment")]
+    [InlineData("PaymentsForCapitalImprovements")]
+    public void UnknownCapex_LaterFallbackTagsUsed(string capexConcept) {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["DepreciationDepletionAndAmortization"] = 30m, [capexConcept] = 40m,
+        });
+        Assert.Equal(60m, CallComputeDerivedMetrics(rawData, null, null).AverageOwnerEarnings);
+    }
+
+    [Fact]
+    public void UnknownCapex_RealEstateDevelopment_IsNotCapex() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["Depreciation"] = 30m, ["PaymentsToDevelopRealEstateAssets"] = 40m,
+        });
+        Assert.Null(CallComputeDerivedMetrics(rawData, null, null).AverageOwnerEarnings);
+    }
+
+    [Fact]
+    public void UnknownCapex_NoCapexAndNoDa_CapexIsZero() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> { ["NetIncomeLoss"] = 100m });
+        Assert.Equal(100m, CallComputeDerivedMetrics(rawData, null, null).AverageOwnerEarnings);
+    }
+
+    [Fact]
+    public void UnknownCapex_YearLeavesAverage_OtherYearsKept() {
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["NetIncomeLoss"] = 500m, ["Depreciation"] = 40m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["NetIncomeLoss"] = 100m, ["PaymentsToAcquirePropertyPlantAndEquipment"] = 20m,
+            },
+        };
+        Assert.Equal(80m, CallComputeDerivedMetrics(rawData, null, null).AverageOwnerEarnings);
+    }
+
+    [Fact]
+    public void UnknownCapex_AllYearsExcluded_OwnerEarningsChecksNotAvailable() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 1000m,
+            ["NetIncomeLoss"] = 100m,
+            ["DepreciationDepletionAndAmortization"] = 30m,
+        });
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 10m, 100);
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Null(metrics.AverageOwnerEarnings);
+        Assert.Null(metrics.AverageRoeOE);
+        foreach (int number in new[] { 5, 7, 9, 15 })
+            Assert.Equal(ScoringCheckResult.NotAvailable, CheckResult(checks, number));
+    }
+
+    [Theory]
+    [InlineData("DepreciationDepletionAndAmortization", 30, null, 0, 30)]
+    [InlineData("DepreciationAndAmortization", 30, "Depletion", 5, 35)]
+    [InlineData("Depreciation", 20, "AmortizationOfIntangibleAssets", 10, 30)]
+    [InlineData("Depreciation", 20, "Depletion", 4, 24)]
+    public void ResolveTotalDa_FollowsTheChain(string first, int firstValue, string? second, int secondValue, int expected) {
+        var data = new Dictionary<string, decimal> { [first] = firstValue };
+        if (second is not null)
+            data[second] = secondValue;
+        Assert.Equal(expected, ScoringService.ResolveTotalDa(data));
+    }
+
+    [Fact]
+    public void ResolveTotalDa_CombinedTotalUsedOutright() {
+        var data = new Dictionary<string, decimal> {
+            ["DepreciationDepletionAndAmortization"] = 30m,
+            ["Depletion"] = 5m, ["Depreciation"] = 20m, ["AmortizationOfIntangibleAssets"] = 10m,
+        };
+        Assert.Equal(30m, ScoringService.ResolveTotalDa(data));
+    }
+
+    [Fact]
+    public void ResolveTotalDa_NothingReported_IsZero() {
+        Assert.Equal(0m, ScoringService.ResolveTotalDa(new Dictionary<string, decimal>()));
     }
 
     #endregion

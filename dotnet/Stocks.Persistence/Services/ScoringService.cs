@@ -142,6 +142,11 @@ public class ScoringService {
         "OtherNoncashIncome",
         // Cash flow — capex
         "PaymentsToAcquirePropertyPlantAndEquipment",
+        "PaymentsToAcquireProductiveAssets",
+        "PaymentsToAcquireOilAndGasPropertyAndEquipment",
+        "PaymentsToAcquireOtherProductiveAssets",
+        "PaymentsToAcquireOtherPropertyPlantAndEquipment",
+        "PaymentsForCapitalImprovements",
         // Income statement (duration)
         "NetIncomeLoss",
         "IncomeLossFromContinuingOperations",
@@ -173,7 +178,17 @@ public class ScoringService {
     ];
     internal static readonly string[] PreferredProceedsChain = ["ProceedsFromIssuanceOfPreferredStockAndPreferenceStock"];
     internal static readonly string[] PreferredRepurchaseChain = ["PaymentsForRepurchaseOfPreferredStockAndPreferenceStock"];
-    internal static readonly string[] CapExChain = ["PaymentsToAcquirePropertyPlantAndEquipment"];
+    // Alternatives (first found). The later four are what E&Ps, some service companies
+    // and others tag instead of PP&E (plan 4.4). Real-estate development is left out: it
+    // is investment, not maintenance capex.
+    internal static readonly string[] CapExChain = [
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "PaymentsToAcquireProductiveAssets",
+        "PaymentsToAcquireOilAndGasPropertyAndEquipment",
+        "PaymentsToAcquireOtherProductiveAssets",
+        "PaymentsToAcquireOtherPropertyPlantAndEquipment",
+        "PaymentsForCapitalImprovements",
+    ];
     internal static readonly string[] DeferredTaxChain = ["DeferredIncomeTaxExpenseBenefit", "DeferredIncomeTaxesAndTaxCredits"];
     internal static readonly string[] DepletionChain = ["Depletion"];
     internal static readonly string[] AmortizationChain = ["AmortizationOfIntangibleAssets"];
@@ -585,6 +600,54 @@ public class ScoringService {
             return dda.Value - depreciation.Value;
 
         return 0m;
+    }
+
+    /// <summary>
+    /// Total depreciation, depletion and amortization:
+    /// 1. DepreciationDepletionAndAmortization outright;
+    /// 2. else DepreciationAndAmortization + Depletion;
+    /// 3. else Depreciation + Depletion + AmortizationOfIntangibleAssets (0 for missing).
+    /// </summary>
+    internal static decimal ResolveTotalDa(IReadOnlyDictionary<string, decimal> yearData) {
+        if (yearData.TryGetValue("DepreciationDepletionAndAmortization", out decimal dda))
+            return dda;
+
+        decimal depletion = ResolveField(yearData, DepletionChain, 0m)!.Value;
+        if (yearData.TryGetValue("DepreciationAndAmortization", out decimal da))
+            return da + depletion;
+
+        decimal depreciation = ResolveField(yearData, DepreciationChain, 0m)!.Value;
+        decimal amortization = ResolveField(yearData, AmortizationChain, 0m)!.Value;
+        return depreciation + depletion + amortization;
+    }
+
+    /// <summary>
+    /// Owner earnings for one year, shared by the value and moat scores:
+    /// NI + depletion and amortization + deferred tax + other non-cash - capex + WC change.
+    /// Null when the year has no net income, or when it has D&amp;A but no capex tag: its capex
+    /// is unknown, not zero, so the year leaves every owner-earnings average. A year with
+    /// neither capex nor D&amp;A keeps capex 0.
+    /// </summary>
+    internal static decimal? ComputeYearOwnerEarnings(
+        IReadOnlyDictionary<string, decimal> yearData,
+        IReadOnlyDictionary<string, TaxonomyBalanceTypes> balanceTypes) {
+        decimal? netIncome = ResolveField(yearData, NetIncomeChain, null);
+        if (!netIncome.HasValue)
+            return null;
+
+        decimal? capEx = ResolveField(yearData, CapExChain, null);
+        if (!capEx.HasValue && ResolveTotalDa(yearData) > 0m)
+            return null;
+
+        decimal depletionAndAmortization = ResolveDepletionAndAmortization(yearData);
+        decimal deferredTax = ResolveDeferredTax(yearData);
+        decimal otherNonCash = ResolveOtherNonCash(yearData);
+        decimal workingCapitalChange = ResolveWorkingCapitalChange(yearData, balanceTypes);
+
+        // Simplified OE formula (Depreciation cancels out)
+        return netIncome.Value
+            + depletionAndAmortization + deferredTax + otherNonCash
+            - (capEx ?? 0m) + workingCapitalChange;
     }
 
     /// <summary>
@@ -1014,21 +1077,11 @@ public class ScoringService {
                 }
             }
 
-            // Owner Earnings for this year
-            decimal? netIncome = ResolveField(yearData, NetIncomeChain, null);
-            if (netIncome.HasValue) {
+            // Owner Earnings for this year (null: no net income, or capex unknown)
+            decimal? yearOwnerEarnings = ComputeYearOwnerEarnings(yearData, balanceTypes ?? EmptyBalanceTypes);
+            if (yearOwnerEarnings.HasValue) {
                 hasAnyOwnerEarnings = true;
-                decimal depletionAndAmortization = ResolveDepletionAndAmortization(yearData);
-                decimal deferredTax = ResolveDeferredTax(yearData);
-                decimal otherNonCash = ResolveOtherNonCash(yearData);
-                decimal capEx = ResolveField(yearData, CapExChain, 0m)!.Value;
-                decimal workingCapitalChange = ResolveWorkingCapitalChange(yearData,
-                    balanceTypes ?? EmptyBalanceTypes);
-
-                // Simplified OE formula (Depreciation cancels out)
-                decimal ownerEarnings = netIncome.Value
-                    + depletionAndAmortization + deferredTax + otherNonCash
-                    - capEx + workingCapitalChange;
+                decimal ownerEarnings = yearOwnerEarnings.Value;
                 totalOwnerEarnings += ownerEarnings;
                 yearsWithOE++;
 

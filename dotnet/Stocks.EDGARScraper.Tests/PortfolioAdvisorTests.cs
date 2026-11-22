@@ -18,11 +18,13 @@ public class PortfolioAdvisorTests {
     private static CompanyScoreSummary MakeScore(
         ulong companyId, string cik, string? name, string? ticker,
         int score, int computable, decimal? price,
-        decimal? bookValue = null, decimal? estimatedReturnCf = null) =>
+        decimal? bookValue = null, decimal? estimatedReturnCf = null, string? checkResults = null) =>
         new(companyId, cik, name, ticker, "NYSE", score, computable, 5,
             bookValue, null, null, null, null, null, null, null, null, null,
             estimatedReturnCf, null,
-            price, Baseline, null, null, null, null, DateTime.UtcNow);
+            price, Baseline, null, null, null, null, DateTime.UtcNow, checkResults);
+
+    private const string AllPass = "PPPPPPPPPPPPPPP";
 
     private async Task SeedScenario() {
         // Current live scores
@@ -128,5 +130,58 @@ public class PortfolioAdvisorTests {
         Assert.Null(sell.Trigger);
         // Without a baseline, reasons fall back to the currently failing checks
         Assert.Contains(sell.Reasons, r => r.Contains("FAILS"));
+    }
+
+    [Fact]
+    public async Task GetRecommendations_StoredResultsShowFlipThatMetricsCannot() {
+        // Identical metric columns; only the stored check 1 result differs (for example,
+        // negative equity fails D/E, which a rebuild from stored columns cannot see).
+        _ = await _dbm.BulkInsertCompanyScores([
+            MakeScore(1, "111", "Neg Co", "NEG", 14, 15, 10m, 500_000_000m, checkResults: "FPPPPPPPPPPPPPP"),
+        ], _ct);
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(Baseline, [
+            MakeScore(1, "111", "Neg Co", "NEG", 15, 15, 10m, 500_000_000m, checkResults: AllPass),
+        ], _ct);
+
+        var service = new PortfolioAdvisorService(_dbm);
+        Result<PortfolioAdvisorReport> result = await service.GetRecommendations(["NEG"], _ct);
+        Assert.True(result.IsSuccess);
+
+        PortfolioRecommendation sell = Assert.Single(result.Value!.Sells);
+        Assert.Contains(sell.Reasons, r => r.Contains("Debt-to-Equity") && r.Contains("now FAILS"));
+        Assert.DoesNotContain(sell.Reasons, r => r.Contains("compare the company's scoring page"));
+    }
+
+    [Fact]
+    public async Task GetRecommendations_StoredResultsReportRetainedEarningsTrendFlip() {
+        _ = await _dbm.BulkInsertCompanyScores([
+            MakeScore(1, "111", "Trend Co", "TRD", 14, 15, 10m, 500_000_000m, checkResults: "PPPPPPPPPPPPFPP"),
+        ], _ct);
+        _ = await _dbm.BulkInsertGrahamScoreSnapshots(Baseline, [
+            MakeScore(1, "111", "Trend Co", "TRD", 15, 15, 10m, 500_000_000m, checkResults: AllPass),
+        ], _ct);
+
+        var service = new PortfolioAdvisorService(_dbm);
+        Result<PortfolioAdvisorReport> result = await service.GetRecommendations(["TRD"], _ct);
+        Assert.True(result.IsSuccess);
+
+        PortfolioRecommendation sell = Assert.Single(result.Value!.Sells);
+        Assert.Contains(sell.Reasons, r => r.Contains("Retained Earnings Increased") && r.Contains("now FAILS"));
+    }
+
+    [Fact]
+    public async Task GetRecommendations_FailingReasonsComeFromStoredResults() {
+        // No baseline: the reasons list the currently failing checks, read from storage
+        _ = await _dbm.BulkInsertCompanyScores([
+            MakeScore(1, "111", "Trend Co", "TRD", 14, 15, 10m, 500_000_000m, checkResults: "PPPPPPPPPPPPFPP"),
+        ], _ct);
+
+        var service = new PortfolioAdvisorService(_dbm);
+        Result<PortfolioAdvisorReport> result = await service.GetRecommendations(["TRD"], _ct);
+        Assert.True(result.IsSuccess);
+
+        PortfolioRecommendation sell = Assert.Single(result.Value!.Sells);
+        Assert.Contains(sell.Reasons, r => r.Contains("Retained Earnings Increased") && r.Contains("FAILS"));
+        Assert.DoesNotContain(sell.Reasons, r => r.Contains("Book Value") && r.Contains("FAILS"));
     }
 }

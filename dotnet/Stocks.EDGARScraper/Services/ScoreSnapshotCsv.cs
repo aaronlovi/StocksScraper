@@ -60,11 +60,7 @@ internal static class ScoreSnapshotCsv {
             ? Math.Round(value.Value, 6, MidpointRounding.AwayFromZero).ToString("0.######", CultureInfo.InvariantCulture)
             : string.Empty;
 
-    internal static char FormatResult(ScoringCheckResult result) => result switch {
-        ScoringCheckResult.Pass => 'P',
-        ScoringCheckResult.Fail => 'F',
-        _ => 'N',
-    };
+    internal static char FormatResult(ScoringCheckResult result) => ScoringCheckResults.ToLetter(result);
 
     private static string BuildHeader(int checkCount, string[] metricColumns) {
         var sb = new StringBuilder("company_id,ticker,score,computable,years");

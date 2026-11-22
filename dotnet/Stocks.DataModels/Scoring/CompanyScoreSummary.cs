@@ -2,6 +2,11 @@ using System;
 
 namespace Stocks.DataModels.Scoring;
 
+/// <summary>
+/// A company's stored value score row. <see cref="CheckResults"/> holds the 15 check
+/// results encoded by <see cref="ScoringCheckResults"/>; null for rows written before
+/// they were stored.
+/// </summary>
 public record CompanyScoreSummary(
     ulong CompanyId,
     string Cik,
@@ -29,4 +34,5 @@ public record CompanyScoreSummary(
     decimal? CurrentDividendsPaid,
     decimal? MaxBuyPrice,
     decimal? PercentageUpside,
-    DateTime ComputedAt);
+    DateTime ComputedAt,
+    string? CheckResults = null);

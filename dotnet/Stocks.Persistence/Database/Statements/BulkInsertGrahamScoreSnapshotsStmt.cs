@@ -24,7 +24,7 @@ internal sealed class BulkInsertGrahamScoreSnapshotsStmt : BulkInsertDbStmtBase<
         + " average_owner_earnings, average_roe_cf, average_roe_oe,"
         + " estimated_return_cf, estimated_return_oe,"
         + " price_per_share, price_date, shares_outstanding,"
-        + " current_dividends_paid, max_buy_price, percentage_upside, computed_at)"
+        + " current_dividends_paid, max_buy_price, percentage_upside, computed_at, check_results)"
         + " FROM STDIN (FORMAT BINARY)";
 
     protected override async Task WriteItemAsync(NpgsqlBinaryImporter writer, CompanyScoreSummary s) {
@@ -59,5 +59,6 @@ internal sealed class BulkInsertGrahamScoreSnapshotsStmt : BulkInsertDbStmtBase<
         await writer.WriteNullableAsync(s.MaxBuyPrice, NpgsqlDbType.Numeric);
         await writer.WriteNullableAsync(s.PercentageUpside, NpgsqlDbType.Numeric);
         await writer.WriteAsync(s.ComputedAt, NpgsqlDbType.TimestampTz);
+        await writer.WriteNullableAsync(s.CheckResults, NpgsqlDbType.Varchar);
     }
 }

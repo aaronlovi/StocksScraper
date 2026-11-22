@@ -16,7 +16,9 @@ namespace Stocks.Persistence.Services;
 /// 15-point scores. "Now" is the live company_scores table (rebuilt by
 /// --compute-all-scores after a data refresh); the baseline for "what changed and why"
 /// is the most recent stored snapshot. Reasons list the specific checks that flipped,
-/// and each change is attributed to a new filing or a pure price move.
+/// read from the stored check results (re-derived from the metric columns only for rows
+/// written before those were stored), and each change is attributed to a new filing or
+/// a pure price move.
 /// </summary>
 public sealed class PortfolioAdvisorService {
     private const int PerfectScore = 15;
@@ -157,9 +159,10 @@ public sealed class PortfolioAdvisorService {
             s.OverallScore, s.ComputableChecks, s.PricePerShare, s.PriceDate, trigger, reasons);
 
     /// <summary>
-    /// Rebuilds the 15 checks from a stored score row's metric columns. The oldest
-    /// retained-earnings value is not stored, so check 13 evaluates as unavailable here;
-    /// callers skip it when diffing.
+    /// Rebuilds the 15 checks from a stored score row's metric columns. Used for the check
+    /// names and the displayed values, and for the results only when the row predates the
+    /// stored check results. The oldest retained-earnings value is not stored, so check 13
+    /// has no value here and evaluates as unavailable.
     /// </summary>
     private static IReadOnlyList<ScoringCheck> BuildChecks(CompanyScoreSummary s) {
         var metrics = new DerivedMetrics(
@@ -172,9 +175,20 @@ public sealed class PortfolioAdvisorService {
 
     private const int RetainedEarningsTrendCheckNumber = 13;
 
+    /// <summary>The check's result: the stored one when present, else the re-derived one.</summary>
+    private static ScoringCheckResult ResultOf(ScoringCheck check, IReadOnlyList<ScoringCheckResult>? stored) =>
+        stored is not null ? stored[check.CheckNumber - 1] : check.Result;
+
     private static List<string> DescribeFlippedChecks(CompanyScoreSummary baseline, CompanyScoreSummary current) {
         IReadOnlyList<ScoringCheck> before = BuildChecks(baseline);
         IReadOnlyList<ScoringCheck> after = BuildChecks(current);
+        IReadOnlyList<ScoringCheckResult>? storedBefore = ScoringCheckResults.Decode(baseline.CheckResults);
+        IReadOnlyList<ScoringCheckResult>? storedAfter = ScoringCheckResults.Decode(current.CheckResults);
+        bool useStored = storedBefore is not null && storedAfter is not null;
+        if (!useStored) {
+            storedBefore = null;
+            storedAfter = null;
+        }
 
         var beforeByNumber = new Dictionary<int, ScoringCheck>();
         foreach (ScoringCheck check in before)
@@ -182,34 +196,43 @@ public sealed class PortfolioAdvisorService {
 
         var reasons = new List<string>();
         foreach (ScoringCheck currentCheck in after) {
-            if (currentCheck.CheckNumber == RetainedEarningsTrendCheckNumber)
-                continue; // not reconstructible from stored rows
+            bool isTrendCheck = currentCheck.CheckNumber == RetainedEarningsTrendCheckNumber;
+            if (isTrendCheck && !useStored)
+                continue; // not reconstructible from stored metric columns
             if (!beforeByNumber.TryGetValue(currentCheck.CheckNumber, out ScoringCheck? baselineCheck))
                 continue;
-            if (baselineCheck.Result == currentCheck.Result)
+            ScoringCheckResult beforeResult = ResultOf(baselineCheck, storedBefore);
+            ScoringCheckResult afterResult = ResultOf(currentCheck, storedAfter);
+            if (beforeResult == afterResult)
                 continue;
 
-            string direction = currentCheck.Result switch {
+            string direction = afterResult switch {
                 ScoringCheckResult.Pass => "now PASSES",
                 ScoringCheckResult.Fail => "now FAILS",
                 _ => "is no longer computable",
             };
-            reasons.Add($"{currentCheck.Name} ({currentCheck.Threshold}) {direction}: "
-                + $"{FormatValue(baselineCheck.ComputedValue)} → {FormatValue(currentCheck.ComputedValue)}.");
+            reasons.Add(isTrendCheck
+                ? $"{currentCheck.Name} ({currentCheck.Threshold}) {direction}."
+                : $"{currentCheck.Name} ({currentCheck.Threshold}) {direction}: "
+                    + $"{FormatValue(baselineCheck.ComputedValue)} → {FormatValue(currentCheck.ComputedValue)}.");
         }
 
-        // The overall score includes the retained-earnings trend check we cannot diff
-        if (reasons.Count == 0 && baseline.OverallScore != current.OverallScore)
+        // Without stored results the overall score includes the trend check we cannot diff
+        if (!useStored && reasons.Count == 0 && baseline.OverallScore != current.OverallScore)
             reasons.Add("Retained Earnings Increased (check 13) changed — compare the company's scoring page for detail.");
 
         return reasons;
     }
 
     private static List<string> DescribeFailingChecks(CompanyScoreSummary current) {
+        IReadOnlyList<ScoringCheckResult>? stored = ScoringCheckResults.Decode(current.CheckResults);
         var reasons = new List<string>();
         foreach (ScoringCheck check in BuildChecks(current)) {
-            if (check.Result == ScoringCheckResult.Fail)
-                reasons.Add($"{check.Name} ({check.Threshold}) FAILS: {FormatValue(check.ComputedValue)}.");
+            if (ResultOf(check, stored) != ScoringCheckResult.Fail)
+                continue;
+            reasons.Add(check.CheckNumber == RetainedEarningsTrendCheckNumber
+                ? $"{check.Name} ({check.Threshold}) FAILS."
+                : $"{check.Name} ({check.Threshold}) FAILS: {FormatValue(check.ComputedValue)}.");
         }
         if (reasons.Count == 0)
             reasons.Add("Failing check detail not reconstructible from stored metrics — see the company's scoring page.");

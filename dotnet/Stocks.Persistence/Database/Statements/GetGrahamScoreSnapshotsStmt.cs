@@ -40,6 +40,7 @@ internal sealed class GetGrahamScoreSnapshotsStmt : QueryDbStmtBase {
     private int _maxBuyPriceIndex = -1;
     private int _percentageUpsideIndex = -1;
     private int _computedAtIndex = -1;
+    private int _checkResultsIndex = -1;
     private int _totalCountIndex = -1;
 
     public GetGrahamScoreSnapshotsStmt(DateOnly asOfDate, PaginationRequest pagination, ScoresFilter? filter)
@@ -76,7 +77,7 @@ SELECT company_id, cik, company_name, ticker, exchange,
     average_owner_earnings, average_roe_cf, average_roe_oe,
     estimated_return_cf, estimated_return_oe,
     price_per_share, price_date, shares_outstanding,
-    current_dividends_paid, max_buy_price, percentage_upside, computed_at,
+    current_dividends_paid, max_buy_price, percentage_upside, computed_at, check_results,
     COUNT(*) OVER() AS total_count
 FROM graham_score_snapshots
 {whereClause}
@@ -113,6 +114,7 @@ LIMIT @limit OFFSET @offset";
         _maxBuyPriceIndex = reader.GetOrdinal("max_buy_price");
         _percentageUpsideIndex = reader.GetOrdinal("percentage_upside");
         _computedAtIndex = reader.GetOrdinal("computed_at");
+        _checkResultsIndex = reader.GetOrdinal("check_results");
         _totalCountIndex = reader.GetOrdinal("total_count");
     }
 
@@ -174,7 +176,8 @@ LIMIT @limit OFFSET @offset";
             reader.IsDBNull(_currentDividendsPaidIndex) ? null : reader.GetDecimal(_currentDividendsPaidIndex),
             reader.IsDBNull(_maxBuyPriceIndex) ? null : reader.GetDecimal(_maxBuyPriceIndex),
             reader.IsDBNull(_percentageUpsideIndex) ? null : reader.GetDecimal(_percentageUpsideIndex),
-            reader.GetDateTime(_computedAtIndex));
+            reader.GetDateTime(_computedAtIndex),
+            reader.IsDBNull(_checkResultsIndex) ? null : reader.GetString(_checkResultsIndex));
         _results.Add(result);
         return true;
     }

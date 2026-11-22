@@ -427,7 +427,8 @@ public class ScoringService {
                 metrics.AverageOwnerEarnings, metrics.AverageRoeCF, metrics.AverageRoeOE,
                 metrics.EstimatedReturnCF, metrics.EstimatedReturnOE,
                 pricePerShare, priceDate, sharesOutstanding,
-                metrics.CurrentDividendsPaid, maxBuyPrice, percentageUpside, now), scorecard));
+                metrics.CurrentDividendsPaid, maxBuyPrice, percentageUpside, now,
+                ScoringCheckResults.Encode(scorecard)), scorecard));
 
             scored++;
             if (scored % logInterval == 0)

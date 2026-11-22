@@ -166,6 +166,32 @@ public class BatchScoringServiceTests {
     }
 
     [Fact]
+    public async Task ComputeAllScores_StoresCheckResultsMatchingScore() {
+        await SeedTaxonomyConcepts();
+        await SeedCompanyWithScoringData(1, 320193, "Apple Inc", "AAPL", "NASDAQ", 5);
+        await SeedCompanyWithScoringData(2, 789019, "Microsoft Corporation", "MSFT", "NASDAQ", 3);
+        await SeedPrices("AAPL", 250m);
+
+        var service = new ScoringService(_dbm);
+        Result<IReadOnlyCollection<CompanyScoreDetail>> details = await service.ComputeAllScoreDetails(_ct);
+        Assert.True(details.IsSuccess);
+
+        foreach (CompanyScoreDetail d in details.Value!) {
+            Assert.Equal(ScoringCheckResults.Encode(d.Checks), d.Summary.CheckResults);
+            string stored = d.Summary.CheckResults!;
+            Assert.Equal(15, stored.Length);
+            int passes = 0;
+            int computable = 0;
+            foreach (char c in stored) {
+                if (c == 'P') passes++;
+                if (c != 'N') computable++;
+            }
+            Assert.Equal(d.Summary.OverallScore, passes);
+            Assert.Equal(d.Summary.ComputableChecks, computable);
+        }
+    }
+
+    [Fact]
     public async Task ComputeAllScores_CompanyWithNoPriceStillGetsScore() {
         await SeedTaxonomyConcepts();
         await SeedCompanyWithScoringData(1, 320193, "Apple Inc", "AAPL", "NASDAQ", 4);

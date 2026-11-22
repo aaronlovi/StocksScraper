@@ -271,7 +271,7 @@ public class MoatScoringService {
             interestCoverage = latestOperatingIncome.Value / latestInterestExpense.Value;
 
         // Debt-to-equity from most recent snapshot
-        decimal? debt = ScoringService.ResolveField(mostRecentSnapshot, ScoringService.DebtChain, 0m);
+        decimal? debt = ScoringService.ResolveTotalDebt(mostRecentSnapshot);
         decimal? snapshotEquity = ScoringService.ResolveEquity(mostRecentSnapshot);
         decimal? debtToEquityRatio = null;
         if (debt.HasValue && snapshotEquity.HasValue && snapshotEquity.Value != 0m)

@@ -42,6 +42,9 @@ public class ScoringService {
         "LongTermDebtAndCapitalLeaseObligations",
         "LongTermDebt",
         "LongTermDebtNoncurrent",
+        // Debt beyond the long-term chain counted in the debt ratios (E4)
+        "LongTermDebtCurrent",
+        "ShortTermBorrowings",
         "RetainedEarningsAccumulatedDeficit",
         "AssetsCurrent",
         "LiabilitiesCurrent",
@@ -214,8 +217,9 @@ public class ScoringService {
         "RedeemableNoncontrollingInterestEquityCarryingAmount",
     ];
     // Debt concepts beyond the long-term chain: current portions, short-term borrowings,
-    // notes, credit lines, combined totals. Fetched by the moat score only (debt-free test
-    // for interest coverage), so the value score's eligible dates don't move.
+    // notes, credit lines, combined totals. Fetched whole by the moat score (debt-free test
+    // for interest coverage); the value score fetches only the two that ResolveTotalDebt
+    // adds, so its eligible dates move as little as possible.
     internal static readonly string[] OtherDebtConcepts = [
         "LongTermDebtCurrent", "DebtCurrent", "ShortTermBorrowings", "CommercialPaper",
         "LinesOfCreditCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent", "LineOfCredit",
@@ -536,6 +540,39 @@ public class ScoringService {
             percentageUpside);
 
         return Result<ScoringResult>.Success(result);
+    }
+
+    /// <summary>
+    /// Debt for the debt ratios: the long-term chain (first found) + the current portion of
+    /// long-term debt + short-term borrowings; missing tags count 0. Per the taxonomy
+    /// LongTermDebt includes current maturities while the other chain concepts are
+    /// noncurrent, so when LongTermDebt is the figure used, the current portion is added
+    /// only if LongTermDebt does not cover noncurrent + current (within 0.1%). Without a
+    /// noncurrent tag to compare against, LongTermDebt is taken as the total.
+    /// </summary>
+    internal static decimal ResolveTotalDebt(IReadOnlyDictionary<string, decimal> snapshot) {
+        string? longTermConcept = null;
+        decimal longTerm = 0m;
+        foreach (string concept in DebtChain) {
+            if (snapshot.TryGetValue(concept, out decimal value)) {
+                longTermConcept = concept;
+                longTerm = value;
+                break;
+            }
+        }
+
+        decimal current = ValueOrNull(snapshot, "LongTermDebtCurrent") ?? 0m;
+        bool longTermIncludesCurrent = false;
+        if (longTermConcept == "LongTermDebt" && current != 0m) {
+            decimal? noncurrent = ValueOrNull(snapshot, "LongTermDebtNoncurrent");
+            longTermIncludesCurrent = !noncurrent.HasValue
+                || NestParent(longTerm, noncurrent.Value + current) == longTerm;
+        }
+
+        decimal total = longTerm + (ValueOrNull(snapshot, "ShortTermBorrowings") ?? 0m);
+        if (!longTermIncludesCurrent)
+            total += current;
+        return total;
     }
 
     internal static decimal? ResolveField(
@@ -990,7 +1027,7 @@ public class ScoringService {
         decimal? equity = ResolveEquity(mostRecentSnapshot);
         decimal? goodwill = ResolveField(mostRecentSnapshot, GoodwillChain, 0m);
         decimal? intangibles = ResolveField(mostRecentSnapshot, IntangiblesChain, 0m);
-        decimal? debt = ResolveField(mostRecentSnapshot, DebtChain, 0m);
+        decimal? debt = ResolveTotalDebt(mostRecentSnapshot);
         decimal? retainedEarnings = ResolveField(mostRecentSnapshot, RetainedEarningsChain, null);
 
         // Book Value

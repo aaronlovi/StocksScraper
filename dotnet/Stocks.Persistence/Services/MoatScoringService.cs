@@ -299,8 +299,9 @@ public class MoatScoringService {
 
         decimal? estimatedReturnOE = null;
         decimal? averageOwnerEarnings = yearsWithOE > 0 ? totalOwnerEarnings / yearsWithOE : null;
-        if (averageOwnerEarnings.HasValue && currentDividendsPaid.HasValue && marketCap.HasValue && marketCap.Value != 0m)
-            estimatedReturnOE = 100m * (averageOwnerEarnings.Value - currentDividendsPaid.Value) / marketCap.Value;
+        // Owner earnings are before dividends: no dividend adjustment.
+        if (averageOwnerEarnings.HasValue && marketCap.HasValue && marketCap.Value != 0m)
+            estimatedReturnOE = 100m * averageOwnerEarnings.Value / marketCap.Value;
 
         var metrics = new MoatDerivedMetrics(
             averageGrossMargin,

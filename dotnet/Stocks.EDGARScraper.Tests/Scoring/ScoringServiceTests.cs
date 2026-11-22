@@ -1280,13 +1280,14 @@ public class ScoringServiceTests {
 
         Assert.Equal(1_000_000_000m, metrics.MarketCap);
 
-        // EstReturn_CF = 100 × (50M - 5M) / 1B = 100 × 45M / 1B = 4.5%
+        // The 50M change in cash is already after the 5M of dividends, so they are added back:
+        // EstReturn_CF = 100 × (50M + 5M) / 1B = 5.5%. (Used to subtract them again: 4.5%.)
         Assert.NotNull(metrics.EstimatedReturnCF);
-        Assert.Equal(4.5m, metrics.EstimatedReturnCF!.Value);
+        Assert.Equal(5.5m, metrics.EstimatedReturnCF!.Value);
 
-        // EstReturn_OE = 100 × (40M - 5M) / 1B = 100 × 35M / 1B = 3.5%
+        // EstReturn_OE = 100 × 40M / 1B = 4% (owner earnings are before dividends; used to be 3.5%)
         Assert.NotNull(metrics.EstimatedReturnOE);
-        Assert.Equal(3.5m, metrics.EstimatedReturnOE!.Value);
+        Assert.Equal(4m, metrics.EstimatedReturnOE!.Value);
     }
 
     [Fact]
@@ -1527,14 +1528,14 @@ public class ScoringServiceTests {
     public void ComputeMaxBuyPrice_TypicalValues_ReturnsMinimumDividedByShares() {
         // bookValue = 600M, avgNCF = 50M, avgOE = 40M, dividends = 5M, shares = 10M
         // val1 = 3 × 600M = 1800M
-        // val2 = 20 × (50M - 5M) = 900M
-        // val3 = 20 × (40M - 5M) = 700M  ← min
-        // maxBuyPrice = 700M / 10M = 70
+        // val2 = 20 × (50M + 5M) = 1100M  (NCF is after dividends: add them back)
+        // val3 = 20 × 40M = 800M  ← min   (OE is before dividends)
+        // maxBuyPrice = 800M / 10M = 80   (used to subtract dividends twice: 70)
         decimal? result = ScoringService.ComputeMaxBuyPrice(
             600_000_000m, 50_000_000m, 40_000_000m, 5_000_000m, 10_000_000);
 
         Assert.NotNull(result);
-        Assert.Equal(70m, result!.Value);
+        Assert.Equal(80m, result!.Value);
     }
 
     [Fact]
@@ -2524,6 +2525,36 @@ public class ScoringServiceTests {
             ["PaymentsToAcquirePropertyPlantAndEquipment"] = 10m,
         };
         Assert.Equal(108m, OwnerEarningsOf(data));
+    }
+
+    #endregion
+
+    #region Dividends in returns and max buy price (E2) tests
+
+    [Fact]
+    public void Dividends_EstimatedReturnCF_AddsBackDividendsPaid() {
+        // Operating cash 100, dividends 40, so the change in cash is 60: owners got 100.
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 1000m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 60m,
+            ["PaymentsOfDividends"] = 40m,
+        });
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 10m, 100); // market cap 1000
+        Assert.Equal(10m, metrics.EstimatedReturnCF);
+    }
+
+    [Fact]
+    public void Dividends_MaxBuyPrice_CashFlowLegAddsBackDividends() {
+        // val1 = 3000, val2 = 20 × (50 + 40) = 1800 ← min, val3 = 20 × 100 = 2000
+        decimal? result = ScoringService.ComputeMaxBuyPrice(1000m, 50m, 100m, 40m, 100);
+        Assert.Equal(18m, result);
+    }
+
+    [Fact]
+    public void Dividends_MaxBuyPrice_OwnerEarningsLegIgnoresDividends() {
+        // val1 = 3000, val2 = 20 × (200 + 40) = 4800, val3 = 20 × 60 = 1200 ← min
+        decimal? result = ScoringService.ComputeMaxBuyPrice(1000m, 200m, 60m, 40m, 100);
+        Assert.Equal(12m, result);
     }
 
     #endregion

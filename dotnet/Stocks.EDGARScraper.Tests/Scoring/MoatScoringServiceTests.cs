@@ -328,9 +328,9 @@ public class MoatScoringServiceTests {
     public void ComputeMoatDerivedMetrics_EstimatedReturnOE_ComputesCorrectly() {
         // OE = 500 - 0 = 500 (year 1), 600 - 0 = 600 (year 2)
         // Avg OE = 550
-        // Dividends (most recent year) = 50
+        // Dividends (most recent year) = 50, not subtracted: OE is before dividends
         // Market cap = 100 * 100 = 10000
-        // Est return = 100 * (550 - 50) / 10000 = 5%
+        // Est return = 100 * 550 / 10000 = 5.5%
         var annualData = BuildAnnualData(
             (2021, new Dictionary<string, decimal> { ["NetIncomeLoss"] = 500m }),
             (2022, new Dictionary<string, decimal> { ["NetIncomeLoss"] = 600m, ["PaymentsOfDividends"] = 50m }));
@@ -341,8 +341,8 @@ public class MoatScoringServiceTests {
         Assert.NotNull(metrics.EstimatedReturnOE);
         Assert.Equal(10000m, metrics.MarketCap);
         // Avg OE = (500 + 600) / 2 = 550
-        // Est return = 100 * (550 - 50) / 10000 = 5
-        Assert.Equal(5.0m, metrics.EstimatedReturnOE!.Value);
+        // Est return = 100 * 550 / 10000 = 5.5 (used to subtract dividends: 5)
+        Assert.Equal(5.5m, metrics.EstimatedReturnOE!.Value);
     }
 
     #endregion

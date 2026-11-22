@@ -935,8 +935,10 @@ public class ScoringService {
     }
 
     /// <summary>
-    /// Computes the maximum buy price using the TSX formula:
-    /// min(3 × bookValue, 20 × (avgNCF - dividends), 20 × (avgOE - dividends)) / shares
+    /// Computes the maximum buy price:
+    /// min(3 × bookValue, 20 × (avgNCF + dividends), 20 × avgOE) / shares.
+    /// Net cash flow is after dividends paid, so they are added back; owner earnings are
+    /// before dividends. (The tsx formula subtracted dividends from both: counted twice.)
     /// Returns null if any required input is missing or shares ≤ 0.
     /// </summary>
     internal static decimal? ComputeMaxBuyPrice(
@@ -951,8 +953,8 @@ public class ScoringService {
             return null;
 
         decimal val1 = 3m * bookValue.Value;
-        decimal val2 = 20m * (averageNetCashFlow.Value - currentDividendsPaid.Value);
-        decimal val3 = 20m * (averageOwnerEarnings.Value - currentDividendsPaid.Value);
+        decimal val2 = 20m * (averageNetCashFlow.Value + currentDividendsPaid.Value);
+        decimal val3 = 20m * averageOwnerEarnings.Value;
 
         decimal minVal = val1;
         if (val2 < minVal) minVal = val2;
@@ -1113,14 +1115,15 @@ public class ScoringService {
         int mostRecentAnnualYear = sortedYears[sortedYears.Count - 1];
         decimal? currentDividendsPaid = ResolveField(annualDataByYear[mostRecentAnnualYear], DividendsChain, 0m);
 
-        // Estimated Returns
+        // Estimated Returns. NCF is after dividends paid (it starts from the change in cash), so
+        // they are added back; owner earnings are before dividends and need no adjustment.
         decimal? estimatedReturnCF = null;
         if (averageNetCashFlow.HasValue && currentDividendsPaid.HasValue && marketCap.HasValue && marketCap.Value != 0m)
-            estimatedReturnCF = 100m * (averageNetCashFlow.Value - currentDividendsPaid.Value) / marketCap.Value;
+            estimatedReturnCF = 100m * (averageNetCashFlow.Value + currentDividendsPaid.Value) / marketCap.Value;
 
         decimal? estimatedReturnOE = null;
-        if (averageOwnerEarnings.HasValue && currentDividendsPaid.HasValue && marketCap.HasValue && marketCap.Value != 0m)
-            estimatedReturnOE = 100m * (averageOwnerEarnings.Value - currentDividendsPaid.Value) / marketCap.Value;
+        if (averageOwnerEarnings.HasValue && marketCap.HasValue && marketCap.Value != 0m)
+            estimatedReturnOE = 100m * averageOwnerEarnings.Value / marketCap.Value;
 
         return new DerivedMetrics(
             bookValue,

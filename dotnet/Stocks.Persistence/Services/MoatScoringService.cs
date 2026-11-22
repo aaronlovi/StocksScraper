@@ -71,6 +71,8 @@ public class MoatScoringService {
         var combined = new HashSet<string>(ScoringService.AllConceptNames, StringComparer.Ordinal);
         foreach (string concept in moatSpecific)
             combined.Add(concept);
+        foreach (string concept in ScoringService.OtherDebtConcepts)
+            combined.Add(concept);
 
         var result = new string[combined.Count];
         combined.CopyTo(result);
@@ -294,6 +296,16 @@ public class MoatScoringService {
         if (debt.HasValue && snapshotEquity.HasValue && snapshotEquity.Value != 0m)
             debtToEquityRatio = debt.Value / snapshotEquity.Value;
 
+        // Debt-free: no debt concept (long-term chain or the other debt concepts) is
+        // non-zero on the latest (10-K-filled) balance sheet.
+        bool debtFree = true;
+        foreach (string concept in ScoringService.DebtGroupConcepts) {
+            if (mostRecentSnapshot.TryGetValue(concept, out decimal debtValue) && debtValue != 0m) {
+                debtFree = false;
+                break;
+            }
+        }
+
         // Market cap
         decimal? marketCap = null;
         if (pricePerShare.HasValue && sharesOutstanding.HasValue)
@@ -329,7 +341,9 @@ public class MoatScoringService {
             snapshotEquity,
             averageOwnerEarnings,
             roeCfHasNonPositiveEquityYear,
-            roeOeHasNonPositiveEquityYear);
+            roeOeHasNonPositiveEquityYear,
+            debtFree,
+            latestOperatingIncome);
 
         return (metrics, trendData);
     }
@@ -409,11 +423,16 @@ public class MoatScoringService {
                     ? (metrics.DebtToEquityRatio.Value < 1.0m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
                     : ScoringCheckResult.NotAvailable));
 
-        // Check 10: Interest coverage > 5x
-        checks.Add(ScoringService.MakeCheck(10, "Interest coverage", metrics.InterestCoverage, "> 5x",
-            metrics.InterestCoverage.HasValue
-                ? (metrics.InterestCoverage.Value > 5m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+        // Check 10: Interest coverage > 5x. Without a coverage figure, a debt-free company
+        // passes when profitable and fails when not; anything else is unknown.
+        ScoringCheckResult coverageResult;
+        if (metrics.InterestCoverage.HasValue)
+            coverageResult = metrics.InterestCoverage.Value > 5m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail;
+        else if (metrics.DebtFree && metrics.LatestOperatingIncome.HasValue)
+            coverageResult = metrics.LatestOperatingIncome.Value > 0m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail;
+        else
+            coverageResult = ScoringCheckResult.NotAvailable;
+        checks.Add(ScoringService.MakeCheck(10, "Interest coverage", metrics.InterestCoverage, "> 5x", coverageResult));
 
         // Check 11: History >= 7 years
         checks.Add(ScoringService.MakeCheck(11, "History", yearsOfData, ">= 7 years",

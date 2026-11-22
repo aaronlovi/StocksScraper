@@ -202,7 +202,17 @@ public class ScoringService {
         "MinorityInterest", "NoncontrollingInterestInVariableInterestEntity",
         "RedeemableNoncontrollingInterestEquityCarryingAmount",
     ];
-    internal static readonly string[] DebtGroupConcepts = DebtChain;
+    // Debt concepts beyond the long-term chain: current portions, short-term borrowings,
+    // notes, credit lines, combined totals. Fetched by the moat score only (debt-free test
+    // for interest coverage), so the value score's eligible dates don't move.
+    internal static readonly string[] OtherDebtConcepts = [
+        "LongTermDebtCurrent", "DebtCurrent", "ShortTermBorrowings", "CommercialPaper",
+        "LinesOfCreditCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent", "LineOfCredit",
+        "LongTermLineOfCredit", "NotesPayable", "ConvertibleNotesPayable", "SeniorNotes",
+        "DebtLongtermAndShorttermCombinedAmount",
+        "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+    ];
+    internal static readonly string[] DebtGroupConcepts = Concat(DebtChain, OtherDebtConcepts);
     internal static readonly string[] IndividuallyFilledBalanceSheetConcepts = [
         "Goodwill", "IntangibleAssetsNetExcludingGoodwill", "RetainedEarningsAccumulatedDeficit",
         "AssetsCurrent", "LiabilitiesCurrent",
@@ -1212,8 +1222,8 @@ public class ScoringService {
     /// <summary>
     /// Fills balance-sheet fields missing from the most recent snapshot with the latest
     /// 10-K's values. Equity: when equity can't be resolved from the snapshot, the whole
-    /// equity group is replaced by the 10-K's (never mixed). Debt: copied when none of the
-    /// group is present. Goodwill, intangibles, retained earnings and current
+    /// equity group is replaced by the 10-K's (never mixed). Debt: the long-term chain and
+    /// the other debt concepts are each copied when none of that subgroup is present. Goodwill, intangibles, retained earnings and current
     /// assets/liabilities: individually. Duration concepts are never filled. Shares are
     /// not filled: a share count up to a year old would give a stale market cap.
     /// </summary>
@@ -1226,13 +1236,24 @@ public class ScoringService {
             CopyConcepts(snapshot, latestTenK, EquityGroupConcepts);
         }
 
-        if (!ContainsAny(snapshot, DebtGroupConcepts))
-            CopyConcepts(snapshot, latestTenK, DebtGroupConcepts);
+        // Long-term debt and the other debt concepts are separate subgroups: a 10-Q that
+        // tags only a credit line must still get the 10-K's long-term debt.
+        if (!ContainsAny(snapshot, DebtChain))
+            CopyConcepts(snapshot, latestTenK, DebtChain);
+        if (!ContainsAny(snapshot, OtherDebtConcepts))
+            CopyConcepts(snapshot, latestTenK, OtherDebtConcepts);
 
         foreach (string concept in IndividuallyFilledBalanceSheetConcepts) {
             if (!snapshot.ContainsKey(concept) && latestTenK.TryGetValue(concept, out decimal value))
                 snapshot[concept] = value;
         }
+    }
+
+    private static string[] Concat(string[] first, string[] second) {
+        var result = new string[first.Length + second.Length];
+        first.CopyTo(result, 0);
+        second.CopyTo(result, first.Length);
+        return result;
     }
 
     private static bool ContainsAny(IReadOnlyDictionary<string, decimal> data, string[] concepts) {

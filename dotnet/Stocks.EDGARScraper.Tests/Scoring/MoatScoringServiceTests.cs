@@ -209,13 +209,16 @@ public class MoatScoringServiceTests {
 
     [Fact]
     public void ComputeMoatDerivedMetrics_InterestCoverage_NullWhenNoInterestExpense() {
+        // Has debt but no interest tag: the coverage is unknown (a debt-free company is a separate case).
         var annualData = BuildAnnualData(
             (2021, new Dictionary<string, decimal> { ["OperatingIncomeLoss"] = 200m }));
+        var snapshot = new Dictionary<string, decimal> { ["LongTermDebt"] = 500m };
 
         var (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(
-            annualData, EmptySnapshot(), null, null, null);
+            annualData, snapshot, null, null, null);
 
         Assert.Null(metrics.InterestCoverage);
+        Assert.Equal(ScoringCheckResult.NotAvailable, MoatScoringService.EvaluateMoatChecks(metrics, 8)[9].Result);
     }
 
     #endregion
@@ -617,6 +620,143 @@ public class MoatScoringServiceTests {
         };
         IReadOnlyList<ScoringCheck> checks = EvaluateMoatSingleYear(data, out _);
         Assert.Equal(ScoringCheckResult.Pass, MoatCheckResult(checks, 7));
+    }
+
+    #endregion
+
+    #region Interest coverage for debt-free companies (P4) tests
+
+    private static ScoringCheckResult InterestCoverageCheck(
+        Dictionary<string, decimal> latestYear, Dictionary<string, decimal> snapshot,
+        out MoatDerivedMetrics metrics) {
+        var annualData = BuildAnnualData((2024, latestYear));
+        (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(annualData, snapshot, null, null, null);
+        return MoatCheckResult(MoatScoringService.EvaluateMoatChecks(metrics, 8), 10);
+    }
+
+    [Fact]
+    public void InterestCoverage_DebtFreeProfitable_Passes() {
+        var year = new Dictionary<string, decimal> { ["OperatingIncomeLoss"] = 100m };
+        var snapshot = new Dictionary<string, decimal> { ["StockholdersEquity"] = 500m };
+
+        ScoringCheckResult result = InterestCoverageCheck(year, snapshot, out MoatDerivedMetrics metrics);
+
+        Assert.True(metrics.DebtFree);
+        Assert.Equal(100m, metrics.LatestOperatingIncome);
+        Assert.Null(metrics.InterestCoverage);
+        Assert.Equal(ScoringCheckResult.Pass, result);
+    }
+
+    [Fact]
+    public void InterestCoverage_DebtFreeLossMaker_Fails() {
+        var year = new Dictionary<string, decimal> { ["OperatingIncomeLoss"] = -100m };
+        var snapshot = new Dictionary<string, decimal> { ["StockholdersEquity"] = 500m };
+        Assert.Equal(ScoringCheckResult.Fail, InterestCoverageCheck(year, snapshot, out _));
+    }
+
+    [Fact]
+    public void InterestCoverage_DebtFreeZeroOperatingIncome_Fails() {
+        var year = new Dictionary<string, decimal> { ["OperatingIncomeLoss"] = 0m };
+        var snapshot = new Dictionary<string, decimal> { ["StockholdersEquity"] = 500m };
+        Assert.Equal(ScoringCheckResult.Fail, InterestCoverageCheck(year, snapshot, out _));
+    }
+
+    [Fact]
+    public void InterestCoverage_DebtButNoInterestTag_NotAvailable() {
+        var year = new Dictionary<string, decimal> { ["OperatingIncomeLoss"] = 100m };
+        var snapshot = new Dictionary<string, decimal> { ["LongTermDebt"] = 300m };
+
+        ScoringCheckResult result = InterestCoverageCheck(year, snapshot, out MoatDerivedMetrics metrics);
+
+        Assert.False(metrics.DebtFree);
+        Assert.Equal(ScoringCheckResult.NotAvailable, result);
+    }
+
+    [Fact]
+    public void InterestCoverage_NegativeOperatingIncomeWithInterest_Fails() {
+        var year = new Dictionary<string, decimal> { ["OperatingIncomeLoss"] = -100m, ["InterestExpense"] = 10m };
+        Assert.Equal(ScoringCheckResult.Fail, InterestCoverageCheck(year, new Dictionary<string, decimal>(), out _));
+    }
+
+    [Theory]
+    [InlineData("LongTermDebtCurrent")]
+    [InlineData("DebtCurrent")]
+    [InlineData("ShortTermBorrowings")]
+    [InlineData("CommercialPaper")]
+    [InlineData("LinesOfCreditCurrent")]
+    [InlineData("LongTermDebtAndCapitalLeaseObligationsCurrent")]
+    [InlineData("LineOfCredit")]
+    [InlineData("LongTermLineOfCredit")]
+    [InlineData("NotesPayable")]
+    [InlineData("ConvertibleNotesPayable")]
+    [InlineData("SeniorNotes")]
+    [InlineData("DebtLongtermAndShorttermCombinedAmount")]
+    [InlineData("LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities")]
+    public void InterestCoverage_AnyOtherDebtConcept_BlocksDebtFree(string debtConcept) {
+        var year = new Dictionary<string, decimal> { ["OperatingIncomeLoss"] = 100m };
+        var snapshot = new Dictionary<string, decimal> { [debtConcept] = 50m };
+
+        ScoringCheckResult result = InterestCoverageCheck(year, snapshot, out MoatDerivedMetrics metrics);
+
+        Assert.False(metrics.DebtFree);
+        Assert.Equal(ScoringCheckResult.NotAvailable, result);
+    }
+
+    [Fact]
+    public void InterestCoverage_ZeroDebtTag_CountsAsDebtFree() {
+        var year = new Dictionary<string, decimal> { ["OperatingIncomeLoss"] = 100m };
+        var snapshot = new Dictionary<string, decimal> { ["LongTermDebt"] = 0m, ["DebtCurrent"] = 0m };
+        Assert.Equal(ScoringCheckResult.Pass, InterestCoverageCheck(year, snapshot, out _));
+    }
+
+    [Fact]
+    public void InterestCoverage_SparseTenQWithTenKDebt_NotDebtFree() {
+        // CAT-shaped: after the latest-10-K fallback the snapshot carries the 10-K debt.
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 1000m, new DateOnly(2025, 12, 31), 1, 1),
+            new("LongTermDebtNoncurrent", 3000m, new DateOnly(2025, 12, 31), 1, 1),
+            new("OperatingIncomeLoss", 400m, new DateOnly(2025, 12, 31), 1, 1),
+            new("StockholdersEquity", 1100m, new DateOnly(2026, 6, 30), 1, 2),
+        };
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+        var annual = new Dictionary<int, IReadOnlyDictionary<string, decimal>>();
+        foreach (KeyValuePair<int, Dictionary<string, decimal>> entry in grouped.AnnualByYear)
+            annual[entry.Key] = entry.Value;
+
+        var (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(
+            annual, grouped.MostRecentSnapshot, null, null, null, grouped.BalanceTypes);
+
+        Assert.False(metrics.DebtFree);
+        Assert.Equal(ScoringCheckResult.NotAvailable,
+            MoatCheckResult(MoatScoringService.EvaluateMoatChecks(metrics, 8), 10));
+    }
+
+    [Fact]
+    public void LatestTenKFallback_TenQWithOnlyCreditLine_StillGetsTenKLongTermDebt() {
+        // AMN-shaped: the 10-Q tags only LongTermLineOfCredit; the 10-K's LongTermDebt must still fill.
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 1000m, new DateOnly(2025, 12, 31), 1, 1),
+            new("LongTermDebt", 1056m, new DateOnly(2025, 12, 31), 1, 1),
+            new("LongTermLineOfCredit", 25m, new DateOnly(2025, 12, 31), 1, 1),
+            new("StockholdersEquity", 1000m, new DateOnly(2026, 6, 30), 1, 2),
+            new("LongTermLineOfCredit", 0m, new DateOnly(2026, 6, 30), 1, 2),
+        };
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        Assert.Equal(1056m, grouped.MostRecentSnapshot["LongTermDebt"]);
+        Assert.Equal(0m, grouped.MostRecentSnapshot["LongTermLineOfCredit"]);
+    }
+
+    [Fact]
+    public void InterestCoverage_SparseTenQWithTenKCurrentDebtOnly_NotDebtFree() {
+        // The debt group copied from the 10-K includes the current/short-term debt concepts.
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 1000m, new DateOnly(2025, 12, 31), 1, 1),
+            new("ShortTermBorrowings", 200m, new DateOnly(2025, 12, 31), 1, 1),
+            new("StockholdersEquity", 1100m, new DateOnly(2026, 6, 30), 1, 2),
+        };
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+        Assert.Equal(200m, grouped.MostRecentSnapshot["ShortTermBorrowings"]);
     }
 
     #endregion

@@ -23,4 +23,9 @@ public record MoatDerivedMetrics(
     decimal? AverageOwnerEarnings = null,
     // True when any year entering the ROE (CF) / ROE (OE) average has equity <= 0.
     bool RoeCfHasNonPositiveEquityYear = false,
-    bool RoeOeHasNonPositiveEquityYear = false);
+    bool RoeOeHasNonPositiveEquityYear = false,
+    // True when no debt concept (long-term chain or the other debt concepts) has a
+    // non-zero value on the latest balance sheet.
+    bool DebtFree = false,
+    // Operating income of the latest year that reports it (the coverage numerator).
+    decimal? LatestOperatingIncome = null);

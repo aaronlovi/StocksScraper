@@ -193,6 +193,21 @@ public class ScoringService {
     internal static readonly string[] WorkingCapitalChangeChain = ["IncreaseDecreaseInOperatingCapital", "IncreaseDecreaseInOtherOperatingCapitalNet"];
     internal static readonly string[] SharesChain = ["CommonStockSharesOutstanding", "WeightedAverageNumberOfSharesOutstandingBasic", "EntityCommonStockSharesOutstanding"];
 
+    // Balance-sheet groups filled from the latest 10-K when a newer 10-Q lacks them.
+    // A group is copied whole, never mixed across dates.
+    internal static readonly string[] EquityGroupConcepts = [
+        "Assets", "Liabilities", "LiabilitiesAndStockholdersEquity",
+        "StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+        "MembersEquity", "PartnersCapital",
+        "MinorityInterest", "NoncontrollingInterestInVariableInterestEntity",
+        "RedeemableNoncontrollingInterestEquityCarryingAmount",
+    ];
+    internal static readonly string[] DebtGroupConcepts = DebtChain;
+    internal static readonly string[] IndividuallyFilledBalanceSheetConcepts = [
+        "Goodwill", "IntangibleAssetsNetExcludingGoodwill", "RetainedEarningsAccumulatedDeficit",
+        "AssetsCurrent", "LiabilitiesCurrent",
+    ];
+
     private static readonly Dictionary<string, TaxonomyBalanceTypes> EmptyBalanceTypes = new(StringComparer.Ordinal);
 
     public async Task<Result<IReadOnlyCollection<CompanyScoreSummary>>> ComputeAllScores(CancellationToken ct) =>
@@ -1127,6 +1142,7 @@ public class ScoringService {
 
         // Track most recent and oldest report dates across ALL filing types
         DateOnly mostRecentDate = DateOnly.MinValue;
+        DateOnly latestAnnualDate = DateOnly.MinValue;
         DateOnly oldestDate = DateOnly.MaxValue;
 
         foreach (ScoringConceptValue v in values) {
@@ -1141,6 +1157,8 @@ public class ScoringService {
 
             // Annual partition: only 10-K
             if (v.FilingTypeId == (int)FilingType.TenK) {
+                if (v.ReportDate > latestAnnualDate)
+                    latestAnnualDate = v.ReportDate;
                 int year = v.ReportDate.Year;
                 if (!annualByYear.ContainsKey(year))
                     annualByYear[year] = new Dictionary<string, decimal>(StringComparer.Ordinal);
@@ -1165,6 +1183,18 @@ public class ScoringService {
             }
         }
 
+        // A newer 10-Q often carries fewer balance-sheet tags than the 10-K. Fill its gaps
+        // from the latest 10-K (at most about a year older), group by group.
+        if (latestAnnualDate != DateOnly.MinValue && latestAnnualDate < mostRecentDate) {
+            var latestTenKSnapshot = new Dictionary<string, decimal>(StringComparer.Ordinal);
+            foreach (ScoringConceptValue v in values) {
+                if (v.ReportDate == latestAnnualDate && v.FilingTypeId == (int)FilingType.TenK
+                    && !latestTenKSnapshot.ContainsKey(v.ConceptName))
+                    latestTenKSnapshot[v.ConceptName] = v.Value;
+            }
+            FillBalanceSheetGapsFromTenK(mostRecentSnapshot, latestTenKSnapshot);
+        }
+
         // Extract oldest retained earnings from values matching oldestDate (any filing type)
         if (oldestDate != DateOnly.MaxValue) {
             // Build a lookup for the oldest date's values, then resolve via the chain
@@ -1177,5 +1207,47 @@ public class ScoringService {
         }
 
         return new GroupedScoringData(annualByYear, balanceTypes, mostRecentSnapshot, oldestRetainedEarnings);
+    }
+
+    /// <summary>
+    /// Fills balance-sheet fields missing from the most recent snapshot with the latest
+    /// 10-K's values. Equity: when equity can't be resolved from the snapshot, the whole
+    /// equity group is replaced by the 10-K's (never mixed). Debt: copied when none of the
+    /// group is present. Goodwill, intangibles, retained earnings and current
+    /// assets/liabilities: individually. Duration concepts are never filled. Shares are
+    /// not filled: a share count up to a year old would give a stale market cap.
+    /// </summary>
+    internal static void FillBalanceSheetGapsFromTenK(
+        Dictionary<string, decimal> snapshot,
+        IReadOnlyDictionary<string, decimal> latestTenK) {
+        if (ResolveEquity(snapshot) is null && ResolveEquity(latestTenK) is not null) {
+            foreach (string concept in EquityGroupConcepts)
+                snapshot.Remove(concept);
+            CopyConcepts(snapshot, latestTenK, EquityGroupConcepts);
+        }
+
+        if (!ContainsAny(snapshot, DebtGroupConcepts))
+            CopyConcepts(snapshot, latestTenK, DebtGroupConcepts);
+
+        foreach (string concept in IndividuallyFilledBalanceSheetConcepts) {
+            if (!snapshot.ContainsKey(concept) && latestTenK.TryGetValue(concept, out decimal value))
+                snapshot[concept] = value;
+        }
+    }
+
+    private static bool ContainsAny(IReadOnlyDictionary<string, decimal> data, string[] concepts) {
+        foreach (string concept in concepts) {
+            if (data.ContainsKey(concept))
+                return true;
+        }
+        return false;
+    }
+
+    private static void CopyConcepts(
+        Dictionary<string, decimal> target, IReadOnlyDictionary<string, decimal> source, string[] concepts) {
+        foreach (string concept in concepts) {
+            if (source.TryGetValue(concept, out decimal value))
+                target[concept] = value;
+        }
     }
 }

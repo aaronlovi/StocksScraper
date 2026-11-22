@@ -1972,4 +1972,126 @@ public class ScoringServiceTests {
     }
 
     #endregion
+
+    #region Latest 10-K balance-sheet fallback (E9) tests
+
+    private static readonly DateOnly TenKDate = new(2025, 12, 31);
+    private static readonly DateOnly TenQDate = new(2026, 6, 30);
+
+    [Fact]
+    public void LatestTenKFallback_SparseTenQ_DebtComesFromTenK() {
+        // CAT-shaped: the 10-Q carries equity only; the 10-K reports long-term debt.
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 1000m, TenKDate, 1, 1),
+            new("LongTermDebtNoncurrent", 3000m, TenKDate, 1, 1),
+            new("StockholdersEquity", 1100m, TenQDate, 1, 2),
+        };
+
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        Assert.Equal(1100m, grouped.MostRecentSnapshot["StockholdersEquity"]);
+        Assert.Equal(3000m, ScoringService.ResolveField(grouped.MostRecentSnapshot, ScoringService.DebtChain, 0m));
+    }
+
+    [Fact]
+    public void LatestTenKFallback_TenQWithOwnDebt_NoFallback() {
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 1000m, TenKDate, 1, 1),
+            new("LongTermDebtNoncurrent", 3000m, TenKDate, 1, 1),
+            new("StockholdersEquity", 1100m, TenQDate, 1, 2),
+            new("LongTermDebt", 2500m, TenQDate, 1, 2),
+        };
+
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        Assert.Equal(2500m, ScoringService.ResolveField(grouped.MostRecentSnapshot, ScoringService.DebtChain, 0m));
+        Assert.False(grouped.MostRecentSnapshot.ContainsKey("LongTermDebtNoncurrent"));
+    }
+
+    [Fact]
+    public void LatestTenKFallback_EquityGroupCopiedWhole_NeverMixed() {
+        // 10-Q has L&SE but no Liabilities and no direct equity: equity is not derivable.
+        // The whole equity group comes from the 10-K; the 10-Q's L&SE is not mixed in.
+        var values = new List<ScoringConceptValue> {
+            new("LiabilitiesAndStockholdersEquity", 5000m, TenKDate, 1, 1),
+            new("Liabilities", 3000m, TenKDate, 1, 1),
+            new("MinorityInterest", 100m, TenKDate, 1, 1),
+            new("LiabilitiesAndStockholdersEquity", 9000m, TenQDate, 1, 2),
+        };
+
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        Assert.Equal(5000m, grouped.MostRecentSnapshot["LiabilitiesAndStockholdersEquity"]);
+        Assert.Equal(1900m, ScoringService.ResolveEquity(grouped.MostRecentSnapshot));
+    }
+
+    [Fact]
+    public void LatestTenKFallback_TenQEquityDerivable_EquityGroupKept() {
+        var values = new List<ScoringConceptValue> {
+            new("Assets", 5000m, TenKDate, 2, 1),
+            new("Liabilities", 3000m, TenKDate, 1, 1),
+            new("MinorityInterest", 100m, TenKDate, 1, 1),
+            new("Assets", 6000m, TenQDate, 2, 2),
+            new("Liabilities", 3500m, TenQDate, 1, 2),
+        };
+
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        // 10-Q equity derives (6000 - 3500); its group is not touched, so the 10-K NCI is not mixed in
+        Assert.Equal(2500m, ScoringService.ResolveEquity(grouped.MostRecentSnapshot));
+    }
+
+    [Fact]
+    public void LatestTenKFallback_IndividualFieldsFilledWhenMissing_SharesNot() {
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 1000m, TenKDate, 1, 1),
+            new("Goodwill", 200m, TenKDate, 2, 1),
+            new("IntangibleAssetsNetExcludingGoodwill", 50m, TenKDate, 2, 1),
+            new("RetainedEarningsAccumulatedDeficit", 400m, TenKDate, 1, 1),
+            new("CommonStockSharesOutstanding", 77m, TenKDate, 1, 1),
+            new("StockholdersEquity", 1100m, TenQDate, 1, 2),
+            new("Goodwill", 210m, TenQDate, 2, 2),
+        };
+
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        Assert.Equal(210m, grouped.MostRecentSnapshot["Goodwill"]);
+        Assert.Equal(50m, grouped.MostRecentSnapshot["IntangibleAssetsNetExcludingGoodwill"]);
+        Assert.Equal(400m, grouped.MostRecentSnapshot["RetainedEarningsAccumulatedDeficit"]);
+        Assert.Null(ScoringService.ResolveField(grouped.MostRecentSnapshot, ScoringService.SharesChain, null));
+    }
+
+    [Fact]
+    public void LatestTenKFallback_DurationConceptsNotFilled() {
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 1000m, TenKDate, 1, 1),
+            new("NetIncomeLoss", 300m, TenKDate, 1, 1),
+            new("StockholdersEquity", 1100m, TenQDate, 1, 2),
+        };
+
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+
+        Assert.False(grouped.MostRecentSnapshot.ContainsKey("NetIncomeLoss"));
+    }
+
+    [Fact]
+    public void LatestTenKFallback_SparseTenQ_DebtToEquityUsesTenKDebt() {
+        var values = new List<ScoringConceptValue> {
+            new("StockholdersEquity", 1000m, TenKDate, 1, 1),
+            new("LongTermDebtNoncurrent", 3000m, TenKDate, 1, 1),
+            new("StockholdersEquity", 1000m, TenQDate, 1, 2),
+        };
+        ScoringService.GroupedScoringData grouped = ScoringService.GroupAndPartitionData(values);
+        var annual = new Dictionary<int, IReadOnlyDictionary<string, decimal>>();
+        foreach (KeyValuePair<int, Dictionary<string, decimal>> entry in grouped.AnnualByYear)
+            annual[entry.Key] = entry.Value;
+
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(
+            annual, grouped.MostRecentSnapshot, grouped.OldestRetainedEarnings, null, null, grouped.BalanceTypes);
+
+        Assert.Equal(3m, metrics.DebtToEquityRatio);
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(ScoringService.EvaluateChecks(metrics, 5), 1));
+    }
+
+    #endregion
 }

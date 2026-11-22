@@ -535,4 +535,89 @@ public class MoatScoringServiceTests {
     }
 
     #endregion
+
+    #region Sign rule (P1) tests
+
+    private static ScoringCheckResult MoatCheckResult(IReadOnlyList<ScoringCheck> checks, int number) {
+        foreach (ScoringCheck check in checks) {
+            if (check.CheckNumber == number)
+                return check.Result;
+        }
+        throw new InvalidOperationException($"No check {number}");
+    }
+
+    private static IReadOnlyList<ScoringCheck> EvaluateMoatSingleYear(
+        Dictionary<string, decimal> data, out MoatDerivedMetrics metrics) {
+        var annualData = BuildAnnualData((2024, data));
+        (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(annualData, data, null, null, null);
+        return MoatScoringService.EvaluateMoatChecks(metrics, 8);
+    }
+
+    [Fact]
+    public void SignRule_Moat_NegativeEquity_DebtToEquityAndRoeFail() {
+        var data = new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = -100m, ["LongTermDebt"] = 500m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = -50m, ["NetIncomeLoss"] = -50m,
+        };
+        IReadOnlyList<ScoringCheck> checks = EvaluateMoatSingleYear(data, out MoatDerivedMetrics metrics);
+
+        Assert.Equal(-5m, metrics.DebtToEquityRatio);
+        Assert.Equal(50m, metrics.AverageRoeCF);
+        Assert.Equal(ScoringCheckResult.Fail, MoatCheckResult(checks, 9));
+        Assert.Equal(ScoringCheckResult.Fail, MoatCheckResult(checks, 1));
+        Assert.Equal(ScoringCheckResult.Fail, MoatCheckResult(checks, 2));
+    }
+
+    [Fact]
+    public void SignRule_Moat_ZeroEquity_DebtToEquityFails() {
+        var data = new Dictionary<string, decimal> { ["StockholdersEquity"] = 0m, ["LongTermDebt"] = 500m };
+        IReadOnlyList<ScoringCheck> checks = EvaluateMoatSingleYear(data, out _);
+        Assert.Equal(ScoringCheckResult.Fail, MoatCheckResult(checks, 9));
+    }
+
+    [Fact]
+    public void SignRule_Moat_PositiveEquity_DebtToEquityAndRoeUnchanged() {
+        var data = new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 100m, ["LongTermDebt"] = 50m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m, ["NetIncomeLoss"] = 50m,
+        };
+        IReadOnlyList<ScoringCheck> checks = EvaluateMoatSingleYear(data, out _);
+
+        Assert.Equal(ScoringCheckResult.Pass, MoatCheckResult(checks, 9));
+        Assert.Equal(ScoringCheckResult.Pass, MoatCheckResult(checks, 1));
+        Assert.Equal(ScoringCheckResult.Pass, MoatCheckResult(checks, 2));
+    }
+
+    [Fact]
+    public void SignRule_Moat_NegativeOwnerEarnings_CapexRatioFails() {
+        var data = new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = -100m, ["PaymentsToAcquirePropertyPlantAndEquipment"] = 50m,
+        };
+        IReadOnlyList<ScoringCheck> checks = EvaluateMoatSingleYear(data, out MoatDerivedMetrics metrics);
+
+        Assert.True(metrics.CapexRatio < 0m);
+        Assert.Equal(ScoringCheckResult.Fail, MoatCheckResult(checks, 7));
+    }
+
+    [Fact]
+    public void SignRule_Moat_ZeroOwnerEarnings_CapexRatioFails() {
+        var data = new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 50m, ["PaymentsToAcquirePropertyPlantAndEquipment"] = 50m,
+        };
+        IReadOnlyList<ScoringCheck> checks = EvaluateMoatSingleYear(data, out MoatDerivedMetrics metrics);
+
+        Assert.Null(metrics.CapexRatio);
+        Assert.Equal(ScoringCheckResult.Fail, MoatCheckResult(checks, 7));
+    }
+
+    [Fact]
+    public void SignRule_Moat_PositiveOwnerEarnings_CapexRatioUnchanged() {
+        var data = new Dictionary<string, decimal> {
+            ["NetIncomeLoss"] = 100m, ["PaymentsToAcquirePropertyPlantAndEquipment"] = 20m,
+        };
+        IReadOnlyList<ScoringCheck> checks = EvaluateMoatSingleYear(data, out _);
+        Assert.Equal(ScoringCheckResult.Pass, MoatCheckResult(checks, 7));
+    }
+
+    #endregion
 }

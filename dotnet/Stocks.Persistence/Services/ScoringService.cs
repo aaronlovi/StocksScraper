@@ -856,6 +856,8 @@ public class ScoringService {
         int yearsWithOE = 0;
         int yearsWithRoeCF = 0;
         int yearsWithRoeOE = 0;
+        bool roeCfHasNonPositiveEquityYear = false;
+        bool roeOeHasNonPositiveEquityYear = false;
         bool hasAnyCashFlow = false;
         bool hasAnyOwnerEarnings = false;
 
@@ -884,7 +886,10 @@ public class ScoringService {
                 yearsWithNCF++;
 
                 // ROE (CF) for this year: net cash flow / equity
+                // A year with equity <= 0 gives no credit: it fails the ROE check (sign rule).
                 decimal? ncfEquity = ResolveEquity(yearData);
+                if (ncfEquity.HasValue && ncfEquity.Value <= 0m)
+                    roeCfHasNonPositiveEquityYear = true;
                 if (ncfEquity.HasValue && ncfEquity.Value != 0m) {
                     totalRoeCF += 100m * netCashFlow / ncfEquity.Value;
                     yearsWithRoeCF++;
@@ -911,6 +916,8 @@ public class ScoringService {
 
                 // ROE (OE) for this year: owner earnings / equity
                 decimal? oeEquity = ResolveEquity(yearData);
+                if (oeEquity.HasValue && oeEquity.Value <= 0m)
+                    roeOeHasNonPositiveEquityYear = true;
                 if (oeEquity.HasValue && oeEquity.Value != 0m) {
                     totalRoeOE += 100m * ownerEarnings / oeEquity.Value;
                     yearsWithRoeOE++;
@@ -980,17 +987,27 @@ public class ScoringService {
             averageRoeOE,
             estimatedReturnCF,
             estimatedReturnOE,
-            currentDividendsPaid);
+            currentDividendsPaid,
+            equity,
+            roeCfHasNonPositiveEquityYear,
+            roeOeHasNonPositiveEquityYear);
     }
 
     internal static IReadOnlyList<ScoringCheck> EvaluateChecks(DerivedMetrics metrics, int yearsOfData) {
         var checks = new List<ScoringCheck>(15);
 
+        // Sign rule: a ratio over a non-positive denominator fails its check. The rule lives
+        // in the check, not the division, so the displayed ratio stays honest.
+        bool equityNonPositive = metrics.Equity.HasValue && metrics.Equity.Value <= 0m;
+        bool bookValueNonPositive = metrics.BookValue.HasValue && metrics.BookValue.Value <= 0m;
+
         // Check 1: Debt-to-Equity < 0.5
         checks.Add(MakeCheck(1, "Debt-to-Equity", metrics.DebtToEquityRatio, "< 0.5",
-            metrics.DebtToEquityRatio.HasValue
-                ? (metrics.DebtToEquityRatio.Value < 0.5m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+            equityNonPositive
+                ? ScoringCheckResult.Fail
+                : metrics.DebtToEquityRatio.HasValue
+                        ? (metrics.DebtToEquityRatio.Value < 0.5m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                        : ScoringCheckResult.NotAvailable));
 
         // Check 2: Book Value > $150M
         checks.Add(MakeCheck(2, "Book Value", metrics.BookValue, "> $150M",
@@ -1000,9 +1017,11 @@ public class ScoringService {
 
         // Check 3: Price-to-Book ≤ 3.0
         checks.Add(MakeCheck(3, "Price-to-Book", metrics.PriceToBookRatio, "≤ 3.0",
-            metrics.PriceToBookRatio.HasValue
-                ? (metrics.PriceToBookRatio.Value <= 3.0m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+            bookValueNonPositive && metrics.MarketCap.HasValue
+                ? ScoringCheckResult.Fail
+                : metrics.PriceToBookRatio.HasValue
+                    ? (metrics.PriceToBookRatio.Value <= 3.0m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                    : ScoringCheckResult.NotAvailable));
 
         // Check 4: Average Net Cash Flow > 0
         checks.Add(MakeCheck(4, "Avg Net Cash Flow Positive", metrics.AverageNetCashFlow, "> 0",
@@ -1042,9 +1061,11 @@ public class ScoringService {
 
         // Check 10: Debt-to-Book < 1.0
         checks.Add(MakeCheck(10, "Debt-to-Book", metrics.DebtToBookRatio, "< 1.0",
-            metrics.DebtToBookRatio.HasValue
-                ? (metrics.DebtToBookRatio.Value < 1.0m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+            bookValueNonPositive
+                ? ScoringCheckResult.Fail
+                : metrics.DebtToBookRatio.HasValue
+                    ? (metrics.DebtToBookRatio.Value < 1.0m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                    : ScoringCheckResult.NotAvailable));
 
         // Check 11: Retained Earnings Positive (Adjusted) > 0
         checks.Add(MakeCheck(11, "Retained Earnings Positive", metrics.AdjustedRetainedEarnings, "> 0",
@@ -1071,16 +1092,21 @@ public class ScoringService {
         checks.Add(MakeCheck(13, "Retained Earnings Increased", check13Value, "increased", check13Result));
 
         // Check 14: Average ROE (CF) >= 10%
+        // A year with equity <= 0 in the average gives no credit: the check fails.
         checks.Add(MakeCheck(14, "Avg ROE (CF)", metrics.AverageRoeCF, ">= 10%",
-            metrics.AverageRoeCF.HasValue
-                ? (metrics.AverageRoeCF.Value >= 10m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+            metrics.RoeCfHasNonPositiveEquityYear
+                ? ScoringCheckResult.Fail
+                : metrics.AverageRoeCF.HasValue
+                    ? (metrics.AverageRoeCF.Value >= 10m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                    : ScoringCheckResult.NotAvailable));
 
         // Check 15: Average ROE (OE) >= 10%
         checks.Add(MakeCheck(15, "Avg ROE (OE)", metrics.AverageRoeOE, ">= 10%",
-            metrics.AverageRoeOE.HasValue
-                ? (metrics.AverageRoeOE.Value >= 10m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+            metrics.RoeOeHasNonPositiveEquityYear
+                ? ScoringCheckResult.Fail
+                : metrics.AverageRoeOE.HasValue
+                    ? (metrics.AverageRoeOE.Value >= 10m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                    : ScoringCheckResult.NotAvailable));
 
         return checks;
     }

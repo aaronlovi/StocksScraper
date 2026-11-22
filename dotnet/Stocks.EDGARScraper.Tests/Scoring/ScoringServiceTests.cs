@@ -1777,4 +1777,199 @@ public class ScoringServiceTests {
     }
 
     #endregion
+
+    #region Sign rule (P1) tests
+
+    private static ScoringCheckResult CheckResult(IReadOnlyList<ScoringCheck> checks, int number) {
+        foreach (ScoringCheck check in checks) {
+            if (check.CheckNumber == number)
+                return check.Result;
+        }
+        throw new InvalidOperationException($"No check {number}");
+    }
+
+    private static IReadOnlyList<ScoringCheck> EvaluateSingleYear(
+        Dictionary<string, decimal> data, decimal? price = null, long? shares = null) {
+        DerivedMetrics metrics = CallComputeDerivedMetrics(MakeSingleYearData(2024, data), price, shares);
+        return ScoringService.EvaluateChecks(metrics, 5);
+    }
+
+    [Fact]
+    public void SignRule_NegativeEquity_DebtToEquityFails_AndRatioStillDisplayed() {
+        var data = new Dictionary<string, decimal> { ["StockholdersEquity"] = -100m, ["LongTermDebt"] = 500m };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(MakeSingleYearData(2024, data), null, null);
+
+        Assert.Equal(-5m, metrics.DebtToEquityRatio);
+        Assert.Equal(-100m, metrics.Equity);
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(ScoringService.EvaluateChecks(metrics, 5), 1));
+    }
+
+    [Fact]
+    public void SignRule_NegativeEquityWithNoDebtTag_DebtToEquityFails() {
+        var data = new Dictionary<string, decimal> { ["StockholdersEquity"] = -100m };
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(EvaluateSingleYear(data), 1));
+    }
+
+    [Fact]
+    public void SignRule_ZeroEquity_DebtToEquityFails() {
+        var data = new Dictionary<string, decimal> { ["StockholdersEquity"] = 0m, ["LongTermDebt"] = 500m };
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(EvaluateSingleYear(data), 1));
+    }
+
+    [Fact]
+    public void SignRule_PositiveEquity_DebtToEquityUnchanged() {
+        var data = new Dictionary<string, decimal> { ["StockholdersEquity"] = 1000m, ["LongTermDebt"] = 100m };
+        Assert.Equal(ScoringCheckResult.Pass, CheckResult(EvaluateSingleYear(data), 1));
+    }
+
+    [Fact]
+    public void SignRule_NoEquity_DebtToEquityStaysNotAvailable() {
+        var data = new Dictionary<string, decimal> { ["LongTermDebt"] = 100m };
+        Assert.Equal(ScoringCheckResult.NotAvailable, CheckResult(EvaluateSingleYear(data), 1));
+    }
+
+    [Fact]
+    public void SignRule_NegativeBookValue_PriceToBookAndDebtToBookFail() {
+        // Equity 100, goodwill 300: book value -200
+        var data = new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 100m, ["Goodwill"] = 300m, ["LongTermDebt"] = 500m,
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(MakeSingleYearData(2024, data), 10m, 100);
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(-5m, metrics.PriceToBookRatio);
+        Assert.Equal(-2.5m, metrics.DebtToBookRatio);
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 3));
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 10));
+    }
+
+    [Fact]
+    public void SignRule_ZeroBookValue_PriceToBookAndDebtToBookFail() {
+        var data = new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 300m, ["Goodwill"] = 300m, ["LongTermDebt"] = 500m,
+        };
+        IReadOnlyList<ScoringCheck> checks = EvaluateSingleYear(data, 10m, 100);
+
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 3));
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 10));
+    }
+
+    [Fact]
+    public void SignRule_NegativeBookValueWithoutMarketCap_PriceToBookStaysNotAvailable() {
+        var data = new Dictionary<string, decimal> { ["StockholdersEquity"] = 100m, ["Goodwill"] = 300m };
+        IReadOnlyList<ScoringCheck> checks = EvaluateSingleYear(data);
+
+        Assert.Equal(ScoringCheckResult.NotAvailable, CheckResult(checks, 3));
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 10));
+    }
+
+    [Fact]
+    public void SignRule_PositiveBookValue_PriceToBookAndDebtToBookUnchanged() {
+        var data = new Dictionary<string, decimal> { ["StockholdersEquity"] = 1000m, ["LongTermDebt"] = 100m };
+        IReadOnlyList<ScoringCheck> checks = EvaluateSingleYear(data, 10m, 100);
+
+        Assert.Equal(ScoringCheckResult.Pass, CheckResult(checks, 3));
+        Assert.Equal(ScoringCheckResult.Pass, CheckResult(checks, 10));
+    }
+
+    [Fact]
+    public void SignRule_LossOverNegativeEquity_RoeChecksFail_AndAverageStillDisplayed() {
+        // NCF -50 and OE -50 over equity -100 give +50%, which must not pass.
+        var data = new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = -100m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = -50m,
+            ["NetIncomeLoss"] = -50m,
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(MakeSingleYearData(2024, data), null, null);
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(50m, metrics.AverageRoeCF);
+        Assert.Equal(50m, metrics.AverageRoeOE);
+        Assert.True(metrics.RoeCfHasNonPositiveEquityYear);
+        Assert.True(metrics.RoeOeHasNonPositiveEquityYear);
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 14));
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 15));
+    }
+
+    [Fact]
+    public void SignRule_OneNegativeEquityYearAmongProfitableYears_RoeChecksFail() {
+        // 2023: loss over negative equity reads as +50%; with 2024's +50% the average is 50%.
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = -100m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = -50m,
+                ["NetIncomeLoss"] = -50m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 100m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m,
+                ["NetIncomeLoss"] = 50m,
+            },
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 14));
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 15));
+    }
+
+    [Fact]
+    public void SignRule_ZeroEquityYear_SetsFlagWithoutEnteringAverage() {
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 0m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m,
+                ["NetIncomeLoss"] = 50m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 100m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m,
+                ["NetIncomeLoss"] = 50m,
+            },
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(50m, metrics.AverageRoeCF);
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 14));
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 15));
+    }
+
+    [Fact]
+    public void SignRule_RoeFlagsAreSeparate_CashFlowYearOnly() {
+        // Negative-equity year with a cash change but no net income: only ROE (CF) is affected.
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = -100m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 100m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m,
+                ["NetIncomeLoss"] = 50m,
+            },
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.True(metrics.RoeCfHasNonPositiveEquityYear);
+        Assert.False(metrics.RoeOeHasNonPositiveEquityYear);
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 14));
+        Assert.Equal(ScoringCheckResult.Pass, CheckResult(checks, 15));
+    }
+
+    [Fact]
+    public void SignRule_PositiveEquityYears_RoeChecksUnchanged() {
+        var data = new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 100m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m,
+            ["NetIncomeLoss"] = 50m,
+        };
+        IReadOnlyList<ScoringCheck> checks = EvaluateSingleYear(data);
+
+        Assert.Equal(ScoringCheckResult.Pass, CheckResult(checks, 14));
+        Assert.Equal(ScoringCheckResult.Pass, CheckResult(checks, 15));
+    }
+
+    #endregion
 }

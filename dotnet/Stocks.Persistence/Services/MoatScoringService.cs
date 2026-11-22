@@ -106,6 +106,8 @@ public class MoatScoringService {
         int yearsWithRoeCF = 0;
         decimal totalRoeOE = 0m;
         int yearsWithRoeOE = 0;
+        bool roeCfHasNonPositiveEquityYear = false;
+        bool roeOeHasNonPositiveEquityYear = false;
         decimal totalOwnerEarnings = 0m;
         int yearsWithOE = 0;
         decimal totalCapEx = 0m;
@@ -184,6 +186,9 @@ public class MoatScoringService {
 
                 decimal netCashFlow = grossCashFlow.Value - (netDebtIssuance + netStockIssuance + netPreferredIssuance);
 
+                // A year with equity <= 0 gives no credit: it fails the ROE check (sign rule).
+                if (equity.HasValue && equity.Value <= 0m)
+                    roeCfHasNonPositiveEquityYear = true;
                 if (equity.HasValue && equity.Value != 0m) {
                     roeCfPct = 100m * netCashFlow / equity.Value;
                     totalRoeCF += roeCfPct.Value;
@@ -214,6 +219,8 @@ public class MoatScoringService {
                 if (ownerEarnings > 0m)
                     positiveOeYears++;
 
+                if (equity.HasValue && equity.Value <= 0m)
+                    roeOeHasNonPositiveEquityYear = true;
                 if (equity.HasValue && equity.Value != 0m) {
                     roeOePct = 100m * ownerEarnings / equity.Value;
                     totalRoeOE += roeOePct.Value;
@@ -318,7 +325,11 @@ public class MoatScoringService {
             positiveOeYears,
             totalOeYears,
             capitalReturnYears,
-            totalCapitalReturnYears);
+            totalCapitalReturnYears,
+            snapshotEquity,
+            averageOwnerEarnings,
+            roeCfHasNonPositiveEquityYear,
+            roeOeHasNonPositiveEquityYear);
 
         return (metrics, trendData);
     }
@@ -326,17 +337,26 @@ public class MoatScoringService {
     internal static IReadOnlyList<ScoringCheck> EvaluateMoatChecks(MoatDerivedMetrics metrics, int yearsOfData) {
         var checks = new List<ScoringCheck>(13);
 
+        // Sign rule: a ratio over a non-positive denominator fails its check; the displayed
+        // ratio is unchanged. A year with equity <= 0 in an ROE average gives no credit.
+        bool equityNonPositive = metrics.Equity.HasValue && metrics.Equity.Value <= 0m;
+        bool ownerEarningsNonPositive = metrics.AverageOwnerEarnings.HasValue && metrics.AverageOwnerEarnings.Value <= 0m;
+
         // Check 1: High ROE (CF) avg >= 15%
         checks.Add(ScoringService.MakeCheck(1, "High ROE (CF) avg", metrics.AverageRoeCF, ">= 15%",
-            metrics.AverageRoeCF.HasValue
-                ? (metrics.AverageRoeCF.Value >= 15m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+            metrics.RoeCfHasNonPositiveEquityYear
+                ? ScoringCheckResult.Fail
+                : metrics.AverageRoeCF.HasValue
+                    ? (metrics.AverageRoeCF.Value >= 15m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                    : ScoringCheckResult.NotAvailable));
 
         // Check 2: High ROE (OE) avg >= 15%
         checks.Add(ScoringService.MakeCheck(2, "High ROE (OE) avg", metrics.AverageRoeOE, ">= 15%",
-            metrics.AverageRoeOE.HasValue
-                ? (metrics.AverageRoeOE.Value >= 15m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+            metrics.RoeOeHasNonPositiveEquityYear
+                ? ScoringCheckResult.Fail
+                : metrics.AverageRoeOE.HasValue
+                    ? (metrics.AverageRoeOE.Value >= 15m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                    : ScoringCheckResult.NotAvailable));
 
         // Check 3: Gross margin avg >= 40%
         checks.Add(ScoringService.MakeCheck(3, "Gross margin avg", metrics.AverageGrossMargin, ">= 40%",
@@ -365,9 +385,11 @@ public class MoatScoringService {
 
         // Check 7: Low capex ratio < 50%
         checks.Add(ScoringService.MakeCheck(7, "Low capex ratio", metrics.CapexRatio, "< 50%",
-            metrics.CapexRatio.HasValue
-                ? (metrics.CapexRatio.Value < 50m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+            ownerEarningsNonPositive
+                ? ScoringCheckResult.Fail
+                : metrics.CapexRatio.HasValue
+                    ? (metrics.CapexRatio.Value < 50m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                    : ScoringCheckResult.NotAvailable));
 
         // Check 8: Consistent dividend or buyback >= 75% of years
         decimal? capitalReturnPct = metrics.TotalCapitalReturnYears > 0
@@ -381,9 +403,11 @@ public class MoatScoringService {
 
         // Check 9: Debt-to-equity < 1.0
         checks.Add(ScoringService.MakeCheck(9, "Debt-to-equity", metrics.DebtToEquityRatio, "< 1.0",
-            metrics.DebtToEquityRatio.HasValue
-                ? (metrics.DebtToEquityRatio.Value < 1.0m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
-                : ScoringCheckResult.NotAvailable));
+            equityNonPositive
+                ? ScoringCheckResult.Fail
+                : metrics.DebtToEquityRatio.HasValue
+                    ? (metrics.DebtToEquityRatio.Value < 1.0m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
+                    : ScoringCheckResult.NotAvailable));
 
         // Check 10: Interest coverage > 5x
         checks.Add(ScoringService.MakeCheck(10, "Interest coverage", metrics.InterestCoverage, "> 5x",

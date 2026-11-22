@@ -16,4 +16,11 @@ public record MoatDerivedMetrics(
     int PositiveOeYears,
     int TotalOeYears,
     int CapitalReturnYears,
-    int TotalCapitalReturnYears);
+    int TotalCapitalReturnYears,
+    // Latest balance-sheet equity (the D/E denominator). Null when not derivable.
+    decimal? Equity = null,
+    // Average owner earnings (the capex ratio denominator). Null when no year has net income.
+    decimal? AverageOwnerEarnings = null,
+    // True when any year entering the ROE (CF) / ROE (OE) average has equity <= 0.
+    bool RoeCfHasNonPositiveEquityYear = false,
+    bool RoeOeHasNonPositiveEquityYear = false);

@@ -1113,7 +1113,11 @@ public class ScoringService {
                 }
             }
 
-            // Accumulate totals for Adjusted Retained Earnings
+            // Accumulate totals for Adjusted Retained Earnings. The oldest retained earnings
+            // (check 13's baseline) is the oldest annual balance, which already contains the
+            // oldest year's flows, so only later years count (E11).
+            if (year == sortedYears[0])
+                continue;
             decimal dividends = ResolveField(yearData, DividendsChain, 0m)!.Value;
             totalDividends += dividends;
 

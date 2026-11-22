@@ -922,13 +922,13 @@ public class ScoringServiceTests {
 
         DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
-        // Current RE = 100M
-        // Total dividends = 5 + 6 + 7 = 18M
-        // Total stock issuance (net) = (2-1) + (3-0) + (1-0) = 1 + 3 + 1 = 5M
-        // Total preferred = 0
-        // Adjusted = 100 + 18 - 5 - 0 = 113M
+        // Current RE = 100M. The oldest year (2022) is the baseline: its flows are
+        // already inside the oldest RE, so only 2023 and 2024 count (E11).
+        // Dividends = 6 + 7 = 13M
+        // Stock issuance (net) = (3-0) + (1-0) = 4M
+        // Adjusted = 100 + 13 - 4 - 0 = 109M
         Assert.NotNull(metrics.AdjustedRetainedEarnings);
-        Assert.Equal(113_000_000m, metrics.AdjustedRetainedEarnings!.Value);
+        Assert.Equal(109_000_000m, metrics.AdjustedRetainedEarnings!.Value);
 
         // Oldest RE = 80M (from 2022)
         Assert.Equal(80_000_000m, metrics.OldestRetainedEarnings);
@@ -2349,13 +2349,57 @@ public class ScoringServiceTests {
 
     [Fact]
     public void FinancingChains_StockProceedsSummed_InAdjustedRetainedEarnings() {
-        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
-            ["RetainedEarningsAccumulatedDeficit"] = 100m,
-            ["ProceedsFromIssuanceOfCommonStock"] = 4m,
-            ["ProceedsFromStockOptionsExercised"] = 2m,
-        });
-        // 100 + 0 dividends - 6 stock issuance
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> { ["RetainedEarningsAccumulatedDeficit"] = 90m },
+            [2024] = new Dictionary<string, decimal> {
+                ["RetainedEarningsAccumulatedDeficit"] = 100m,
+                ["ProceedsFromIssuanceOfCommonStock"] = 4m,
+                ["ProceedsFromStockOptionsExercised"] = 2m,
+            },
+        };
+        // 100 + 0 dividends - 6 stock issuance (2024; 2023 is the baseline year)
         Assert.Equal(94m, CallComputeDerivedMetrics(rawData, null, null).AdjustedRetainedEarnings);
+    }
+
+    [Fact]
+    public void AdjustedRetainedEarnings_OldestYearDividendsNotAddedBack() {
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["RetainedEarningsAccumulatedDeficit"] = 90m, ["PaymentsOfDividends"] = 50m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["RetainedEarningsAccumulatedDeficit"] = 100m, ["PaymentsOfDividends"] = 5m,
+            },
+        };
+        // Only 2024's dividends: 100 + 5
+        Assert.Equal(105m, CallComputeDerivedMetrics(rawData, null, null).AdjustedRetainedEarnings);
+    }
+
+    [Fact]
+    public void AdjustedRetainedEarnings_OneYearCompany_FlatRetainedEarningsFailsCheck13() {
+        // One year: the oldest and current RE are the same balance. Counting the year's
+        // dividends would make RE look increased on its own flows.
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["RetainedEarningsAccumulatedDeficit"] = 100m, ["PaymentsOfDividends"] = 10m,
+        });
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+
+        Assert.Equal(100m, metrics.AdjustedRetainedEarnings);
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(ScoringService.EvaluateChecks(metrics, 1), 13));
+    }
+
+    [Fact]
+    public void AdjustedRetainedEarnings_HeavyIssuanceOldestYearDropped_RaisesFigure() {
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["RetainedEarningsAccumulatedDeficit"] = 90m, ["ProceedsFromIssuanceOfCommonStock"] = 80m,
+            },
+            [2024] = new Dictionary<string, decimal> { ["RetainedEarningsAccumulatedDeficit"] = 100m },
+        };
+        // Was 100 - 80 = 20 (fails check 13 against 90); now 100 (passes)
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+        Assert.Equal(100m, metrics.AdjustedRetainedEarnings);
+        Assert.Equal(ScoringCheckResult.Pass, CheckResult(ScoringService.EvaluateChecks(metrics, 2), 13));
     }
 
     #endregion

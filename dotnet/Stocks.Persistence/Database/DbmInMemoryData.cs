@@ -474,7 +474,7 @@ public sealed class DbmInMemoryData {
 
             // Collect candidate data points, keyed by (submissionId, conceptName)
             // Keep only the one with the max end_date per key (DISTINCT ON equivalent)
-            var bestByKey = new Dictionary<(ulong submissionId, string conceptName), (DateOnly endDate, decimal value, DateOnly reportDate, int balanceTypeId, int filingTypeId)>();
+            var bestByKey = new Dictionary<(ulong submissionId, string conceptName), (DataPoint point, DateOnly reportDate, int balanceTypeId, int filingTypeId)>();
 
             foreach (DataPoint dp in _dataPoints) {
                 if (dp.CompanyId != companyId)
@@ -490,12 +490,12 @@ public sealed class DbmInMemoryData {
                     continue;
 
                 var key = (dp.SubmissionId, conceptInfo.Name);
-                if (!bestByKey.TryGetValue(key, out var existing) || dp.DatePair.EndDate > existing.endDate)
-                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate, conceptInfo.BalanceTypeId, (int)submission.FilingType);
+                if (!bestByKey.TryGetValue(key, out var existing) || IsPreferredScoringFact(dp, existing.point))
+                    bestByKey[key] = (dp, submission.ReportDate, conceptInfo.BalanceTypeId, (int)submission.FilingType);
             }
 
             foreach (var entry in bestByKey)
-                results.Add(new ScoringConceptValue(entry.Key.conceptName, entry.Value.value, entry.Value.reportDate, entry.Value.balanceTypeId, entry.Value.filingTypeId));
+                results.Add(new ScoringConceptValue(entry.Key.conceptName, entry.Value.point.Value, entry.Value.reportDate, entry.Value.balanceTypeId, entry.Value.filingTypeId));
         }
 
         // Sort by report_date DESC, then concept name
@@ -508,6 +508,27 @@ public sealed class DbmInMemoryData {
 
         return results;
     }
+
+    /// <summary>
+    /// Mirrors the scoring statements' DISTINCT ON order: latest end date, then earliest
+    /// start date, then a preferred unit (usd, shares), then the lowest id.
+    /// </summary>
+    private static bool IsPreferredScoringFact(DataPoint candidate, DataPoint current) {
+        int byEnd = candidate.DatePair.EndDate.CompareTo(current.DatePair.EndDate);
+        if (byEnd != 0)
+            return byEnd > 0;
+        int byStart = candidate.DatePair.StartDate.CompareTo(current.DatePair.StartDate);
+        if (byStart != 0)
+            return byStart < 0;
+        bool candidatePreferred = IsPreferredScoringUnit(candidate.Units);
+        bool currentPreferred = IsPreferredScoringUnit(current.Units);
+        if (candidatePreferred != currentPreferred)
+            return candidatePreferred;
+        return candidate.DataPointId < current.DataPointId;
+    }
+
+    private static bool IsPreferredScoringUnit(DataPointUnit unit) =>
+        unit.UnitNameNormalized is "usd" or "shares";
 
     // Batch scoring data points (all companies)
 
@@ -586,7 +607,7 @@ public sealed class DbmInMemoryData {
             // Collect candidate data points, keyed by (companyId, submissionId, conceptName)
             // Keep only the one with the max end_date per key (DISTINCT ON equivalent)
             var bestByKey = new Dictionary<(ulong companyId, ulong submissionId, string conceptName),
-                (DateOnly endDate, decimal value, DateOnly reportDate, int balanceTypeId, int filingTypeId)>();
+                (DataPoint point, DateOnly reportDate, int balanceTypeId, int filingTypeId)>();
 
             foreach (DataPoint dp in _dataPoints) {
                 if (!eligibleSubmissions.TryGetValue(dp.SubmissionId, out Submission? submission))
@@ -601,15 +622,15 @@ public sealed class DbmInMemoryData {
                     continue;
 
                 var key = (dp.CompanyId, dp.SubmissionId, conceptInfo.Name);
-                if (!bestByKey.TryGetValue(key, out var existing) || dp.DatePair.EndDate > existing.endDate)
-                    bestByKey[key] = (dp.DatePair.EndDate, dp.Value, submission.ReportDate, conceptInfo.BalanceTypeId, (int)submission.FilingType);
+                if (!bestByKey.TryGetValue(key, out var existing) || IsPreferredScoringFact(dp, existing.point))
+                    bestByKey[key] = (dp, submission.ReportDate, conceptInfo.BalanceTypeId, (int)submission.FilingType);
             }
 
             foreach (var entry in bestByKey) {
                 results.Add(new BatchScoringConceptValue(
                     entry.Key.companyId,
                     entry.Key.conceptName,
-                    entry.Value.value,
+                    entry.Value.point.Value,
                     entry.Value.reportDate,
                     entry.Value.balanceTypeId,
                     entry.Value.filingTypeId));

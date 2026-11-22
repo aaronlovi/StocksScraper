@@ -55,9 +55,11 @@ FROM data_points dp
 JOIN taxonomy_concepts tc ON dp.taxonomy_concept_id = tc.taxonomy_concept_id
 JOIN submissions s ON dp.submission_id = s.submission_id AND dp.company_id = s.company_id
 JOIN eligible_dates ed ON ed.company_id = dp.company_id AND ed.report_date = s.report_date
+JOIN data_point_units u ON u.data_point_unit_id = dp.unit_id
 WHERE s.filing_type IN (1, 2){cutoff}
   AND tc.name = ANY(@concept_names)
-ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_date ASC";
+ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_date ASC,
+    CASE WHEN u.data_point_unit_name IN ('usd', 'shares') THEN 0 ELSE 1 END, dp.data_point_id";
     }
 
     private readonly string[] _conceptNames;

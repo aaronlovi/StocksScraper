@@ -17,6 +17,7 @@ FROM (
     FROM data_points dp
     JOIN taxonomy_concepts tc ON dp.taxonomy_concept_id = tc.taxonomy_concept_id
     JOIN submissions s ON dp.submission_id = s.submission_id AND dp.company_id = s.company_id
+    JOIN data_point_units u ON u.data_point_unit_id = dp.unit_id
     WHERE dp.company_id = @company_id
       AND s.filing_type IN (1, 2)
       AND tc.name = ANY(@concept_names)
@@ -49,7 +50,8 @@ FROM (
             LIMIT 1
         ) latest_date
       )
-    ORDER BY s.submission_id, tc.name, dp.end_date DESC, dp.start_date ASC
+    ORDER BY s.submission_id, tc.name, dp.end_date DESC, dp.start_date ASC,
+        CASE WHEN u.data_point_unit_name IN ('usd', 'shares') THEN 0 ELSE 1 END, dp.data_point_id
 ) sub
 ORDER BY report_date DESC, concept_name";
 

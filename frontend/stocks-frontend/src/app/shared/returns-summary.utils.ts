@@ -68,9 +68,16 @@ export function defaultStartDate(): string {
   return d.toISOString().slice(0, 10);
 }
 
+const SecondsPerDay = 86400;
+
+/**
+ * Yahoo Finance S&P 500 chart from startDate to the end of the current UTC day. The end
+ * is a whole day, not "now": the URL is a template binding, and dev-mode change detection
+ * reads it twice, so a value that moves with the clock throws NG0100.
+ */
 export function yahooFinanceSP500Url(startDate: string): string {
   const period1 = Math.floor(new Date(startDate + 'T00:00:00').getTime() / 1000);
-  const period2 = Math.floor(Date.now() / 1000);
+  const period2 = (Math.floor(Date.now() / 1000 / SecondsPerDay) + 1) * SecondsPerDay;
   return `https://finance.yahoo.com/quote/%5EGSPC/chart/?period1=${period1}&period2=${period2}`;
 }
 

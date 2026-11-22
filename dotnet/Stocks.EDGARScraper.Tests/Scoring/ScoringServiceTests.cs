@@ -330,6 +330,9 @@ public class ScoringServiceTests {
         ["IncreaseDecreaseInOperatingLeaseLiability"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInEmployeeRelatedLiabilities"] = TaxonomyBalanceTypes.Debit,
         ["IncreaseDecreaseInInterestPayableNet"] = TaxonomyBalanceTypes.Debit,
+        // Aggregate and "other, net" (both credit; weight -1 in the indirect cash-flow calc)
+        ["IncreaseDecreaseInOperatingCapital"] = TaxonomyBalanceTypes.Credit,
+        ["IncreaseDecreaseInOtherOperatingCapitalNet"] = TaxonomyBalanceTypes.Credit,
     };
 
     [Fact]
@@ -342,7 +345,9 @@ public class ScoringServiceTests {
 
         decimal result = ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes);
 
-        Assert.Equal(-5_000_000m, result); // Aggregate preferred
+        // Aggregate preferred, negated (credit, taxonomy weight -1): operating capital
+        // fell by 5M, which provided 5M of cash. (This test used to assert -5M, the bug.)
+        Assert.Equal(5_000_000m, result);
     }
 
     [Fact]
@@ -793,7 +798,9 @@ public class ScoringServiceTests {
 
         decimal result = ScoringService.ResolveOtherNonCash(data);
 
-        Assert.Equal(500_000m, result); // Aggregate preferred
+        // Aggregate preferred, negated: positive OtherNoncashIncomeExpense is non-cash income,
+        // which is subtracted. (This test used to assert +500k, the bug.)
+        Assert.Equal(-500_000m, result);
     }
 
     [Fact]
@@ -1157,9 +1164,11 @@ public class ScoringServiceTests {
 
         DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
-        // OE = 30 + 1 + 2 + 3 + 0.5 - 10 + (-2) = 24.5M
+        // Taxonomy signs: OtherNoncashIncomeExpense +0.5 is income (-0.5); operating capital
+        // -2 is a decrease (+2 cash). OE = 30 + 1 + 2 + 3 - 0.5 - 10 + 2 = 27.5M
+        // (this test used to assert 24.5M, the old signs).
         Assert.NotNull(metrics.AverageOwnerEarnings);
-        Assert.Equal(24_500_000m, metrics.AverageOwnerEarnings!.Value);
+        Assert.Equal(27_500_000m, metrics.AverageOwnerEarnings!.Value);
     }
 
     [Fact]
@@ -2091,6 +2100,81 @@ public class ScoringServiceTests {
 
         Assert.Equal(3m, metrics.DebtToEquityRatio);
         Assert.Equal(ScoringCheckResult.Fail, CheckResult(ScoringService.EvaluateChecks(metrics, 5), 1));
+    }
+
+    #endregion
+
+    #region Taxonomy signs for aggregates (P2) tests
+
+    [Fact]
+    public void TaxonomySigns_OperatingCapitalAggregate_IncreaseUsesCash() {
+        var data = new Dictionary<string, decimal> { ["IncreaseDecreaseInOperatingCapital"] = 5m };
+        Assert.Equal(-5m, ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes));
+    }
+
+    [Fact]
+    public void TaxonomySigns_AggregateAndComponents_AgreeOnSameEconomics() {
+        // AR +3 and inventory +2 use 5 of cash; the aggregate reports the same +5 increase.
+        var components = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsReceivable"] = 3m, ["IncreaseDecreaseInInventories"] = 2m,
+        };
+        var aggregate = new Dictionary<string, decimal> { ["IncreaseDecreaseInOperatingCapital"] = 5m };
+
+        Assert.Equal(-5m, ScoringService.ResolveWorkingCapitalChange(components, WcBalanceTypes));
+        Assert.Equal(-5m, ScoringService.ResolveWorkingCapitalChange(aggregate, WcBalanceTypes));
+    }
+
+    [Fact]
+    public void TaxonomySigns_OtherNoncashAggregate_MatchesIncomeComponent() {
+        var aggregate = new Dictionary<string, decimal> { ["OtherNoncashIncomeExpense"] = 4m };
+        var component = new Dictionary<string, decimal> { ["OtherNoncashIncome"] = 4m };
+
+        Assert.Equal(-4m, ScoringService.ResolveOtherNonCash(component));
+        Assert.Equal(-4m, ScoringService.ResolveOtherNonCash(aggregate));
+    }
+
+    [Fact]
+    public void TaxonomySigns_OtherOperatingCapitalNet_IsAddedToComponents() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInAccountsReceivable"] = 3m,
+            ["IncreaseDecreaseInInventories"] = 2m,
+            ["IncreaseDecreaseInAccountsPayable"] = 1m,
+            ["IncreaseDecreaseInOtherOperatingCapitalNet"] = 4m,
+        };
+        // -3 - 2 + 1 - 4 = -8: the "other, net" line is one more component, not the total
+        Assert.Equal(-8m, ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes));
+    }
+
+    [Fact]
+    public void TaxonomySigns_OtherOperatingCapitalNet_AloneIsNegated() {
+        var data = new Dictionary<string, decimal> { ["IncreaseDecreaseInOtherOperatingCapitalNet"] = 4m };
+        Assert.Equal(-4m, ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes));
+    }
+
+    [Fact]
+    public void TaxonomySigns_AggregatePresent_OtherNetChildIgnored() {
+        var data = new Dictionary<string, decimal> {
+            ["IncreaseDecreaseInOperatingCapital"] = 10m,
+            ["IncreaseDecreaseInOtherOperatingCapitalNet"] = 4m,
+        };
+        Assert.Equal(-10m, ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes));
+    }
+
+    [Fact]
+    public void TaxonomySigns_EveryWorkingCapitalConceptHasTheTaxonomySign() {
+        // Each IncreaseDecrease concept the code reads, alone at +1, must move cash by
+        // -1 when credit (weight -1) and +1 when debit (weight +1). Balance types are the
+        // us-gaap 2025 values in the DB (checked 2026-11-22).
+        foreach (string concept in ScoringService.AllConceptNames) {
+            if (!concept.StartsWith("IncreaseDecreaseIn", StringComparison.Ordinal))
+                continue;
+            Assert.True(WcBalanceTypes.ContainsKey(concept), $"{concept} missing from the balance-type map");
+
+            var data = new Dictionary<string, decimal> { [concept] = 1m };
+            decimal expected = WcBalanceTypes[concept] == TaxonomyBalanceTypes.Credit ? -1m : 1m;
+            Assert.True(expected == ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes),
+                $"{concept}: expected {expected}");
+        }
     }
 
     #endregion

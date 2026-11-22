@@ -190,7 +190,9 @@ public class ScoringService {
     internal static readonly string[] OtherNonCashChain = ["OtherNoncashIncomeExpense"];
     internal static readonly string[] OtherNonCashExpenseChain = ["OtherNoncashExpense"];
     internal static readonly string[] OtherNonCashIncomeChain = ["OtherNoncashIncome"];
-    internal static readonly string[] WorkingCapitalChangeChain = ["IncreaseDecreaseInOperatingCapital", "IncreaseDecreaseInOtherOperatingCapitalNet"];
+    // The aggregate operating-capital change. IncreaseDecreaseInOtherOperatingCapitalNet is
+    // its child (an "other, net" line), so it is a component, not an alternative total.
+    internal static readonly string[] WorkingCapitalChangeChain = ["IncreaseDecreaseInOperatingCapital"];
     internal static readonly string[] SharesChain = ["CommonStockSharesOutstanding", "WeightedAverageNumberOfSharesOutstandingBasic", "EntityCommonStockSharesOutstanding"];
 
     // Balance-sheet groups filled from the latest 10-K when a newer 10-Q lacks them.
@@ -613,14 +615,15 @@ public class ScoringService {
 
     /// <summary>
     /// Resolve other non-cash items with component sum fallback.
-    /// 1. If OtherNoncashIncomeExpense is found, use it.
+    /// 1. If OtherNoncashIncomeExpense is found, use its negation: it is credit (income
+    ///    positive) with weight -1 under AdjustmentsNoncashItems in the indirect cash flow.
     /// 2. Otherwise, sum OtherNoncashExpense - OtherNoncashIncome (0 for missing, but at least one must exist).
     /// 3. If nothing is found, return 0.
     /// </summary>
     internal static decimal ResolveOtherNonCash(IReadOnlyDictionary<string, decimal> yearData) {
         decimal? aggregate = ResolveField(yearData, OtherNonCashChain, null);
         if (aggregate.HasValue)
-            return aggregate.Value;
+            return -aggregate.Value;
 
         decimal? expense = ResolveField(yearData, OtherNonCashExpenseChain, null);
         decimal? income = ResolveField(yearData, OtherNonCashIncomeChain, null);
@@ -632,8 +635,9 @@ public class ScoringService {
     }
 
     /// <summary>
-    /// Resolve working capital change with component sum fallback.
-    /// 1. If IncreaseDecreaseInOperatingCapital or IncreaseDecreaseInOtherOperatingCapitalNet exists, use it.
+    /// Resolve working capital change (as its cash-flow impact) with component sum fallback.
+    /// 1. If IncreaseDecreaseInOperatingCapital exists, use its negation (credit; taxonomy
+    ///    weight -1 in the indirect cash-flow statement: an increase in operating capital uses cash).
     /// 2. Otherwise, sum individual components with overlap-aware grouping:
     ///    - Receivables: prefer combined AccountsAndOtherReceivables, else AR + OtherReceivables
     ///    - Inventories
@@ -641,19 +645,18 @@ public class ScoringService {
     ///    - Prepaid/deferred assets
     ///    - Revenue: prefer DeferredRevenue, else ContractWithCustomerLiability
     ///    - Other operating assets/liabilities
+    ///    - Other operating capital, net (IncreaseDecreaseInOtherOperatingCapitalNet)
     ///
-    /// XBRL sign convention: IncreaseDecrease values represent the direction of change
-    /// (positive = asset/liability increased). Credit-balance concepts (assets) must be
-    /// negated to convert to cash flow impact: an increase in assets uses cash.
-    /// Debit-balance concepts (liabilities) already have the correct sign: an increase
-    /// in liabilities provides cash.
+    /// Sign convention: the balance type of an IncreaseDecrease concept records its
+    /// cash-flow direction, not the balance-sheet side. Credit (asset increase, liability
+    /// decrease) reduces operating cash, so it is negated; debit adds to it.
     /// </summary>
     internal static decimal ResolveWorkingCapitalChange(
         IReadOnlyDictionary<string, decimal> yearData,
         IReadOnlyDictionary<string, TaxonomyBalanceTypes> balanceTypes) {
         decimal? aggregate = ResolveField(yearData, WorkingCapitalChangeChain, null);
         if (aggregate.HasValue)
-            return aggregate.Value;
+            return -aggregate.Value;
 
         decimal sum = 0m;
         bool foundAny = false;
@@ -745,12 +748,16 @@ public class ScoringService {
         // Income taxes receivable (105 exclusive, credit/asset)
         AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInIncomeTaxesReceivable"], ref sum, ref foundAny);
 
+        // Other operating capital, net (credit): an "other" line beside the components above
+        AccumulateWcField(yearData, balanceTypes, ["IncreaseDecreaseInOtherOperatingCapitalNet"], ref sum, ref foundAny);
+
         return foundAny ? sum : 0m;
     }
 
     /// <summary>
     /// Resolve a WC field from the fallback chain and accumulate into sum with sign correction.
-    /// Credit-balance concepts (asset changes) are negated; debit-balance (liability changes) are kept.
+    /// Credit concepts (asset increase, liability decrease: uses cash) are negated; debit
+    /// concepts (provide cash) are kept.
     /// Returns true if a value was found.
     /// </summary>
     private static bool AccumulateWcField(
@@ -773,8 +780,8 @@ public class ScoringService {
         ref decimal sum) {
         foreach (string conceptName in chain) {
             if (yearData.TryGetValue(conceptName, out decimal value)) {
-                // Credit-balance = asset concept: negate (positive increase = cash outflow)
-                // Debit-balance = liability concept: keep as-is (positive increase = cash inflow)
+                // The balance type is the concept's cash-flow direction, not its balance-sheet
+                // side. Credit: a positive value reduces operating cash, so negate. Debit: keep.
                 if (balanceTypes.TryGetValue(conceptName, out TaxonomyBalanceTypes bt)
                     && bt == TaxonomyBalanceTypes.Credit) {
                     sum -= value;

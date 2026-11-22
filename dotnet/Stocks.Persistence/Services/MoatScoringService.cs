@@ -174,19 +174,7 @@ public class MoatScoringService {
             decimal? roeCfPct = null;
             decimal? grossCashFlow = ScoringService.ResolveField(yearData, ScoringService.CashChangeChain, null);
             if (grossCashFlow.HasValue) {
-                decimal debtProceeds = ScoringService.ResolveField(yearData, ScoringService.DebtProceedsChain, 0m)!.Value;
-                decimal debtRepayments = ScoringService.ResolveField(yearData, ScoringService.DebtRepaymentsChain, 0m)!.Value;
-                decimal netDebtIssuance = debtProceeds - debtRepayments;
-
-                decimal stockProceeds = ScoringService.ResolveField(yearData, ScoringService.StockProceedsChain, 0m)!.Value;
-                decimal stockRepurchase = ScoringService.ResolveField(yearData, ScoringService.StockRepurchaseChain, 0m)!.Value;
-                decimal netStockIssuance = stockProceeds - stockRepurchase;
-
-                decimal preferredProceeds = ScoringService.ResolveField(yearData, ScoringService.PreferredProceedsChain, 0m)!.Value;
-                decimal preferredRepurchase = ScoringService.ResolveField(yearData, ScoringService.PreferredRepurchaseChain, 0m)!.Value;
-                decimal netPreferredIssuance = preferredProceeds - preferredRepurchase;
-
-                decimal netCashFlow = grossCashFlow.Value - (netDebtIssuance + netStockIssuance + netPreferredIssuance);
+                decimal netCashFlow = ScoringService.ComputeYearNetCashFlow(yearData, grossCashFlow.Value);
 
                 // A year with equity <= 0 gives no credit: it fails the ROE check (sign rule).
                 if (equity.HasValue && equity.Value <= 0m)

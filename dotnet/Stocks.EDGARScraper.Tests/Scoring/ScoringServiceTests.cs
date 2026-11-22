@@ -1010,16 +1010,18 @@ public class ScoringServiceTests {
             ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50_000_000m,
             ["ProceedsFromIssuanceOfLongTermDebt"] = 10_000_000m,
             ["RepaymentsOfLongTermDebt"] = 5_000_000m,
-            ["RepaymentsOfDebt"] = 8_000_000m, // should be ignored since LT variant exists
-            ["RepaymentsOfConvertibleDebt"] = 3_000_000m, // should be ignored
-            ["ProceedsFromIssuanceOfDebt"] = 12_000_000m, // should be ignored since LT variant exists
+            ["RepaymentsOfDebt"] = 8_000_000m, // all-debt total, covers the long-term 5M
+            ["RepaymentsOfConvertibleDebt"] = 3_000_000m, // child of the long-term 5M
+            ["ProceedsFromIssuanceOfDebt"] = 12_000_000m, // all-debt total, covers the long-term 10M
         });
 
         DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
-        // NCF = 50M - ((10-5) + 0 + 0) = 50 - 5 = 45M  (uses LT variants, not broader ones)
+        // Nested per the taxonomy, each parent covering its children: proceeds 12M (total),
+        // repayments 8M (total). NCF = 50M - (12 - 8) = 46M. (This test used to assert 45M:
+        // first-found took the long-term lines and ignored the larger all-debt totals.)
         Assert.NotNull(metrics.AverageNetCashFlow);
-        Assert.Equal(45_000_000m, metrics.AverageNetCashFlow!.Value);
+        Assert.Equal(46_000_000m, metrics.AverageNetCashFlow!.Value);
     }
 
     [Fact]
@@ -2210,6 +2212,163 @@ public class ScoringServiceTests {
             ["IncreaseDecreaseInAccountsPayable"] = 1000m,
         };
         Assert.Equal(2000m, ScoringService.ResolveWorkingCapitalChange(data, WcBalanceTypes));
+    }
+
+    #endregion
+
+    #region Financing chains: summing and short-term debt (P3) tests
+
+    private static decimal YearNcf(Dictionary<string, decimal> data, decimal grossCashFlow = 1000m) =>
+        ScoringService.ComputeYearNetCashFlow(data, grossCashFlow);
+
+    [Fact]
+    public void FinancingChains_LongTermSmallerThanConvertible_BothCounted() {
+        // P3a: a parent can't be smaller than its own child, so these are separate lines.
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 200m,
+            ["ProceedsFromIssuanceOfLongTermDebt"] = 50m,
+            ["ProceedsFromConvertibleDebt"] = 100m,
+        });
+        Assert.Equal(50m, CallComputeDerivedMetrics(rawData, null, null).AverageNetCashFlow);
+    }
+
+    [Fact]
+    public void FinancingChains_ParentCoversChildren_ParentOnly() {
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromIssuanceOfLongTermDebt"] = 100m,
+            ["ProceedsFromIssuanceOfSeniorLongTermDebt"] = 60m,
+            ["ProceedsFromConvertibleDebt"] = 30m,
+        };
+        Assert.Equal(900m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_ParentWithinTolerance_ParentOnly() {
+        // 99.95 is within 0.1% of the children's 100: the same line, rounded.
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromIssuanceOfLongTermDebt"] = 99.95m,
+            ["ProceedsFromConvertibleDebt"] = 100m,
+        };
+        Assert.Equal(900.05m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_EqualChildren_CountedOnce() {
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromIssuanceOfSeniorLongTermDebt"] = 40m,
+            ["ProceedsFromConvertibleDebt"] = 40m,
+        };
+        Assert.Equal(960m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_TotalCoversLongTerm_TotalOnly() {
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromIssuanceOfDebt"] = 120m,
+            ["ProceedsFromIssuanceOfLongTermDebt"] = 100m,
+        };
+        Assert.Equal(880m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_TotalSmallerThanLongTerm_BothCounted() {
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromIssuanceOfDebt"] = 50m,
+            ["ProceedsFromIssuanceOfLongTermDebt"] = 100m,
+        };
+        Assert.Equal(850m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_RepaymentsNested_SameShapeAsProceeds() {
+        // Convertible 30 + senior 20 = 50 children; long-term 40 < 50, so 90; total 200 >= 90, so 200.
+        var data = new Dictionary<string, decimal> {
+            ["RepaymentsOfConvertibleDebt"] = 30m,
+            ["RepaymentsOfSeniorDebt"] = 20m,
+            ["RepaymentsOfLongTermDebt"] = 40m,
+            ["RepaymentsOfDebt"] = 200m,
+        };
+        Assert.Equal(1200m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_NotesPayableRepayments_AddedWithoutShortTermTotal() {
+        var data = new Dictionary<string, decimal> {
+            ["RepaymentsOfLongTermDebt"] = 10m,
+            ["RepaymentsOfNotesPayable"] = 5m,
+        };
+        Assert.Equal(1015m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_NotesPayableRepayments_IgnoredWhenShortTermTotalPresent() {
+        // Notes payable repayments are a child of the net short-term figure.
+        var data = new Dictionary<string, decimal> {
+            ["RepaymentsOfLongTermDebt"] = 10m,
+            ["RepaymentsOfNotesPayable"] = 5m,
+            ["ProceedsFromRepaymentsOfShortTermDebt"] = -3m,
+        };
+        // net debt = -10 + (-3) = -13
+        Assert.Equal(1013m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_LinesOfCredit_NetPreferredOverGross() {
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromRepaymentsOfLinesOfCredit"] = 20m,
+            ["ProceedsFromLinesOfCredit"] = 300m,
+            ["RepaymentsOfLinesOfCredit"] = 100m,
+        };
+        Assert.Equal(980m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_LinesOfCredit_GrossWhenNoNet_PlusCommercialPaper() {
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromLinesOfCredit"] = 30m,
+            ["RepaymentsOfLinesOfCredit"] = 10m,
+            ["ProceedsFromRepaymentsOfCommercialPaper"] = 5m,
+        };
+        Assert.Equal(975m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_ShortTermTotal_PreferredOverLinesOfCredit() {
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromRepaymentsOfShortTermDebt"] = 40m,
+            ["ProceedsFromRepaymentsOfLinesOfCredit"] = 20m,
+            ["ProceedsFromRepaymentsOfCommercialPaper"] = 5m,
+        };
+        Assert.Equal(955m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_StockProceeds_SiblingsSummed() {
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromIssuanceOfCommonStock"] = 4m,
+            ["ProceedsFromStockOptionsExercised"] = 2m,
+        };
+        Assert.Equal(994m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_StockProceeds_EqualCountedOnce() {
+        var data = new Dictionary<string, decimal> {
+            ["ProceedsFromIssuanceOfCommonStock"] = 3m,
+            ["ProceedsFromStockOptionsExercised"] = 3m,
+        };
+        Assert.Equal(997m, YearNcf(data));
+    }
+
+    [Fact]
+    public void FinancingChains_StockProceedsSummed_InAdjustedRetainedEarnings() {
+        var rawData = MakeSingleYearData(2024, new Dictionary<string, decimal> {
+            ["RetainedEarningsAccumulatedDeficit"] = 100m,
+            ["ProceedsFromIssuanceOfCommonStock"] = 4m,
+            ["ProceedsFromStockOptionsExercised"] = 2m,
+        });
+        // 100 + 0 dividends - 6 stock issuance
+        Assert.Equal(94m, CallComputeDerivedMetrics(rawData, null, null).AdjustedRetainedEarnings);
     }
 
     #endregion

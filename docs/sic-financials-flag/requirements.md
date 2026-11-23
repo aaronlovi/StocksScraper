@@ -1,6 +1,6 @@
 # SIC Industry Code and Financials Flag Requirements
 
-> **Status (2026-11-22): Approved by the owner; not started.** Owner decisions in section 10. Owner decision 7 in the vault note *EDGAR Scoring Bug Fix Plan* (section 4.6): add an industry field from the EDGAR submissions data and show financials with a flag or filter on the results pages, excluding nothing from scoring. Spec 9.22 in the same note.
+> **Status (2026-11-22): Done.** All requirements are implemented (commits `1974b85`, `eb949fe`, `4f7c038`, `09ea244`, `fbb3860`, `a4b2aca`, `185e762`), V023 is applied and `--import-company-sic` has run on the 2026-11-22 data. ADR 0014 records the decision. Owner decisions in section 10. Owner decision 7 in the vault note *EDGAR Scoring Bug Fix Plan* (section 4.6): add an industry field from the EDGAR submissions data and show financials with a flag or filter on the results pages, excluding nothing from scoring. Spec 9.22 in the same note.
 
 ## Table of Contents
 
@@ -46,41 +46,41 @@ This feature:
 
 | ID | Requirement | Description | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Store SIC per company | Migration V023 adds `companies.sic_code` (int, null) and `companies.sic_description` (varchar(200), null), with column comments and an index on `sic_code`. | Not Started | Null means no SIC in the SEC file, or not yet imported. |
-| 2 | Import SIC | New CLI command `--import-company-sic` reads `sic` and `sicDescription` from each `CIK##########.json` in `submissions.zip` and updates `companies`. Idempotent; re-runnable without reimporting submissions. | Not Started | Paginated `-submissions-NNN.json` files carry no SIC and are skipped. Empty `sic` → null. |
-| 3 | Financials classification | One shared rule, `IndustryClassification.IsFinancial(int? sicCode)`: SIC 6000–6499. Null or any other code → not financial. | Not Started | Range decision in 4.2. The rule exists once in C#; SQL predicates and the frontend use its output, never a copy of the range. |
-| 4 | SIC in value score rows | `GET /api/reports/scores` rows carry `sicCode`, `sicDescription` and `isFinancial`, read from `companies` by join. | Not Started | `company_scores` is not changed or rebuilt. |
-| 5 | SIC in moat score rows | Same for `GET /api/reports/moat-scores`. | Not Started | |
-| 6 | Financials filter (API) | Both endpoints accept `financials=only|exclude` (omitted = all). Filter applies before pagination and counts. | Not Started | `exclude` keeps companies with a null SIC. |
-| 7 | Badge (UI) | The scores and moat-scores pages show a small "Financial" badge next to the company name, with the SIC code and description as tooltip. | Not Started | Warm Institutional styles, a shared badge class in `report-table.css`. |
-| 8 | Filter (UI) | A "Financials" select (All / Only financials / Exclude financials) beside the Exchange filter on both pages; kept in the CSV export rows. | Not Started | |
-| 9 | Backtest filter (API) | `GET /api/reports/graham-backtest` accepts `financials=only|exclude`; constituents are filtered per snapshot date using the company's current SIC. | Not Started | Needed for the E6 and E5 measurements (section 6). UI select is requirement 10. |
-| 10 | Backtest filter (UI) | Same select on the `graham-backtest` page. | Not Started | Owner decision 4: build it. |
-| 11 | Snapshot CSV columns | `--snapshot-scores` writes `sic_code` and `is_financial` as trailing columns in both CSVs. | Not Started | Trailing, so older CSVs still load. |
-| 12 | Diff split | `scripts/score_snapshot_diff.py` gains `--split financials`: reports the change histogram, group entries/exits and check flips for financials and non-financials separately. | Not Started | Takes the flag from the newer file; companies without it count as non-financial. |
-| 13 | No score change | Snapshot diff before and after the feature is empty on scores and check results. | Not Started | Acceptance check, not code. |
-| 14 | Tests | xUnit for parsing, classification, the update statement (in-memory), score and backtest filters; Angular specs for the badge and filter. | Not Started | In-memory `IDbmService` doubles; no DB in tests. |
-| 15 | Docs | ADR 0014 (SIC financials flag: source, range, alternatives); reimport runbook gains the new step; this document's statuses. | Not Started | |
+| 1 | Store SIC per company | Migration V023 adds `companies.sic_code` (int, null) and `companies.sic_description` (varchar(200), null), with column comments and an index on `sic_code`. | Done | Null means no SIC in the SEC file, or not yet imported. |
+| 2 | Import SIC | New CLI command `--import-company-sic` reads `sic` and `sicDescription` from each `CIK##########.json` in `submissions.zip` and updates `companies`. Idempotent; re-runnable without reimporting submissions. | Done | Paginated `-submissions-NNN.json` files carry no SIC and are skipped. Empty `sic` → null. |
+| 3 | Financials classification | One shared rule, `IndustryClassification.IsFinancial(int? sicCode)`: SIC 6000–6499. Null or any other code → not financial. | Done | Range decision in 4.2. The rule exists once in C#; SQL predicates and the frontend use its output, never a copy of the range. |
+| 4 | SIC in value score rows | `GET /api/reports/scores` rows carry `sicCode`, `sicDescription` and `isFinancial`, read from `companies` by join. | Done | `company_scores` is not changed or rebuilt. |
+| 5 | SIC in moat score rows | Same for `GET /api/reports/moat-scores`. | Done | |
+| 6 | Financials filter (API) | Both endpoints accept `financials=only|exclude` (omitted = all). Filter applies before pagination and counts. | Done | `exclude` keeps companies with a null SIC. |
+| 7 | Badge (UI) | The scores and moat-scores pages show a small "Financial" badge next to the company name, with the SIC code and description as tooltip. | Done | A shared `.badge-financial` class in `report-table.css` (plain hex colors, like the rest of the file). |
+| 8 | Filter (UI) | A "Financials" select (All / Only financials / Exclude financials) beside the Exchange filter on both pages; kept in the CSV export rows. | Done | |
+| 9 | Backtest filter (API) | `GET /api/reports/graham-backtest` accepts `financials=only|exclude`; constituents are filtered per snapshot date using the company's current SIC. | Done | Needed for the E6 and E5 measurements (section 6). Implemented in `GrahamBacktestService` (filters constituents via `GetCompanySics`), not in the constituents SQL. |
+| 10 | Backtest filter (UI) | Same select on the `graham-backtest` page. | Done | Owner decision 4: build it. |
+| 11 | Snapshot CSV columns | `--snapshot-scores` writes `sic_code` and `is_financial` as trailing columns in both CSVs. | Done | Trailing, so older CSVs still load. |
+| 12 | Diff split | `scripts/score_snapshot_diff.py` gains `--split financials`: reports the change histogram, group entries/exits and check flips for financials and non-financials separately. | Done | Takes the flag from the newer file; companies without it count as non-financial. |
+| 13 | No score change | Snapshot diff before and after the feature is empty on scores and check results. | Done | Snapshot `…-a4b2aca-sic-s6-*` equals the stored score tables for all 14,041; `…-sic-baseline-*` (with SIC) diffs empty against it. |
+| 14 | Tests | xUnit for parsing, classification, the update statement (in-memory), score and backtest filters; Angular specs for the badge and filter. | Done | In-memory `IDbmService` doubles; no DB in tests. |
+| 15 | Docs | ADR 0014 (SIC financials flag: source, range, alternatives); reimport runbook gains the new step; this document's statuses. | Done | |
 
 ## 3. Kanban Task List
 
 Each task is at most about 2 hours. Vault first: each task's spec goes into the plan's section 9 before code, and each commit gets a 1.6 progress row.
 
-**Backlog**
-- [ ] **T1 Migration (0.5 h).** `V023__AddSicToCompanies.sql`: two columns, comments, `idx_companies_sic_code`. Note: the first app start after this commit applies it.
-- [ ] **T2 Parse and classify (1 h).** `SubmissionsCompanyHeader` record (`cik`, `sic`, `sicDescription`) in `Stocks.DataModels/EdgarFileModels`; `IndustryClassification` with `FinancialSicMin = 6000`, `FinancialSicMax = 6499`, `IsFinancial(int?)` and `ParseSic(string?)`. Tests: Apple 3571 → not financial; 6021, 6331, 6411 → financial; 6798, 6770, 6500 → not; "" and null → null; non-numeric → null.
-- [ ] **T3 Update statement (1.5 h).** `UpdateCompanySicBatchStmt` (`NonQueryBatchedDbStmtBase`, `UPDATE companies SET sic_code, sic_description WHERE company_id`); `IDbmService.UpdateCompanySic(IReadOnlyCollection<CompanySic>, ct)` in `DbmService` and `DbmInMemoryService`/`DbmInMemoryData`. Read side: `Company` gains optional `SicCode`/`SicDescription`, or a separate `GetCompanySicStmt` (decide while coding, prefer the smaller change). Tests in-memory.
-- [ ] **T4 CLI command (1.5 h).** `--import-company-sic` in `Program.cs`: CIK → company id map from `GetAllCompaniesByDataSource`, enumerate the zip, skip `-submissions-` files, batch updates of 5,000, log counts (files, with SIC, matched, unmatched). `run.sh` menu entry. Test: a small in-memory zip with three files (SIC, empty SIC, paginated) → two updates, one null.
-- [ ] **T5 Score reads (2 h).** `GetCompanyScoresStmt` and `GetCompanyMoatScoresStmt`: `LEFT JOIN companies c USING (company_id)`, select `c.sic_code, c.sic_description`; `ScoresFilter` / moat filter gain `FinancialsFilter Financials` (`All`, `Only`, `Exclude`) → `c.sic_code BETWEEN @fin_min AND @fin_max` or its negation with `IS NULL`. `CompanyScoreSummary` and `CompanyMoatScoreSummary` gain trailing optional `int? SicCode = null, string? SicDescription = null` and a computed `IsFinancial`. In-memory mirror. Tests: filter only/exclude/all, null SIC under exclude, total count follows the filter.
-- [ ] **T6 Endpoints (1 h).** Parse `financials` on `/api/reports/scores` and `/api/reports/moat-scores`; unknown values → all. Endpoint tests if the project has them, else statement-level tests from T5 cover it.
-- [ ] **T7 Angular (2 h).** `api.service.ts` models and params; `scores-report` and `moat-scores-report`: badge, tooltip, filter select, CSV export columns; `.badge-financial` in `shared/styles/report-table.css`. Specs: badge shown only when `isFinancial`, filter sends the param and resets to page 1. `ng build` clean, `ng test` green.
-- [ ] **T8 Backtest filter (2 h).** `GetGrahamSnapshotConstituentsStmt` joins `companies` and takes the filter; `GrahamBacktestService.GetBacktest` and the endpoint pass it through; the cache key (if any) includes it. Tests: a financial 15/15 constituent drops out under `exclude`, is alone under `only`; monthly chaining unchanged.
-- [ ] **T9 Backtest UI (1 h).** Select on the `graham-backtest` page; spec.
-- [ ] **T10 Snapshot CSV and diff split (1.5 h).** `ScoreSnapshotCsv` trailing `sic_code,is_financial`; the snapshot path reads them from the T3/T5 source; `score_snapshot_diff.py --split financials`. Test: CSV header and a row; a script self-test on two tiny CSVs if the script has one, else a scratch run documented in the progress row.
-- [ ] **T11 Data step (0.5 h, owner approval).** Run `--import-company-sic` on the real DB (it applies V023 first). Verify: 74,208 companies with a SIC; of the 14,041 scored, 13,841 with a SIC and 1,836 financial; spot checks AAPL 3571, BAC 6021, BRK-B 6331. Then a snapshot and a diff against the last one: scores identical (requirement 13).
-- [ ] **T12 Docs (1 h).** ADR 0014 and its `decisions/README.md` line; the reimport order (new step after step 3); `project_fact_sheet.md` if it lists the data fields; this document's statuses (ask the owner first).
+**Done** (2026-11-22)
+- [x] **T1 Migration (0.5 h).** `V023__AddSicToCompanies.sql`: two columns, comments, `idx_companies_sic_code`. Note: the first app start after this commit applies it.
+- [x] **T2 Parse and classify (1 h).** `SubmissionsCompanyHeader` record (`cik`, `sic`, `sicDescription`) in `Stocks.DataModels/EdgarFileModels`; `IndustryClassification` with `FinancialSicMin = 6000`, `FinancialSicMax = 6499`, `IsFinancial(int?)` and `ParseSic(string?)`. Tests: Apple 3571 → not financial; 6021, 6331, 6411 → financial; 6798, 6770, 6500 → not; "" and null → null; non-numeric → null.
+- [x] **T3 Update statement (1.5 h).** `UpdateCompanySicBatchStmt` (`NonQueryBatchedDbStmtBase`, `UPDATE companies SET sic_code, sic_description WHERE company_id`); `IDbmService.UpdateCompanySic(IReadOnlyCollection<CompanySic>, ct)` in `DbmService` and `DbmInMemoryService`/`DbmInMemoryData`. Read side: `Company` gains optional `SicCode`/`SicDescription`, or a separate `GetCompanySicStmt` (decide while coding, prefer the smaller change). Tests in-memory.
+- [x] **T4 CLI command (1.5 h).** `--import-company-sic` in `Program.cs`: CIK → company id map from `GetAllCompaniesByDataSource`, enumerate the zip, skip `-submissions-` files, batch updates of 5,000, log counts (files, with SIC, matched, unmatched). `run.sh` menu entry. Test: a small in-memory zip with three files (SIC, empty SIC, paginated) → two updates, one null.
+- [x] **T5 Score reads (2 h).** `GetCompanyScoresStmt` and `GetCompanyMoatScoresStmt`: `LEFT JOIN companies c USING (company_id)`, select `c.sic_code, c.sic_description`; `ScoresFilter` / moat filter gain `FinancialsFilter Financials` (`All`, `Only`, `Exclude`) → `c.sic_code BETWEEN @fin_min AND @fin_max` or its negation with `IS NULL`. `CompanyScoreSummary` and `CompanyMoatScoreSummary` gain trailing optional `int? SicCode = null, string? SicDescription = null` and a computed `IsFinancial`. In-memory mirror. Tests: filter only/exclude/all, null SIC under exclude, total count follows the filter.
+- [x] **T6 Endpoints (1 h).** Parse `financials` on `/api/reports/scores` and `/api/reports/moat-scores`; unknown values → all. Endpoint tests if the project has them, else statement-level tests from T5 cover it.
+- [x] **T7 Angular (2 h).** `api.service.ts` models and params; `scores-report` and `moat-scores-report`: badge, tooltip, filter select, CSV export columns; `.badge-financial` in `shared/styles/report-table.css`. Specs: badge shown only when `isFinancial`, filter sends the param and resets to page 1. `ng build` clean, `ng test` green.
+- [x] **T8 Backtest filter (2 h).** As built: `GrahamBacktestService` filters the constituents with `GetCompanySics` (the constituents statement is unchanged); `GrahamBacktestService.GetBacktest` and the endpoint pass it through; the cache key (if any) includes it. Tests: a financial 15/15 constituent drops out under `exclude`, is alone under `only`; monthly chaining unchanged.
+- [x] **T9 Backtest UI (1 h).** Select on the `graham-backtest` page; spec.
+- [x] **T10 Snapshot CSV and diff split (1.5 h).** `ScoreSnapshotCsv` trailing `sic_code,is_financial`; the snapshot path reads them from the T3/T5 source; `score_snapshot_diff.py --split financials`. Test: CSV header and a row; a script self-test on two tiny CSVs if the script has one, else a scratch run documented in the progress row.
+- [x] **T11 Data step (0.5 h, owner approval).** Run `--import-company-sic` on the real DB (it applies V023 first). Verify: 74,208 companies with a SIC; of the 14,041 scored, 13,841 with a SIC and 1,836 financial; spot checks AAPL 3571, BAC 6021, BRK-B 6331. Then a snapshot and a diff against the last one: scores identical (requirement 13).
+- [x] **T12 Docs (1 h).** ADR 0014 and its `decisions/README.md` line; the reimport order (new step after step 3); `project_fact_sheet.md` if it lists the data fields; this document's statuses (ask the owner first).
 
-**Ready / In Progress / Done:** empty.
+**Backlog / Ready / In Progress:** empty.
 
 ## 4. High-Level Design
 

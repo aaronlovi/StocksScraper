@@ -1209,10 +1209,10 @@ public class ScoringServiceTests {
 
         DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
-        // ROE(CF) per year: 2022 = 100*20/200 = 10%, 2023 = 100*30/250 = 12%, 2024 = 100*40/400 = 10%
-        // Average = (10 + 12 + 10) / 3 = 32/3
+        // E6: average equity 2022 = 200 (no prior year), 2023 = (200+250)/2 = 225,
+        // 2024 = (250+400)/2 = 325; ROE = 100 * (20+30+40) / (200+225+325) = 12%
         Assert.NotNull(metrics.AverageRoeCF);
-        Assert.Equal(32m / 3m, metrics.AverageRoeCF!.Value);
+        Assert.Equal(12m, metrics.AverageRoeCF!.Value);
     }
 
     [Fact]
@@ -1236,10 +1236,9 @@ public class ScoringServiceTests {
         DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, 150m, 1_000_000);
 
         // OE per year = NetIncome (no non-cash or capex items)
-        // ROE(OE) per year: 2022 = 100*20/200 = 10%, 2023 = 100*30/250 = 12%, 2024 = 100*40/400 = 10%
-        // Average = (10 + 12 + 10) / 3 = 32/3
+        // E6: ROE = 100 * (20+30+40) / (200+225+325) = 12% (see the CF test)
         Assert.NotNull(metrics.AverageRoeOE);
-        Assert.Equal(32m / 3m, metrics.AverageRoeOE!.Value);
+        Assert.Equal(12m, metrics.AverageRoeOE!.Value);
     }
 
     [Fact]
@@ -1912,7 +1911,7 @@ public class ScoringServiceTests {
     }
 
     [Fact]
-    public void SignRule_ZeroEquityYear_SetsFlagWithoutEnteringAverage() {
+    public void SignRule_ZeroAverageEquityYear_FailsChecks() {
         var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
             [2023] = new Dictionary<string, decimal> {
                 ["StockholdersEquity"] = 0m,
@@ -1928,7 +1927,9 @@ public class ScoringServiceTests {
         DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
         IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
 
-        Assert.Equal(50m, metrics.AverageRoeCF);
+        // E6: average equity 2023 = 0, 2024 = 50; ROE = 100 * 100 / 50 = 200%, but the
+        // zero-average year fails both checks.
+        Assert.Equal(200m, metrics.AverageRoeCF);
         Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 14));
         Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 15));
     }
@@ -1942,7 +1943,8 @@ public class ScoringServiceTests {
                 ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m,
             },
             [2024] = new Dictionary<string, decimal> {
-                ["StockholdersEquity"] = 100m,
+                // Opening -100, closing 300: average equity 100 > 0 for the OE year.
+                ["StockholdersEquity"] = 300m,
                 ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m,
                 ["NetIncomeLoss"] = 50m,
             },
@@ -2599,6 +2601,136 @@ public class ScoringServiceTests {
         // val1 = 3000, val2 = 20 × (200 + 40) = 4800, val3 = 20 × 60 = 1200 ← min
         decimal? result = ScoringService.ComputeMaxBuyPrice(1000m, 200m, 60m, 40m, 100);
         Assert.Equal(12m, result);
+    }
+
+    #endregion
+
+    #region Sum-over-sum ROE on average equity (E6) tests
+
+    [Fact]
+    public void SumRoe_OpeningEquityFromPriorYear_AveragesWithClosing() {
+        // 2023: no prior year, average = 100. 2024: (100 + 300) / 2 = 200.
+        // ROE = 100 * (10 + 60) / (100 + 200); the old mean of ratios was (10% + 20%) / 2 = 15%.
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 100m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 10m,
+                ["NetIncomeLoss"] = 10m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 300m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 60m,
+                ["NetIncomeLoss"] = 60m,
+            },
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+
+        Assert.Equal(100m * 70m / 300m, metrics.AverageRoeCF);
+        Assert.Equal(100m * 70m / 300m, metrics.AverageRoeOE);
+        Assert.False(metrics.RoeCfHasNonPositiveEquityYear);
+        Assert.False(metrics.RoeOeHasNonPositiveEquityYear);
+    }
+
+    [Fact]
+    public void SumRoe_GapYear_UsesClosingEquityOnly() {
+        // No 2022 key: 2023's average is its closing equity. ROE = 100 * 70 / (100 + 300).
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2021] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 100m,
+                ["NetIncomeLoss"] = 10m,
+            },
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 300m,
+                ["NetIncomeLoss"] = 60m,
+            },
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+
+        Assert.Equal(17.5m, metrics.AverageRoeOE);
+    }
+
+    [Fact]
+    public void SumRoe_PriorYearWithoutNumerator_StillGivesOpeningEquity() {
+        // 2023 has equity only; it does not enter the sums but opens 2024.
+        // ROE = 100 * 60 / ((100 + 300) / 2) = 30%.
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 100m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 300m,
+                ["NetIncomeLoss"] = 60m,
+            },
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+
+        Assert.Equal(30m, metrics.AverageRoeOE);
+    }
+
+    [Fact]
+    public void SumRoe_CashFlowNumerator_AddsBackDividends() {
+        // NCF 5 + dividends 10 over equity 100 = 15%; before E6 it was 5%.
+        var data = new Dictionary<string, decimal> {
+            ["StockholdersEquity"] = 100m,
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 5m,
+            ["PaymentsOfDividends"] = 10m,
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(MakeSingleYearData(2024, data), null, null);
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(15m, metrics.AverageRoeCF);
+        Assert.Equal(ScoringCheckResult.Pass, CheckResult(checks, 14));
+    }
+
+    [Fact]
+    public void SumRoe_OneNonPositiveAverageEquityYear_FailsAmongGoodYears() {
+        // Average equity: 2022 = -100, 2023 = (-100 + 300) / 2 = 100, 2024 = 300.
+        // The sum is positive (300) but 2022's average is not: both checks fail.
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2022] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = -100m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 10m,
+                ["NetIncomeLoss"] = 10m,
+            },
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 300m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 60m,
+                ["NetIncomeLoss"] = 60m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 300m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 60m,
+                ["NetIncomeLoss"] = 60m,
+            },
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+        IReadOnlyList<ScoringCheck> checks = ScoringService.EvaluateChecks(metrics, 5);
+
+        Assert.Equal(100m * 130m / 300m, metrics.AverageRoeCF);
+        Assert.True(metrics.RoeCfHasNonPositiveEquityYear);
+        Assert.True(metrics.RoeOeHasNonPositiveEquityYear);
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 14));
+        Assert.Equal(ScoringCheckResult.Fail, CheckResult(checks, 15));
+    }
+
+    [Fact]
+    public void SumRoe_OwnerEarningsNullYear_LeavesOnlyTheOeSum() {
+        // 2024 has no net income: it enters the CF sum only.
+        var rawData = new Dictionary<int, IReadOnlyDictionary<string, decimal>> {
+            [2023] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 100m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 10m,
+                ["NetIncomeLoss"] = 10m,
+            },
+            [2024] = new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 300m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 60m,
+            },
+        };
+        DerivedMetrics metrics = CallComputeDerivedMetrics(rawData, null, null);
+
+        Assert.Equal(100m * 70m / 300m, metrics.AverageRoeCF);
+        Assert.Equal(10m, metrics.AverageRoeOE);
     }
 
     #endregion

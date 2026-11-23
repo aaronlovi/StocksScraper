@@ -179,8 +179,8 @@ export class MoatScoringComponent implements OnInit {
     const m = s.metrics;
     const n = s.yearsOfData;
     return {
-      1: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs; fails if any year has equity ≤ 0) = ' + fmtPct(m.averageRoeCF),
-      2: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs; fails if any year has equity ≤ 0) = ' + fmtPct(m.averageRoeOE),
+      1: 'Σ (Net Cash Flow + Dividends) / Σ Avg Equity (' + n + ' yrs; fails if the sum or any year\'s avg equity ≤ 0) = ' + fmtPct(m.averageRoeCF),
+      2: 'Σ Owner Earnings / Σ Avg Equity (' + n + ' yrs; fails if the sum or any year\'s avg equity ≤ 0) = ' + fmtPct(m.averageRoeOE),
       3: 'Avg annual: Gross Profit / Revenue (' + n + ' yrs) = ' + fmtPct(m.averageGrossMargin),
       4: 'Avg annual: Operating Income / Revenue (' + n + ' yrs) = ' + fmtPct(m.averageOperatingMargin),
       5: 'CAGR: (Latest Rev / Oldest Rev)^(1/' + n + ') − 1 = ' + fmtPct(m.revenueCagr),
@@ -204,8 +204,8 @@ export class MoatScoringComponent implements OnInit {
     return [
       { label: 'Avg Gross Margin', display: fmtPct(m.averageGrossMargin), tooltip: 'Avg annual: Gross Profit / Revenue (' + n + ' yrs)' },
       { label: 'Avg Operating Margin', display: fmtPct(m.averageOperatingMargin), tooltip: 'Avg annual: Operating Income / Revenue (' + n + ' yrs)' },
-      { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF), tooltip: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs)' },
-      { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE), tooltip: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs)' },
+      { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF), tooltip: 'Σ (Net Cash Flow + Dividends) / Σ Avg Equity (' + n + ' yrs; avg equity = (opening + closing) / 2)' },
+      { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE), tooltip: 'Σ Owner Earnings / Σ Avg Equity (' + n + ' yrs; avg equity = (opening + closing) / 2)' },
       { label: 'Revenue CAGR', display: fmtPct(m.revenueCagr), tooltip: '(Latest Rev / Oldest Rev)^(1/' + n + ') − 1' },
       { label: 'CapEx Ratio', display: fmtPct(m.capexRatio), tooltip: 'Avg CapEx / Avg Owner Earnings' },
       { label: 'Interest Coverage', display: m.interestCoverage != null ? m.interestCoverage.toFixed(2) + 'x' : 'N/A', tooltip: 'Operating Income / Interest Expense (latest year)' },

@@ -661,6 +661,89 @@ public class ScoringService {
     /// is unknown, not zero, so the year leaves every owner-earnings average. A year with
     /// neither capex nor D&amp;A keeps capex 0.
     /// </summary>
+    /// <summary>
+    /// Sum-over-sum ROE (E6): the ratio in percent (null when no year enters or the sum of
+    /// average equity is 0), the sign-rule flag, and each entering year's own percentage.
+    /// </summary>
+    internal sealed record SumOverSumRoe(
+        decimal? Value, bool HasNonPositiveEquityYear, IReadOnlyDictionary<int, decimal> YearlyPct);
+
+    /// <summary>
+    /// ROE numerator for the cash-flow variant: net cash flow plus dividends paid (NCF starts
+    /// from the change in cash, so it is after dividends). Null when the year has no cash change.
+    /// </summary>
+    internal static decimal? ComputeYearRoeCfNumerator(IReadOnlyDictionary<string, decimal> yearData) {
+        decimal? grossCashFlow = ResolveField(yearData, CashChangeChain, null);
+        if (!grossCashFlow.HasValue)
+            return null;
+        return ComputeYearNetCashFlow(yearData, grossCashFlow.Value)
+            + ResolveField(yearData, DividendsChain, 0m)!.Value;
+    }
+
+    /// <summary>
+    /// Average equity for one annual year: (opening + closing) / 2, where opening is the equity
+    /// of annual key year - 1. Without a resolvable prior year, the closing equity alone.
+    /// Null when the year's own equity can't be resolved.
+    /// </summary>
+    internal static decimal? ResolveAverageEquity(
+        IReadOnlyDictionary<int, IReadOnlyDictionary<string, decimal>> annualDataByYear, int year) {
+        if (!annualDataByYear.TryGetValue(year, out IReadOnlyDictionary<string, decimal>? yearData))
+            return null;
+        decimal? closing = ResolveEquity(yearData);
+        if (!closing.HasValue)
+            return null;
+        if (annualDataByYear.TryGetValue(year - 1, out IReadOnlyDictionary<string, decimal>? priorData)) {
+            decimal? opening = ResolveEquity(priorData);
+            if (opening.HasValue)
+                return (opening.Value + closing.Value) / 2m;
+        }
+        return closing.Value;
+    }
+
+    /// <summary>
+    /// ROE = 100 * sum of numerators / sum of average equity, over the annual years where both
+    /// resolve (E6). The ratio is null when no year enters or the sum is 0. Sign rule: the
+    /// flag is set when the sum is &lt;= 0 or any entering year's average equity is &lt;= 0, and
+    /// the check then fails; the ratio itself is still shown. Per-year values (numerator over
+    /// that year's average equity) feed the moat trend chart.
+    /// </summary>
+    internal static SumOverSumRoe ComputeSumOverSumRoe(
+        IReadOnlyDictionary<int, IReadOnlyDictionary<string, decimal>> annualDataByYear,
+        Func<IReadOnlyDictionary<string, decimal>, decimal?> numerator) {
+        var sortedYears = new List<int>(annualDataByYear.Keys);
+        sortedYears.Sort();
+
+        decimal totalNumerator = 0m;
+        decimal totalAverageEquity = 0m;
+        bool anyYear = false;
+        bool hasNonPositiveEquityYear = false;
+        var yearlyPct = new Dictionary<int, decimal>();
+
+        foreach (int year in sortedYears) {
+            decimal? yearNumerator = numerator(annualDataByYear[year]);
+            if (!yearNumerator.HasValue)
+                continue;
+            decimal? averageEquity = ResolveAverageEquity(annualDataByYear, year);
+            if (!averageEquity.HasValue)
+                continue;
+
+            anyYear = true;
+            totalNumerator += yearNumerator.Value;
+            totalAverageEquity += averageEquity.Value;
+            if (averageEquity.Value <= 0m)
+                hasNonPositiveEquityYear = true;
+            if (averageEquity.Value != 0m)
+                yearlyPct[year] = 100m * yearNumerator.Value / averageEquity.Value;
+        }
+
+        if (!anyYear)
+            return new SumOverSumRoe(null, false, yearlyPct);
+        if (totalAverageEquity <= 0m)
+            hasNonPositiveEquityYear = true;
+        decimal? roe = totalAverageEquity != 0m ? 100m * totalNumerator / totalAverageEquity : null;
+        return new SumOverSumRoe(roe, hasNonPositiveEquityYear, yearlyPct);
+    }
+
     internal static decimal? ComputeYearOwnerEarnings(
         IReadOnlyDictionary<string, decimal> yearData,
         IReadOnlyDictionary<string, TaxonomyBalanceTypes> balanceTypes) {
@@ -1075,17 +1158,11 @@ public class ScoringService {
 
         decimal totalNetCashFlow = 0m;
         decimal totalOwnerEarnings = 0m;
-        decimal totalRoeCF = 0m;
-        decimal totalRoeOE = 0m;
         decimal totalDividends = 0m;
         decimal totalStockIssuance = 0m;
         decimal totalPreferredIssuance = 0m;
         int yearsWithNCF = 0;
         int yearsWithOE = 0;
-        int yearsWithRoeCF = 0;
-        int yearsWithRoeOE = 0;
-        bool roeCfHasNonPositiveEquityYear = false;
-        bool roeOeHasNonPositiveEquityYear = false;
         bool hasAnyCashFlow = false;
         bool hasAnyOwnerEarnings = false;
 
@@ -1099,16 +1176,6 @@ public class ScoringService {
                 decimal netCashFlow = ComputeYearNetCashFlow(yearData, grossCashFlow.Value);
                 totalNetCashFlow += netCashFlow;
                 yearsWithNCF++;
-
-                // ROE (CF) for this year: net cash flow / equity
-                // A year with equity <= 0 gives no credit: it fails the ROE check (sign rule).
-                decimal? ncfEquity = ResolveEquity(yearData);
-                if (ncfEquity.HasValue && ncfEquity.Value <= 0m)
-                    roeCfHasNonPositiveEquityYear = true;
-                if (ncfEquity.HasValue && ncfEquity.Value != 0m) {
-                    totalRoeCF += 100m * netCashFlow / ncfEquity.Value;
-                    yearsWithRoeCF++;
-                }
             }
 
             // Owner Earnings for this year (null: no net income, or capex unknown)
@@ -1118,15 +1185,6 @@ public class ScoringService {
                 decimal ownerEarnings = yearOwnerEarnings.Value;
                 totalOwnerEarnings += ownerEarnings;
                 yearsWithOE++;
-
-                // ROE (OE) for this year: owner earnings / equity
-                decimal? oeEquity = ResolveEquity(yearData);
-                if (oeEquity.HasValue && oeEquity.Value <= 0m)
-                    roeOeHasNonPositiveEquityYear = true;
-                if (oeEquity.HasValue && oeEquity.Value != 0m) {
-                    totalRoeOE += 100m * ownerEarnings / oeEquity.Value;
-                    yearsWithRoeOE++;
-                }
             }
 
             // Accumulate totals for Adjusted Retained Earnings. The oldest retained earnings
@@ -1155,13 +1213,12 @@ public class ScoringService {
         if (hasAnyOwnerEarnings && yearsWithOE > 0)
             averageOwnerEarnings = totalOwnerEarnings / yearsWithOE;
 
-        decimal? averageRoeCF = null;
-        if (yearsWithRoeCF > 0)
-            averageRoeCF = totalRoeCF / yearsWithRoeCF;
-
-        decimal? averageRoeOE = null;
-        if (yearsWithRoeOE > 0)
-            averageRoeOE = totalRoeOE / yearsWithRoeOE;
+        // ROE: sum of numerators over sum of average equity (E6)
+        IReadOnlyDictionary<string, TaxonomyBalanceTypes> types = balanceTypes ?? EmptyBalanceTypes;
+        SumOverSumRoe roeCf = ComputeSumOverSumRoe(annualDataByYear, ComputeYearRoeCfNumerator);
+        SumOverSumRoe roeOe = ComputeSumOverSumRoe(annualDataByYear, yearData => ComputeYearOwnerEarnings(yearData, types));
+        decimal? averageRoeCF = roeCf.Value;
+        decimal? averageRoeOE = roeOe.Value;
 
         // Adjusted Retained Earnings (current RE from snapshot, totals from annual)
         decimal? adjustedRetainedEarnings = null;
@@ -1199,8 +1256,8 @@ public class ScoringService {
             estimatedReturnOE,
             currentDividendsPaid,
             equity,
-            roeCfHasNonPositiveEquityYear,
-            roeOeHasNonPositiveEquityYear);
+            roeCf.HasNonPositiveEquityYear,
+            roeOe.HasNonPositiveEquityYear);
     }
 
     internal static IReadOnlyList<ScoringCheck> EvaluateChecks(DerivedMetrics metrics, int yearsOfData) {
@@ -1302,7 +1359,8 @@ public class ScoringService {
         checks.Add(MakeCheck(13, "Retained Earnings Increased", check13Value, "increased", check13Result));
 
         // Check 14: Average ROE (CF) >= 10%
-        // A year with equity <= 0 in the average gives no credit: the check fails.
+        // Sum of (NCF + dividends) over sum of average equity. A sum <= 0, or a year whose
+        // average equity is <= 0, fails the check.
         checks.Add(MakeCheck(14, "Avg ROE (CF)", metrics.AverageRoeCF, ">= 10%",
             metrics.RoeCfHasNonPositiveEquityYear
                 ? ScoringCheckResult.Fail
@@ -1310,7 +1368,7 @@ public class ScoringService {
                     ? (metrics.AverageRoeCF.Value >= 10m ? ScoringCheckResult.Pass : ScoringCheckResult.Fail)
                     : ScoringCheckResult.NotAvailable));
 
-        // Check 15: Average ROE (OE) >= 10%
+        // Check 15: Average ROE (OE) >= 10%: sum of owner earnings over sum of average equity
         checks.Add(MakeCheck(15, "Avg ROE (OE)", metrics.AverageRoeOE, ">= 10%",
             metrics.RoeOeHasNonPositiveEquityYear
                 ? ScoringCheckResult.Fail

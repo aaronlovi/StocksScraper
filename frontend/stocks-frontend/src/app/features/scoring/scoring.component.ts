@@ -125,8 +125,8 @@ export class ScoringComponent implements OnInit {
       11: 'Adjusted RE = RE + Dividends − Stock − Preferred Issuance = ' + fmtCurrency(m.adjustedRetainedEarnings),
       12: n + ' years of annual financial data available',
       13: 'Adjusted RE − Oldest RE = ' + fmtCurrency(m.adjustedRetainedEarnings) + ' − ' + fmtCurrency(m.oldestRetainedEarnings) + ' = ' + diff,
-      14: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs; fails if any year has equity ≤ 0) = ' + fmtPct(m.averageRoeCF),
-      15: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs; fails if any year has equity ≤ 0) = ' + fmtPct(m.averageRoeOE),
+      14: 'Σ (Net Cash Flow + Dividends) / Σ Avg Equity (' + n + ' yrs; fails if the sum or any year\'s avg equity ≤ 0) = ' + fmtPct(m.averageRoeCF),
+      15: 'Σ Owner Earnings / Σ Avg Equity (' + n + ' yrs; fails if the sum or any year\'s avg equity ≤ 0) = ' + fmtPct(m.averageRoeOE),
     };
   });
 
@@ -146,8 +146,8 @@ export class ScoringComponent implements OnInit {
       { label: 'Oldest Retained Earnings', display: fmtCurrency(m.oldestRetainedEarnings), tooltip: 'Retained Earnings from oldest year in dataset' },
       { label: 'Avg Net Cash Flow', display: fmtCurrency(m.averageNetCashFlow), tooltip: 'Avg annual: Change in Cash − Net Debt (incl. short-term) − Net Stock − Net Preferred Issuance (' + n + ' yrs)' },
       { label: 'Avg Owner Earnings', display: fmtCurrency(m.averageOwnerEarnings), tooltip: 'Avg annual: Net Income + D&A + Deferred Tax + Non-Cash − CapEx + WC Change (' + n + ' yrs)' },
-      { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF), tooltip: 'Avg annual: Net Cash Flow / Equity (' + n + ' yrs)' },
-      { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE), tooltip: 'Avg annual: Owner Earnings / Equity (' + n + ' yrs)' },
+      { label: 'Avg ROE (CF)', display: fmtPct(m.averageRoeCF), tooltip: 'Σ (Net Cash Flow + Dividends) / Σ Avg Equity (' + n + ' yrs; avg equity = (opening + closing) / 2)' },
+      { label: 'Avg ROE (OE)', display: fmtPct(m.averageRoeOE), tooltip: 'Σ Owner Earnings / Σ Avg Equity (' + n + ' yrs; avg equity = (opening + closing) / 2)' },
       { label: 'Est. Return (CF)', display: fmtPct(m.estimatedReturnCF), tooltip: '(Avg NCF + Dividends) / Market Cap (NCF is after dividends paid)' },
       { label: 'Est. Return (OE)', display: fmtPct(m.estimatedReturnOE), tooltip: 'Avg OE / Market Cap (OE is before dividends)' },
       { label: 'Current Dividends Paid', display: fmtCurrency(m.currentDividendsPaid), tooltip: 'Dividends from most recent fiscal year' },

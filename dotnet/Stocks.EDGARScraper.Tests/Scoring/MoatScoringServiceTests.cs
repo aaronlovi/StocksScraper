@@ -807,4 +807,55 @@ public class MoatScoringServiceTests {
     }
 
     #endregion
+
+    #region Sum-over-sum ROE on average equity (E6) tests
+
+    private static Dictionary<int, IReadOnlyDictionary<string, decimal>> TwoYearRoeData(decimal firstEquity) =>
+        BuildAnnualData(
+            (2023, new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = firstEquity,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 5m,
+                ["PaymentsOfDividends"] = 5m,
+                ["NetIncomeLoss"] = 10m,
+            }),
+            (2024, new Dictionary<string, decimal> {
+                ["StockholdersEquity"] = 300m,
+                ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 50m,
+                ["PaymentsOfDividends"] = 10m,
+                ["NetIncomeLoss"] = 60m,
+            }));
+
+    [Fact]
+    public void SumRoe_Moat_SumOverAverageEquity_WithDividendsAddedBack() {
+        // CF numerators 5+5 = 10 and 50+10 = 60; OE 10 and 60. Average equity 100 and 200.
+        var annualData = TwoYearRoeData(100m);
+        var (metrics, trendData) = MoatScoringService.ComputeMoatDerivedMetrics(
+            annualData, annualData[2024], null, null, null);
+        IReadOnlyList<ScoringCheck> checks = MoatScoringService.EvaluateMoatChecks(metrics, 8);
+
+        Assert.Equal(100m * 70m / 300m, metrics.AverageRoeCF);
+        Assert.Equal(100m * 70m / 300m, metrics.AverageRoeOE);
+        Assert.Equal(ScoringCheckResult.Pass, MoatCheckResult(checks, 1));
+        Assert.Equal(ScoringCheckResult.Pass, MoatCheckResult(checks, 2));
+
+        // Trend: per-year numerator over that year's average equity
+        Assert.Equal(10m, trendData[0].RoeCfPct);
+        Assert.Equal(10m, trendData[0].RoeOePct);
+        Assert.Equal(30m, trendData[1].RoeCfPct);
+        Assert.Equal(30m, trendData[1].RoeOePct);
+    }
+
+    [Fact]
+    public void SumRoe_Moat_NonPositiveAverageEquityYear_FailsBothChecks() {
+        // 2023 equity -100: average -100 (fails); 2024 average (-100 + 300) / 2 = 100.
+        var annualData = TwoYearRoeData(-100m);
+        var (metrics, _) = MoatScoringService.ComputeMoatDerivedMetrics(
+            annualData, annualData[2024], null, null, null);
+        IReadOnlyList<ScoringCheck> checks = MoatScoringService.EvaluateMoatChecks(metrics, 8);
+
+        Assert.Equal(ScoringCheckResult.Fail, MoatCheckResult(checks, 1));
+        Assert.Equal(ScoringCheckResult.Fail, MoatCheckResult(checks, 2));
+    }
+
+    #endregion
 }

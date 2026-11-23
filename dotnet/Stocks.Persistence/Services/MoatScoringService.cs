@@ -104,12 +104,12 @@ public class MoatScoringService {
         int yearsWithGrossMargin = 0;
         decimal totalOperatingMargin = 0m;
         int yearsWithOperatingMargin = 0;
-        decimal totalRoeCF = 0m;
-        int yearsWithRoeCF = 0;
-        decimal totalRoeOE = 0m;
-        int yearsWithRoeOE = 0;
-        bool roeCfHasNonPositiveEquityYear = false;
-        bool roeOeHasNonPositiveEquityYear = false;
+        // ROE: sum of numerators over sum of average equity (E6), shared with the value score
+        IReadOnlyDictionary<string, TaxonomyBalanceTypes> types = balanceTypes ?? EmptyBalanceTypes;
+        ScoringService.SumOverSumRoe roeCf = ScoringService.ComputeSumOverSumRoe(
+            annualDataByYear, ScoringService.ComputeYearRoeCfNumerator);
+        ScoringService.SumOverSumRoe roeOe = ScoringService.ComputeSumOverSumRoe(
+            annualDataByYear, yearData => ScoringService.ComputeYearOwnerEarnings(yearData, types));
         decimal totalOwnerEarnings = 0m;
         int yearsWithOE = 0;
         decimal totalCapEx = 0m;
@@ -167,30 +167,13 @@ public class MoatScoringService {
                 latestInterestExpense = interestExp;
             }
 
-            // Equity for ROE computations
-            decimal? equity = ScoringService.ResolveEquity(yearData);
+            // Per-year ROE for the trend chart: numerator over that year's average equity
+            decimal? roeCfPct = roeCf.YearlyPct.TryGetValue(year, out decimal cfPct) ? cfPct : null;
+            decimal? roeOePct = roeOe.YearlyPct.TryGetValue(year, out decimal oePct) ? oePct : null;
 
-            // Net Cash Flow for ROE (CF) — same computation as Value Score
-            decimal? roeCfPct = null;
-            decimal? grossCashFlow = ScoringService.ResolveField(yearData, ScoringService.CashChangeChain, null);
-            if (grossCashFlow.HasValue) {
-                decimal netCashFlow = ScoringService.ComputeYearNetCashFlow(yearData, grossCashFlow.Value);
-
-                // A year with equity <= 0 gives no credit: it fails the ROE check (sign rule).
-                if (equity.HasValue && equity.Value <= 0m)
-                    roeCfHasNonPositiveEquityYear = true;
-                if (equity.HasValue && equity.Value != 0m) {
-                    roeCfPct = 100m * netCashFlow / equity.Value;
-                    totalRoeCF += roeCfPct.Value;
-                    yearsWithRoeCF++;
-                }
-            }
-
-            // Owner Earnings for ROE (OE) — same computation as Value Score. Null when the
-            // year has no net income or its capex is unknown: it leaves every OE average.
-            decimal? roeOePct = null;
-            decimal? yearOwnerEarnings = ScoringService.ComputeYearOwnerEarnings(yearData,
-                balanceTypes ?? EmptyBalanceTypes);
+            // Owner Earnings — same computation as Value Score. Null when the year has no net
+            // income or its capex is unknown: it leaves every OE average.
+            decimal? yearOwnerEarnings = ScoringService.ComputeYearOwnerEarnings(yearData, types);
 
             if (yearOwnerEarnings.HasValue) {
                 decimal ownerEarnings = yearOwnerEarnings.Value;
@@ -200,14 +183,6 @@ public class MoatScoringService {
 
                 if (ownerEarnings > 0m)
                     positiveOeYears++;
-
-                if (equity.HasValue && equity.Value <= 0m)
-                    roeOeHasNonPositiveEquityYear = true;
-                if (equity.HasValue && equity.Value != 0m) {
-                    roeOePct = 100m * ownerEarnings / equity.Value;
-                    totalRoeOE += roeOePct.Value;
-                    yearsWithRoeOE++;
-                }
 
                 // CapEx ratio years: owner earnings known and a capex tag present
                 decimal? capEx = ScoringService.ResolveField(yearData, ScoringService.CapExChain, null);
@@ -241,8 +216,8 @@ public class MoatScoringService {
         // Post-loop computations
         decimal? averageGrossMargin = yearsWithGrossMargin > 0 ? totalGrossMargin / yearsWithGrossMargin : null;
         decimal? averageOperatingMargin = yearsWithOperatingMargin > 0 ? totalOperatingMargin / yearsWithOperatingMargin : null;
-        decimal? averageRoeCF = yearsWithRoeCF > 0 ? totalRoeCF / yearsWithRoeCF : null;
-        decimal? averageRoeOE = yearsWithRoeOE > 0 ? totalRoeOE / yearsWithRoeOE : null;
+        decimal? averageRoeCF = roeCf.Value;
+        decimal? averageRoeOE = roeOe.Value;
 
         // Revenue CAGR
         decimal? revenueCagr = null;
@@ -322,8 +297,8 @@ public class MoatScoringService {
             totalCapitalReturnYears,
             snapshotEquity,
             averageOwnerEarnings,
-            roeCfHasNonPositiveEquityYear,
-            roeOeHasNonPositiveEquityYear,
+            roeCf.HasNonPositiveEquityYear,
+            roeOe.HasNonPositiveEquityYear,
             debtFree,
             latestOperatingIncome);
 
@@ -334,7 +309,8 @@ public class MoatScoringService {
         var checks = new List<ScoringCheck>(13);
 
         // Sign rule: a ratio over a non-positive denominator fails its check; the displayed
-        // ratio is unchanged. A year with equity <= 0 in an ROE average gives no credit.
+        // ratio is unchanged. ROE (sum over sum of average equity) fails when the sum, or any
+        // year's average equity, is <= 0.
         bool equityNonPositive = metrics.Equity.HasValue && metrics.Equity.Value <= 0m;
         bool ownerEarningsNonPositive = metrics.AverageOwnerEarnings.HasValue && metrics.AverageOwnerEarnings.Value <= 0m;
 

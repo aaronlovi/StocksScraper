@@ -1,7 +1,7 @@
 # 13. Scoring Data Rules
 
 ## Status
-Accepted (2026-11-22; amended the same day for E10 and E11)
+Accepted (2026-11-22; amended the same day for E10 and E11, and on 2026-11-23 for E6)
 
 ## Context
 The value score (`ScoringService`, 15 checks) and the moat score (`MoatScoringService`, 13 checks) were ported from tsx-aggregator before tsx fixed a series of data-handling defects. A review of the 2026-08-23 load found that the ports still carried those defects and that EDGAR's XBRL tags added some of their own:
@@ -28,7 +28,7 @@ Every check is Pass, Fail or NotAvailable; the score counts Pass only, and `comp
 A ratio over a denominator ≤ 0 **fails** its check. The rule lives in the check, not the division, so the displayed ratio stays honest (a negative D/E still shows).
 - Value checks 1 (D/E, equity ≤ 0), 3 (P/B, book value ≤ 0 with a market cap) and 10 (D/B, book value ≤ 0); moat check 9 (D/E).
 - Moat check 7 (capex ratio) fails when average owner earnings ≤ 0.
-- ROE (value 14/15, moat 1/2): a year in the average with equity ≤ 0 gives no credit, so the check fails. CF and OE carry separate flags because their year sets differ. The displayed average is unchanged.
+- ROE (value 14/15, moat 1/2): fails when the sum of average equity is ≤ 0 or any year's average equity is ≤ 0 (see "ROE"). CF and OE carry separate flags because their year sets differ. The displayed ratio is unchanged.
 
 ### Missing versus zero, per field
 | Field | Missing means |
@@ -97,6 +97,13 @@ Net cash flow starts from the change in cash, so it is already after dividends p
 - Est. return (OE) = avg OE ÷ market cap, on both scores.
 - Max buy price = min(3 × book, 20 × (avg NCF + dividends), 20 × avg OE) ÷ shares.
 
+### ROE (E6)
+ROE = 100 × Σ numerator ÷ Σ average equity, over the annual years where both the numerator and the year's own equity resolve. It replaced the mean of yearly `numerator ÷ year-end equity`, where a small-equity year could dominate and year-end equity did not match the year's flow.
+- Average equity = (opening + closing) ÷ 2. Opening is the equity of the previous annual year key (E7 keys); without one, the closing equity alone. A year outside the sums can still open the next.
+- Numerators: CF = net cash flow + dividends paid (NCF is after dividends, which left payers behind buyback companies); OE = owner earnings (unchanged).
+- Sign rule: the check fails when the sum, or any entering year's average equity, is ≤ 0. The ratio is still shown (null only when the sum is 0).
+- The moat trend chart shows each year's numerator over that year's average equity.
+
 ## Consequences
 - Measured on the 2026-08-23 load with the read-only `--snapshot-scores` command and `scripts/score_snapshot_diff.py`, baseline → all fixes:
   - **Value:** 7,750 of 14,018 scores changed; 13+ 171 → 233; 14+ 53 → 107; 15/15 16 → 30.
@@ -110,6 +117,7 @@ Net cash flow starts from the change in cash, so it is already after dividends p
 - **E10 and E11, measured on the same load after all the fixes above:**
   - E10: value 5 and moat 6 scores changed, no group changes. Most multi-currency filers already got USD by chance.
   - E11: value 525 changed both ways (checks 11 and 13 only); 13+ 233 → 230, 14+ 103 → 102, 15/15 30 → 29. Moat unchanged.
+- **E6, measured on the 2026-11-22 load** (against the SIC baseline, split with `--split financials`): value 1,070 changed, mostly up (checks 14 and 15 only); 13+ 259 → 289; 15/15 32 → 60, split evenly (financials 14 → 29, others 18 → 31). Moat 831 changed (checks 1 and 2 only); 13/13 4 → 13, all non-financial. Backtest of the 61 month-ends (2021-10-31..2026-10-31, monthly, SPY +60.6%): 15/15 all +68.6% → +66.3% (45 → 70 names on average), excluding financials +82.7% → +76.9%, financials only +50.7% → +47.4%; 14+ all +65.0% → +60.9%. E6 is adopted as a correctness fix, not for returns. Rebuilt on 2026-11-23.
 - **Stale until rebuilt:** `company_scores`, `company_moat_scores` and the 61 `graham_score_snapshots` dates keep the old scores until rebuilt (`--compute-all-scores`, `--compute-all-moat-scores`, then `--compute-score-snapshots`, about 2 hours). Backtest and Portfolio Advisor results change after the rebuild. Done on 2026-11-22 with the 2026-11-22 data reimport: every live score and all 61 snapshot dates carry every rule here, including E10 and E11.
 - **Portfolio Advisor reasons:** until the rebuild fills `check_results`, `PortfolioAdvisorService` falls back to rebuilding checks from the metric columns, which lack equity and the ROE flags, so its "why it flipped" text can't reflect the sign rule for checks 1, 14 and 15. After the rebuild it reads the stored results (display only; scores are unaffected).
 - **Concept-list side effect (fixed by E10):** adding concepts (P3, P4, E3, E4) made a handful of companies flip unrelated checks. Checked 2026-11-22 on the four P4 strays: their eligible dates did not move. The cause was facts tagged in two currencies with the same concept, period and filing, with the tie broken by the query plan, so a plan change could switch the currency used. Since E10 the pick is fixed (see "Duplicate facts in several units"), and adding a concept no longer moves unrelated values.
@@ -119,7 +127,8 @@ Footprints are value / moat scores changed, measured against the baseline in a s
 - **NotAvailable instead of Fail for non-positive denominators:** identical scores; rejected to match tsx and to count the check as computable.
 - **ROE: exclude negative-equity years** (3,140 / 3,095): lifts buyback compounders (ADSK FICO FTNT IDXX ORLY) on their few positive-equity years.
 - **ROE: such a year counts as 0%** (3,153 / 3,115).
-- **ROE: Σ numerator ÷ Σ equity** (3,874): really the separate E6 redesign; moves companies both ways.
+- **ROE: Σ numerator ÷ Σ year-end equity** (3,874, scratch replay): the first E6 sketch; adopted instead with average equity and the dividend add-back.
+- **ROE: keep the mean of yearly ratios** (status quo before E6): a small-equity year dominates the mean, and dividend payers look worse than buyback companies on ROE (CF).
 - **P2: flip the aggregates but keep "other, net" as a total** (284 / 306): still drops the components in 4,201 company-years.
 - **P3: plain summing** (220 value) or **NCF = Δcash − financing total − dividends** (4,409 / 2,153): the latter also removes bank deposit flows (E5) but changes what NCF means. Deferred with E5.
 - **P4: debt-free on long-term debt alone** (603 moat): passes companies whose debt is current or short-term.
@@ -130,4 +139,4 @@ Footprints are value / moat scores changed, measured against the baseline in a s
 - **E10: drop non-USD monetary facts** (not measured): also ends the random pick, but a company that reports only in a foreign currency would lose every monetary value.
 - **E10: keep the plan-dependent pick** (status quo): scores could move whenever the concept list or the query plan changed.
 - **E11: keep all years in the window** (status quo, the tsx P8 defect): counts the oldest year's dividends and issuance twice; tsx measured 29 of 654 scores moving.
-- **E5, E6** (financing-total NCF, Σ ÷ Σ ROE): measured separately (plan sections 4.6–4.7) and deferred until the SIC/financials flag.
+- **E5** (financing-total NCF): measured separately (plan section 4.6) and deferred until it can be measured per segment with the SIC/financials flag (ADR 0014).

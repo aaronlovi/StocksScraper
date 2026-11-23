@@ -42,7 +42,7 @@ Companies like Coca-Cola, Apple, Visa, Mastercard, Procter & Gamble, Moody's —
 
 ## 3. Scoring Checks
 
-All margin and return checks that reference an "average" compute the metric per fiscal year (from annual 10-K data only), then average those yearly values across all available years. This is the same averaging pattern used by the Value Score for owner earnings, net cash flow, and ROE.
+All margin and return checks that reference an "average" compute the metric per fiscal year (from annual 10-K data only), then average those yearly values across all available years. This is the same averaging pattern used by the Value Score for owner earnings and net cash flow. ROE is the exception on both scores: a sum of numerators over a sum of average equity (E6, ADR 0013).
 
 ### 3.1. Scoring Checks - Computation Notes
 
@@ -53,7 +53,7 @@ All margin and return checks that reference an "average" compute the metric per 
 - **CapEx ratio**: `Average annual CapEx / Average annual Owner Earnings * 100`. CapEx is averaged over years with known owner earnings and a capex tag. Average owner earnings ≤ 0 fails the check (sign rule).
 - **Interest coverage**: `Operating Income / Interest Expense`, using the most recent fiscal year. Without an interest figure, a debt-free company (no long-term, current, short-term, notes, credit-line or combined debt tag is non-zero on the latest balance sheet) passes when operating income is > 0 and fails when it is ≤ 0; otherwise the check is not available.
 - **Debt-to-equity**: latest balance sheet; gaps in a newer 10-Q are filled from the latest 10-K. Equity ≤ 0 fails the check (sign rule).
-- **ROE (CF and OE)**: average of yearly ratios; any year in the average with equity ≤ 0 fails the check.
+- **ROE (CF and OE)**: `Σ numerator / Σ average equity * 100` over the years with both; average equity = (prior year's equity + this year's) ÷ 2, or this year's alone without a prior year. The CF numerator is net cash flow + dividends; the OE numerator is owner earnings. The sum ≤ 0, or any year's average equity ≤ 0, fails the check (ADR 0013). The trend chart shows each year's numerator over its average equity.
 - **Estimated return (OE)**: `Average Owner Earnings / Market Cap * 100`. Owner earnings are before dividends, so dividends are not subtracted.
 
 ### 3.2. Scoring Checks - Check Table

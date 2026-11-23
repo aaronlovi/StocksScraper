@@ -154,6 +154,14 @@ internal partial class Program {
                 }
                 return 0;
             }
+            case "--import-company-sic": {
+                Result res = await ImportCompanySicAsync();
+                if (res.IsFailure) {
+                    _logger.LogError("ImportCompanySic failed: {Error}", res.ErrorMessage);
+                    return 2;
+                }
+                return 0;
+            }
             case "--import-prices-stooq": {
                 Result res = await ImportStooqPricesAsync();
                 if (res.IsFailure) {
@@ -494,6 +502,18 @@ internal partial class Program {
         ILogger<SecTickerMappingsDownloader> logger = _svp!.GetRequiredService<ILogger<SecTickerMappingsDownloader>>();
         var downloader = new SecTickerMappingsDownloader(httpClient, logger);
         return await downloader.DownloadAsync(outputDir, userAgent, CancellationToken.None);
+    }
+
+    private static async Task<Result> ImportCompanySicAsync() {
+        if (_svp is null)
+            return Result.Failure(ErrorCodes.ValidationError, "Service provider is not initialized.");
+
+        const int batchSize = 5000;
+        ILogger<CompanySicImporter> logger = _svp.GetRequiredService<ILogger<CompanySicImporter>>();
+        var importer = new CompanySicImporter(_dbm!, logger);
+        Result<CompanySicImportStats> result =
+            await importer.ImportAsync(GetConfigValue("EdgarSubmissionsBulkZipPath"), batchSize, CancellationToken.None);
+        return result.IsSuccess ? Result.Success : Result.Failure(result);
     }
 
     private static async Task<Result> ImportSecTickerMappingsAsync() {

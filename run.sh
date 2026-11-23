@@ -36,6 +36,7 @@ display_menu() {
     printf "  %-${col1_w}s  %s\n" "--- Data Import ---"           "--- Data Download ---"
     printf "  %-${col1_w}s  %s\n" "4) Import price CSVs"          "3) Download SEC ticker mappings"
     printf "  %-${col1_w}s  %s\n" "5) Import bulk Stooq files"    ""
+    printf "  %-${col1_w}s  %s\n" "12) Import company SIC codes" ""
     printf "  %-${col1_w}s  %s\n" "6) Import SEC ticker mappings" ""
     echo ""
     printf "  %-${col1_w}s  %s\n" "--- Other ---"                 ""
@@ -177,6 +178,15 @@ while true; do
             echo "Importing SEC ticker mappings..."
             pushd $WORKING_DIR > /dev/null
             dotnet run --project Stocks.EDGARScraper.csproj -- --import-sec-ticker-mappings
+            if [ $? -ne 0 ]; then
+                echo "The application failed to run. Check the output for errors."
+            fi
+            popd > /dev/null
+            ;;
+        12)
+            echo "Importing company SIC codes from the submissions archive..."
+            pushd $WORKING_DIR > /dev/null
+            dotnet run --project Stocks.EDGARScraper.csproj -- --import-company-sic
             if [ $? -ne 0 ]; then
                 echo "The application failed to run. Check the output for errors."
             fi

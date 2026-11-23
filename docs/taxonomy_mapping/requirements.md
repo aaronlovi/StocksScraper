@@ -1,5 +1,7 @@
 # Taxonomy Mapping Requirements
 
+> **Status (2026-11-22): Superseded, never implemented.** Scoring uses explicit, hand-curated concept chains in `ScoringService` instead (ADR 0013). The target classes `CompanyReport`, `CashFlowItem` and `RawReportDataMap` were unused and were deleted in `365aa9c`. Requirement 9 was settled in practice: `--load-taxonomy-all` imports every taxonomy year.
+
 ## Summary
 
 Define a mapping layer that converts EDGAR taxonomy concepts into the normalized `CompanyReport` and `CashFlowItem` fields used for comparison data. The mapping should use the taxonomy metadata stored in `taxonomy_concepts` (name, label, documentation) to propose candidate concepts, apply ranking/priority rules, and populate raw report maps for annual and non-annual statements. The initial focus is on US GAAP 2025, with a plan to decide whether additional taxonomy years should be imported for broader coverage.
@@ -8,15 +10,15 @@ Define a mapping layer that converts EDGAR taxonomy concepts into the normalized
 
 | ID | Requirement | Description | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Mapping config | Create a structured mapping definition per `CompanyReport`/`CashFlowItem` field. | Proposed | Include keyword rules and priority lists. |
-| 2 | Candidate discovery | Use `taxonomy_concepts` name/label/documentation to find candidates per field. | Proposed | Score based on keyword matches and exclude negatives. |
-| 3 | Period handling | Respect period type (instant vs duration) when selecting data points. | Proposed | Annual vs non-annual alignment required. |
-| 4 | Field selection | Choose the highest-ranked candidate available per report date. | Proposed | Prefer exact name matches over fuzzy label matches. |
-| 5 | Raw report maps | Populate `RawReportDataMap` per statement and report date. | Proposed | Use normalized keys for downstream processing. |
-| 6 | Company report build | Build `CompanyReport` from EDGAR data points plus mapping. | Proposed | Integrate with existing statement processing. |
-| 7 | Diagnostics | Emit warnings for missing or ambiguous mappings. | Proposed | Collect in warnings list for review. |
-| 8 | Tests | Add xUnit tests for mapping selection and report assembly. | Proposed | No LINQ in production paths. |
-| 9 | Multi-year taxonomy decision | Decide whether to import taxonomies for years other than 2025. | Proposed | Capture decision in requirements and ADR. |
+| 1 | Mapping config | Create a structured mapping definition per `CompanyReport`/`CashFlowItem` field. | Superseded | Include keyword rules and priority lists. |
+| 2 | Candidate discovery | Use `taxonomy_concepts` name/label/documentation to find candidates per field. | Superseded | Score based on keyword matches and exclude negatives. |
+| 3 | Period handling | Respect period type (instant vs duration) when selecting data points. | Superseded | Annual vs non-annual alignment required. |
+| 4 | Field selection | Choose the highest-ranked candidate available per report date. | Superseded | Prefer exact name matches over fuzzy label matches. |
+| 5 | Raw report maps | Populate `RawReportDataMap` per statement and report date. | Superseded | Use normalized keys for downstream processing. |
+| 6 | Company report build | Build `CompanyReport` from EDGAR data points plus mapping. | Superseded | Integrate with existing statement processing. |
+| 7 | Diagnostics | Emit warnings for missing or ambiguous mappings. | Superseded | Collect in warnings list for review. |
+| 8 | Tests | Add xUnit tests for mapping selection and report assembly. | Superseded | No LINQ in production paths. |
+| 9 | Multi-year taxonomy decision | Decide whether to import taxonomies for years other than 2025. | Superseded | Capture decision in requirements and ADR. |
 
 ## Kanban Task List (<= 2h each)
 

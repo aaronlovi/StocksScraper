@@ -1,5 +1,7 @@
 # Price Fetch Pipeline Requirements (Stooq CSV)
 
+> **Status (2026-11-22): Superseded.** The per-ticker downloader was built (`2ce00c3`) and then removed (`d40ebc9`, 2026-02-21): Stooq's daily request limit (about 100–500) cannot cover 14,000+ tickers. Prices now come from the manually downloaded Stooq bulk zip via `--import-prices-stooq-bulk` (see price-fetch-2).
+
 ## Summary
 
 Build a CLI-driven price fetch pipeline that uses the existing SEC CIK-to-ticker mapping JSON files to download daily price data from Stooq without ingesting any data into the database yet. The output will be stored as files under a configurable directory so the data can later be imported or analyzed.
@@ -8,14 +10,14 @@ Build a CLI-driven price fetch pipeline that uses the existing SEC CIK-to-ticker
 
 | ID | Requirement | Description | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Source selection | Use Stooq CSV as the primary free data source for daily prices. | Proposed | Stooq URLs: `https://stooq.com/q/d/l/?s=<ticker>.us&i=d` |
-| 2 | Input mapping | Read ticker symbols from the SEC mapping JSON files already downloaded to the configured data directory. | Proposed | Use `company_tickers.json` and `company_tickers_exchange.json` if present. |
-| 3 | CLI command | Provide a new CLI switch to fetch daily prices and write output files to disk. | Proposed | Example: `--download-prices-stooq` |
-| 4 | Output files | Write one CSV per ticker symbol in the output directory, overwritten each run. | Proposed | Each file includes all dates for that ticker. |
-| 5 | Config-driven paths | Use `EdgarDataDir` (or another config key) for locating mappings and writing output. | Proposed | No database changes. |
-| 6 | Error handling | Handle missing tickers, invalid responses, or rate limits without aborting the whole run. | Proposed | Log warnings and continue. |
-| 7 | Deduping/overwrites | Support overwriting existing files or skipping up-to-date ones. | Proposed | Controlled by a flag. |
-| 8 | Logging | Log progress (counts, failures, elapsed time). | Proposed | Use existing Serilog configuration. |
+| 1 | Source selection | Use Stooq CSV as the primary free data source for daily prices. | Superseded | Stooq URLs: `https://stooq.com/q/d/l/?s=<ticker>.us&i=d` |
+| 2 | Input mapping | Read ticker symbols from the SEC mapping JSON files already downloaded to the configured data directory. | Superseded | Use `company_tickers.json` and `company_tickers_exchange.json` if present. |
+| 3 | CLI command | Provide a new CLI switch to fetch daily prices and write output files to disk. | Superseded | Example: `--download-prices-stooq` |
+| 4 | Output files | Write one CSV per ticker symbol in the output directory, overwritten each run. | Superseded | Each file includes all dates for that ticker. |
+| 5 | Config-driven paths | Use `EdgarDataDir` (or another config key) for locating mappings and writing output. | Superseded | No database changes. |
+| 6 | Error handling | Handle missing tickers, invalid responses, or rate limits without aborting the whole run. | Superseded | Log warnings and continue. |
+| 7 | Deduping/overwrites | Support overwriting existing files or skipping up-to-date ones. | Superseded | Controlled by a flag. |
+| 8 | Logging | Log progress (counts, failures, elapsed time). | Superseded | Use existing Serilog configuration. |
 
 ## Kanban Task List (<= 2h each)
 

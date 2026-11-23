@@ -1,5 +1,7 @@
 # Price Import Phase 2 Requirements (Stooq -> Database)
 
+> **Status (2026-11-22): Done.** Tables in V007 (`prices`, `price_imports`) and V009 (`price_downloads`); `--import-prices-stooq` with `StooqImport` config (`MaxTickersPerRun`, `BatchSize`); `StooqPriceImporterTests`. Duplicates are avoided by deleting a ticker's prices and re-inserting them, not by appending only new dates. The bulk importer (`--import-prices-stooq-bulk`) was added later and is the normal path.
+
 ## Summary
 
 Extend the Stooq price pipeline to import daily price data into the database. Persist raw price rows with the same schema as the current Stooq CSV outputs, and add a supplementary table to track when each ticker was last imported. The importer should select which tickers to import based on last-import timestamps to reduce repeated hits and avoid exhausting the Stooq daily limit on the same symbols.
@@ -8,25 +10,25 @@ Extend the Stooq price pipeline to import daily price data into the database. Pe
 
 | ID | Requirement | Description | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Price data table | Create a database table to store Stooq daily price rows with the same fields as the CSV output. | Proposed | Fields: Cik, Ticker, Exchange, StooqSymbol, Date, Open, High, Low, Close, Volume. |
-| 2 | Import tracking table | Create a supplementary table to track last-imported date/time per ticker. | Proposed | Used to rotate tickers on subsequent runs. |
-| 3 | Import CLI | Add a CLI switch to import Stooq price data into the database. | Proposed | Separate from download command. |
-| 4 | Import selection | Determine which tickers to import based on last-imported timestamps. | Proposed | Prefer least recently imported first. |
-| 5 | Incremental import | Avoid duplicate inserts for previously-imported dates. | Proposed | Use unique constraint or upsert logic. |
-| 6 | Error handling | Log per-ticker failures and continue. | Proposed | Do not abort entire run for a few failures. |
-| 7 | Config | Add config values for import batch size and max tickers per run. | Proposed | Avoid hitting Stooq daily limits. |
-| 8 | Tests | Add unit tests for ticker selection and import logic. | Proposed | No external network calls in tests. |
+| 1 | Price data table | Create a database table to store Stooq daily price rows with the same fields as the CSV output. | Done | Fields: Cik, Ticker, Exchange, StooqSymbol, Date, Open, High, Low, Close, Volume. |
+| 2 | Import tracking table | Create a supplementary table to track last-imported date/time per ticker. | Done | Used to rotate tickers on subsequent runs. |
+| 3 | Import CLI | Add a CLI switch to import Stooq price data into the database. | Done | Separate from download command. |
+| 4 | Import selection | Determine which tickers to import based on last-imported timestamps. | Done | Prefer least recently imported first. |
+| 5 | Incremental import | Avoid duplicate inserts for previously-imported dates. | Done | Use unique constraint or upsert logic. |
+| 6 | Error handling | Log per-ticker failures and continue. | Done | Do not abort entire run for a few failures. |
+| 7 | Config | Add config values for import batch size and max tickers per run. | Done | Avoid hitting Stooq daily limits. |
+| 8 | Tests | Add unit tests for ticker selection and import logic. | Done | No external network calls in tests. |
 
 ## Kanban Task List (<= 2h each)
 
-- [ ] Design schema for Stooq price table and import tracking table.
-- [ ] Add migrations for new tables and indexes/constraints.
-- [ ] Implement DB statements and DTOs for inserting price rows.
-- [ ] Implement import tracking upsert/update.
-- [ ] Implement ticker selection (least recently imported first).
-- [ ] Add CLI command and options for import run.
-- [ ] Add tests for selection and import logic.
-- [ ] Update docs/run.sh for the new import command.
+- [x] Design schema for Stooq price table and import tracking table.
+- [x] Add migrations for new tables and indexes/constraints.
+- [x] Implement DB statements and DTOs for inserting price rows.
+- [x] Implement import tracking upsert/update.
+- [x] Implement ticker selection (least recently imported first).
+- [x] Add CLI command and options for import run.
+- [x] Add tests for selection and import logic.
+- [x] Update docs/run.sh for the new import command.
 
 ## High-Level Design
 

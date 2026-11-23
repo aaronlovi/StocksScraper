@@ -1,5 +1,7 @@
 # Graham Score Backtest Requirements (Point-in-Time Snapshots + Monthly Rebalance)
 
+> **Status (2026-11-22): Done.** All requirements are implemented: migration V020, as-of scoring, `--compute-score-snapshots`, the three `/api/reports/graham-*` endpoints, the `graham-snapshot` and `graham-backtest` pages, and `GrahamBacktestTests`. The 5-year monthly backfill was last re-run on 2026-11-22 (2021-10-31..2026-10-31, 61 dates).
+
 ## Table of Contents
 
 - [[#1. Summary|1. Summary]]
@@ -31,34 +33,34 @@ To avoid look-ahead bias, an as-of score may only use filings whose `acceptance_
 
 | ID | Requirement | Description | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Snapshot table | Create `graham_score_snapshots` keyed by `(as_of_date, company_id)` mirroring `company_scores` columns. | Proposed | Append-per-date, not truncate-replace. |
-| 2 | As-of scoring data | Scoring data query accepts an as-of cutoff: only submissions with `acceptance_datetime <= as-of` are eligible. | Proposed | New statement variant of `GetAllScoringDataPointsStmt`. |
-| 3 | As-of prices | Score computation at an as-of date uses the price at or just before that date. | Proposed | Reuse `GetAllPricesNearDateStmt`. |
-| 4 | As-of compute | `ScoringService` supports computing all company scores as of a given date. | Proposed | Same 15 checks, different inputs. |
-| 5 | Backfill CLI | CLI command computes and stores snapshots for a range of month-end dates. | Proposed | `--compute-score-snapshots --from YYYY-MM-DD --to YYYY-MM-DD`. Idempotent per date (delete + insert). |
-| 6 | Snapshot dates API | Endpoint lists available snapshot dates. | Proposed | Drives the date picker. |
-| 7 | Point-in-time API | Endpoint returns companies with a given min score at a snapshot date, with return from that date to today. | Proposed | Reuses returns machinery. |
-| 8 | Backtest API | Endpoint returns the monthly-rebalance backtest: per-month constituents, entered/left, monthly return, cumulative value, SPY comparison. | Proposed | Equal-weighted; missing end price = held at last known price. |
-| 9 | Angular point-in-time page | New route/page with snapshot-date picker and results table. | Proposed | Mirrors graham-returns UI. |
-| 10 | Angular backtest page | New route/page with summary cards, cumulative chart vs SPY, expandable month rows. | Proposed | |
-| 11 | Tests | Unit tests for as-of cutoff behavior, snapshot storage, and backtest chaining math. | Proposed | In-memory `IDbmService` doubles; no DB in tests. |
+| 1 | Snapshot table | Create `graham_score_snapshots` keyed by `(as_of_date, company_id)` mirroring `company_scores` columns. | Done | Append-per-date, not truncate-replace. |
+| 2 | As-of scoring data | Scoring data query accepts an as-of cutoff: only submissions with `acceptance_datetime <= as-of` are eligible. | Done | New statement variant of `GetAllScoringDataPointsStmt`. |
+| 3 | As-of prices | Score computation at an as-of date uses the price at or just before that date. | Done | Reuse `GetAllPricesNearDateStmt`. |
+| 4 | As-of compute | `ScoringService` supports computing all company scores as of a given date. | Done | Same 15 checks, different inputs. |
+| 5 | Backfill CLI | CLI command computes and stores snapshots for a range of month-end dates. | Done | `--compute-score-snapshots --from YYYY-MM-DD --to YYYY-MM-DD`. Idempotent per date (delete + insert). |
+| 6 | Snapshot dates API | Endpoint lists available snapshot dates. | Done | Drives the date picker. |
+| 7 | Point-in-time API | Endpoint returns companies with a given min score at a snapshot date, with return from that date to today. | Done | Reuses returns machinery. |
+| 8 | Backtest API | Endpoint returns the monthly-rebalance backtest: per-month constituents, entered/left, monthly return, cumulative value, SPY comparison. | Done | Equal-weighted; missing end price = held at last known price. |
+| 9 | Angular point-in-time page | New route/page with snapshot-date picker and results table. | Done | Mirrors graham-returns UI. |
+| 10 | Angular backtest page | New route/page with summary cards, cumulative chart vs SPY, expandable month rows. | Done | |
+| 11 | Tests | Unit tests for as-of cutoff behavior, snapshot storage, and backtest chaining math. | Done | In-memory `IDbmService` doubles; no DB in tests. |
 
 ## 3. Kanban Task List
 
-- [ ] Migration for `graham_score_snapshots` (with comments, indexes).
-- [ ] As-of variant of the scoring data-points statement (acceptance cutoff).
-- [ ] Snapshot statements: bulk insert, delete-by-date, get dates, get by date.
-- [ ] Wire new statements through `IDbmService` / `DbmService` / `DbmInMemoryService`.
-- [ ] `ScoringService.ComputeAllScores(asOfDate)` overload using as-of data + prices.
-- [ ] CLI command `--compute-score-snapshots` with `--from` / `--to`.
-- [ ] `GrahamBacktestService` (backtest chaining + SPY benchmark).
-- [ ] REST endpoints: snapshot dates, point-in-time report, backtest report.
-- [ ] Angular API service methods + models.
-- [ ] Angular point-in-time page (`graham-snapshot` route).
-- [ ] Angular backtest page (`graham-backtest` route) with chart.
-- [ ] Sidebar navigation links.
-- [ ] Unit tests (as-of scoring, backtest math).
-- [ ] Run 5-year monthly backfill; verify reports end to end.
+- [x] Migration for `graham_score_snapshots` (with comments, indexes).
+- [x] As-of variant of the scoring data-points statement (acceptance cutoff).
+- [x] Snapshot statements: bulk insert, delete-by-date, get dates, get by date.
+- [x] Wire new statements through `IDbmService` / `DbmService` / `DbmInMemoryService`.
+- [x] `ScoringService.ComputeAllScores(asOfDate)` overload using as-of data + prices.
+- [x] CLI command `--compute-score-snapshots` with `--from` / `--to`.
+- [x] `GrahamBacktestService` (backtest chaining + SPY benchmark).
+- [x] REST endpoints: snapshot dates, point-in-time report, backtest report.
+- [x] Angular API service methods + models.
+- [x] Angular point-in-time page (`graham-snapshot` route).
+- [x] Angular backtest page (`graham-backtest` route) with chart.
+- [x] Sidebar navigation links.
+- [x] Unit tests (as-of scoring, backtest math).
+- [x] Run 5-year monthly backfill; verify reports end to end.
 
 ## 4. High-Level Design
 

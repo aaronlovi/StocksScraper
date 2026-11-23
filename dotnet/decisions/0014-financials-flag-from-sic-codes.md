@@ -1,7 +1,7 @@
 # 14. Financials Flag from SEC SIC Codes
 
 ## Status
-Accepted (2026-11-22)
+Accepted (2026-11-22). Amended by ADR 0015: scoring reads the SIC to pick the net cash flow basis of financials.
 
 ## Context
 The value score (15 checks) and the moat score (13 checks) treat every company alike (ADR 0013). For banks, insurers and other financials several inputs mean something different: deposits are financing flows that the net cash flow counts as cash generated (open item E5), debt and book value are the business itself, and capex is usually untagged. Two scoring changes, E5 (financing-total net cash flow) and E6 (Σ ÷ Σ ROE with average equity), were measured with financials mixed in and deferred until financials could be seen separately. On the 2026-11-22 data, 108 of the 259 companies at value 13+ and 14 of the 32 at 15/15 are financials.

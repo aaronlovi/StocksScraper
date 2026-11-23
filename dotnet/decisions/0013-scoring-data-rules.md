@@ -92,7 +92,7 @@ Owner earnings = net income + total D&A + deferred tax + other non-cash − cape
 - One shared per-year function serves both scores.
 
 ### Dividends in returns
-Net cash flow starts from the change in cash, so it is already after dividends paid; owner earnings are before dividends.
+Net cash flow starts from the change in cash, so it is already after dividends paid; owner earnings are before dividends. For financials (SIC 6000–6499) NCF uses the financing-activities total instead of the chains (ADR 0015).
 - Est. return (CF) = (avg NCF + dividends) ÷ market cap.
 - Est. return (OE) = avg OE ÷ market cap, on both scores.
 - Max buy price = min(3 × book, 20 × (avg NCF + dividends), 20 × avg OE) ÷ shares.
@@ -139,4 +139,4 @@ Footprints are value / moat scores changed, measured against the baseline in a s
 - **E10: drop non-USD monetary facts** (not measured): also ends the random pick, but a company that reports only in a foreign currency would lose every monetary value.
 - **E10: keep the plan-dependent pick** (status quo): scores could move whenever the concept list or the query plan changed.
 - **E11: keep all years in the window** (status quo, the tsx P8 defect): counts the oldest year's dividends and issuance twice; tsx measured 29 of 654 scores moving.
-- **E5** (financing-total NCF): measured separately (plan section 4.6) and deferred until it can be measured per segment with the SIC/financials flag (ADR 0014).
+- **E5** (financing-total NCF): measured per segment after the SIC/financials flag (ADR 0014) and adopted for financials only (ADR 0015).

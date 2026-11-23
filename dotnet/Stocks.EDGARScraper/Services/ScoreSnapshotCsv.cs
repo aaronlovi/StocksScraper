@@ -9,8 +9,9 @@ namespace EDGARScraper.Services;
 /// <summary>
 /// Formats score details as CSV rows for the read-only <c>--snapshot-scores</c> command.
 /// One row per company: identity, score, computable checks, years of data, each check as
-/// P/F/N, then the summary's metric columns. Compare two snapshots with
-/// <c>scripts/score_snapshot_diff.py</c>.
+/// P/F/N, the summary's metric columns, then <c>sic_code</c> and <c>is_financial</c> (1/0,
+/// from the summary's SIC). Compare two snapshots with <c>scripts/score_snapshot_diff.py</c>
+/// (<c>--split financials</c> reads the trailing columns).
 /// </summary>
 internal static class ScoreSnapshotCsv {
     internal const int ValueCheckCount = 15;
@@ -39,6 +40,7 @@ internal static class ScoreSnapshotCsv {
             s.AdjustedRetainedEarnings, s.AverageNetCashFlow, s.AverageOwnerEarnings,
             s.AverageRoeCF, s.AverageRoeOE, s.EstimatedReturnCF, s.EstimatedReturnOE, s.MaxBuyPrice,
         ]);
+        AppendIndustry(sb, s.SicCode);
         return sb.ToString();
     }
 
@@ -51,6 +53,7 @@ internal static class ScoreSnapshotCsv {
             s.AverageRoeCF, s.AverageRoeOE, s.CapexRatio, s.InterestCoverage, s.DebtToEquityRatio,
             s.EstimatedReturnOE, s.AverageGrossMargin, s.AverageOperatingMargin, s.RevenueCagr,
         ]);
+        AppendIndustry(sb, s.SicCode);
         return sb.ToString();
     }
 
@@ -68,6 +71,7 @@ internal static class ScoreSnapshotCsv {
             sb.Append(",c").Append(i.ToString("00", CultureInfo.InvariantCulture));
         foreach (string column in metricColumns)
             sb.Append(',').Append(column);
+        sb.Append(",sic_code,is_financial");
         return sb.ToString();
     }
 
@@ -90,6 +94,13 @@ internal static class ScoreSnapshotCsv {
             if (byNumber.TryGetValue(i, out ScoringCheckResult result))
                 sb.Append(FormatResult(result));
         }
+    }
+
+    private static void AppendIndustry(StringBuilder sb, int? sicCode) {
+        sb.Append(',');
+        if (sicCode.HasValue)
+            sb.Append(sicCode.Value.ToString(CultureInfo.InvariantCulture));
+        sb.Append(',').Append(IndustryClassification.IsFinancial(sicCode) ? '1' : '0');
     }
 
     private static void AppendNumbers(StringBuilder sb, decimal?[] values) {

@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Compare two score snapshots written by `--snapshot-scores --out <prefix>`.
 
-Usage: score_snapshot_diff.py <a.csv> <b.csv> value|moat
+Usage: score_snapshot_diff.py <a.csv> <b.csv> value|moat [--split financials]
 
 Reports:
   - how many scores changed, with a histogram of the change;
   - entries and exits (with tickers) for value 13+, 14+, 15/15 or moat 11+, 12+, 13/13;
   - per-check flips (e.g. "c01 P>F 315");
   - companies present in only one file.
+
+With --split financials the report is repeated for financials and for non-financials,
+using the is_financial column of <b.csv> (a missing column or value counts as
+non-financial).
 
 Standard library only.
 """
@@ -35,14 +39,11 @@ def ticker_list(rows):
     return " ".join(names[:MAX_TICKERS]) + more
 
 
-def main(argv):
-    if len(argv) != 4 or argv[3] not in GROUPS:
-        print(__doc__.strip(), file=sys.stderr)
-        return 2
-    a, b = load(argv[1]), load(argv[2])
-    n, groups = GROUPS[argv[3]]
-    common = [cid for cid in a if cid in b]
+def is_financial(row):
+    return (row.get("is_financial") or "") == "1"
 
+
+def report(a, b, common, n, groups):
     deltas = Counter()
     for cid in common:
         d = int(b[cid]["score"]) - int(a[cid]["score"])
@@ -72,6 +73,30 @@ def main(argv):
         if counts:
             flips.append(f"{col} " + " ".join(f"{x}>{y} {k}" for (x, y), k in counts.most_common()))
     print("  flips: " + ("; ".join(flips) if flips else "none"))
+
+
+def main(argv):
+    split = False
+    if len(argv) == 6 and argv[4] == "--split" and argv[5] == "financials":
+        split = True
+        argv = argv[:4]
+    if len(argv) != 4 or argv[3] not in GROUPS:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    a, b = load(argv[1]), load(argv[2])
+    n, groups = GROUPS[argv[3]]
+    common = [cid for cid in a if cid in b]
+
+    if split:
+        print("== all ==")
+    report(a, b, common, n, groups)
+    if split:
+        financial = [cid for cid in common if is_financial(b[cid])]
+        other = [cid for cid in common if not is_financial(b[cid])]
+        print("== financials ==")
+        report(a, b, financial, n, groups)
+        print("== non-financials ==")
+        report(a, b, other, n, groups)
 
     only_a = [a[cid] for cid in a if cid not in b]
     only_b = [b[cid] for cid in b if cid not in a]

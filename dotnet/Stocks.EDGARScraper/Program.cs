@@ -1180,6 +1180,20 @@ internal partial class Program {
 
         CancellationToken ct = CancellationToken.None;
 
+        // SIC codes for the financials columns. Read-only; a DB without V023 (a scratch
+        // measurement) has no sic_code column, so the columns are then left empty.
+        var sicByCompany = new Dictionary<ulong, int>();
+        Result<IReadOnlyCollection<CompanySic>> sicResult = await _dbm!.GetCompanySics(ct);
+        if (sicResult.IsSuccess && sicResult.Value is not null) {
+            foreach (CompanySic sic in sicResult.Value) {
+                if (sic.SicCode.HasValue)
+                    sicByCompany[sic.CompanyId] = sic.SicCode.Value;
+            }
+        } else {
+            _logger.LogWarning("Snapshot: SIC codes unavailable ({Error}); sic_code and is_financial left empty/0",
+                sicResult.ErrorMessage);
+        }
+
         var scoringService = new Stocks.Persistence.Services.ScoringService(_dbm!, _logger);
         Result<IReadOnlyCollection<Stocks.DataModels.Scoring.CompanyScoreDetail>> valueResult =
             await scoringService.ComputeAllScoreDetails(ct);
@@ -1188,8 +1202,10 @@ internal partial class Program {
 
         string valuePath = prefix + "-value.csv";
         var valueLines = new List<string>(valueResult.Value.Count + 1) { ScoreSnapshotCsv.ValueHeader() };
-        foreach (Stocks.DataModels.Scoring.CompanyScoreDetail detail in valueResult.Value)
-            valueLines.Add(ScoreSnapshotCsv.FormatValueRow(detail));
+        foreach (Stocks.DataModels.Scoring.CompanyScoreDetail detail in valueResult.Value) {
+            int? sicCode = sicByCompany.TryGetValue(detail.Summary.CompanyId, out int code) ? code : null;
+            valueLines.Add(ScoreSnapshotCsv.FormatValueRow(detail with { Summary = detail.Summary with { SicCode = sicCode } }));
+        }
         await File.WriteAllLinesAsync(valuePath, valueLines, ct);
         _logger.LogInformation("Wrote {Count} value score rows to {Path}", valueResult.Value.Count, valuePath);
 
@@ -1201,8 +1217,10 @@ internal partial class Program {
 
         string moatPath = prefix + "-moat.csv";
         var moatLines = new List<string>(moatResult.Value.Count + 1) { ScoreSnapshotCsv.MoatHeader() };
-        foreach (Stocks.DataModels.Scoring.CompanyMoatScoreDetail detail in moatResult.Value)
-            moatLines.Add(ScoreSnapshotCsv.FormatMoatRow(detail));
+        foreach (Stocks.DataModels.Scoring.CompanyMoatScoreDetail detail in moatResult.Value) {
+            int? sicCode = sicByCompany.TryGetValue(detail.Summary.CompanyId, out int code) ? code : null;
+            moatLines.Add(ScoreSnapshotCsv.FormatMoatRow(detail with { Summary = detail.Summary with { SicCode = sicCode } }));
+        }
         await File.WriteAllLinesAsync(moatPath, moatLines, ct);
         _logger.LogInformation("Wrote {Count} moat score rows to {Path}", moatResult.Value.Count, moatPath);
 

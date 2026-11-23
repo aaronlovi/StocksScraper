@@ -18,7 +18,8 @@ public class ScoreSnapshotCsvTests {
         Assert.Equal(
             "company_id,ticker,score,computable,years,"
             + "c01,c02,c03,c04,c05,c06,c07,c08,c09,c10,c11,c12,c13,c14,c15,"
-            + "book_value,market_cap,de,pb,db,adj_re,avg_ncf,avg_oe,roe_cf,roe_oe,ret_cf,ret_oe,max_buy",
+            + "book_value,market_cap,de,pb,db,adj_re,avg_ncf,avg_oe,roe_cf,roe_oe,ret_cf,ret_oe,max_buy,"
+            + "sic_code,is_financial",
             ScoreSnapshotCsv.ValueHeader());
     }
 
@@ -27,7 +28,8 @@ public class ScoreSnapshotCsvTests {
         Assert.Equal(
             "company_id,ticker,score,computable,years,"
             + "c01,c02,c03,c04,c05,c06,c07,c08,c09,c10,c11,c12,c13,"
-            + "roe_cf,roe_oe,capex_ratio,interest_cov,de,est_ret_oe,gm,om,cagr",
+            + "roe_cf,roe_oe,capex_ratio,interest_cov,de,est_ret_oe,gm,om,cagr,"
+            + "sic_code,is_financial",
             ScoreSnapshotCsv.MoatHeader());
     }
 
@@ -45,7 +47,7 @@ public class ScoreSnapshotCsvTests {
 
         Assert.Equal(
             "36,,6,10,3,P,F,N,P,F,N,P,F,N,P,F,N,P,F,N,"
-            + "-2070069,,0,,0,-10784882,2313112.666667,8974816.333333,18.438633,63.933803,,,-0.719973",
+            + "-2070069,,0,,0,-10784882,2313112.666667,8974816.333333,18.438633,63.933803,,,-0.719973,,0",
             row);
     }
 
@@ -61,7 +63,7 @@ public class ScoreSnapshotCsvTests {
 
         Assert.Equal(
             "150,ABC,6,11,2,P,P,P,P,P,P,P,P,P,P,P,P,P,"
-            + "8570.217586,-5.174459,1.962649,-25.16948,0,,79.951081,-177.50491,32.303493",
+            + "8570.217586,-5.174459,1.962649,-25.16948,0,,79.951081,-177.50491,32.303493,,0",
             row);
     }
 
@@ -75,5 +77,19 @@ public class ScoreSnapshotCsvTests {
         string row = ScoreSnapshotCsv.FormatValueRow(new CompanyScoreDetail(summary, []));
 
         Assert.StartsWith("1,\"A,B\",0,0,1,,,", row);
+    }
+
+    [Fact]
+    public void FormatRows_WriteSicCodeAndFinancialFlag() {
+        CompanyScoreSummary bank = new CompanyScoreSummary(
+            2, "70858", null, "BAC", null, 0, 0, 1,
+            null, null, null, null, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, DateTime.UnixEpoch) with { SicCode = 6021 };
+        CompanyMoatScoreSummary apple = new CompanyMoatScoreSummary(
+            1, "320193", null, "AAPL", null, 0, 0, 1,
+            null, null, null, null, null, null, null, null, null, null, null, null, DateTime.UnixEpoch) with { SicCode = 3571 };
+
+        Assert.EndsWith(",6021,1", ScoreSnapshotCsv.FormatValueRow(new CompanyScoreDetail(bank, [])));
+        Assert.EndsWith(",3571,0", ScoreSnapshotCsv.FormatMoatRow(new CompanyMoatScoreDetail(apple, [])));
     }
 }

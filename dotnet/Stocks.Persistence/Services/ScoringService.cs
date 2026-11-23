@@ -61,12 +61,33 @@ public class ScoringService {
         "ProceedsFromIssuanceOfSeniorLongTermDebt",
         "ProceedsFromIssuanceOfDebt",
         "ProceedsFromConvertibleDebt",
+        "ProceedsFromIssuanceOfSecuredDebt",
+        "ProceedsFromIssuanceOfUnsecuredDebt",
+        "ProceedsFromIssuanceOfSubordinatedLongTermDebt",
+        "ProceedsFromIssuanceOfMediumTermNotes",
+        "ProceedsFromIssuanceOfFirstMortgageBond",
+        "ProceedsFromIssuanceOfOtherLongTermDebt",
+        "ProceedsFromLongTermLinesOfCredit",
+        "ProceedsFromRelatedPartyDebt",
         // Cash flow — debt repayments (90 exclusive for Notes, 53 for Senior)
         "RepaymentsOfLongTermDebt",
         "RepaymentsOfDebt",
         "RepaymentsOfConvertibleDebt",
         "RepaymentsOfNotesPayable",
         "RepaymentsOfSeniorDebt",
+        "RepaymentsOfSecuredDebt",
+        "RepaymentsOfUnsecuredDebt",
+        "RepaymentsOfSubordinatedDebt",
+        "RepaymentsOfMediumTermNotes",
+        "RepaymentsOfFirstMortgageBond",
+        "RepaymentsOfOtherLongTermDebt",
+        "RepaymentsOfLongTermLinesOfCredit",
+        "RepaymentsOfRelatedPartyDebt",
+        // Cash flow — long-term debt reported net only
+        "ProceedsFromRepaymentsOfRelatedPartyDebt",
+        "ProceedsFromRepaymentsOfSecuredDebt",
+        "ProceedsFromRepaymentsOfNotesPayable",
+        "ProceedsFromRepaymentsOfOtherLongTermDebt",
         // Cash flow — dividends (24 exclusive for CommonStockCash)
         "PaymentsOfDividends",
         "PaymentsOfDividendsCommonStock",
@@ -75,6 +96,16 @@ public class ScoringService {
         // Cash flow — stock issuance/repurchase (540 exclusive for Options, 41 for Equity)
         "ProceedsFromIssuanceOfCommonStock",
         "ProceedsFromStockOptionsExercised",
+        "ProceedsFromIssuanceOrSaleOfEquity",
+        "ProceedsFromIssuanceInitialPublicOffering",
+        "ProceedsFromIssuanceOfPrivatePlacement",
+        "ProceedsFromIssuanceOfWarrants",
+        "ProceedsFromWarrantExercises",
+        "ProceedsFromStockPlans",
+        "ProceedsFromIssuanceOfCommonLimitedPartnersUnits",
+        "ProceedsFromContributedCapital",
+        "ProceedsFromIssuanceOfConvertiblePreferredStock",
+        "ProceedsFromIssuanceOfSharesUnderIncentiveAndShareBasedCompensationPlansIncludingStockOptions",
         "PaymentsForRepurchaseOfCommonStock",
         "PaymentsForRepurchaseOfEquity",
         // Cash flow — financing-activities total (net cash flow of financials, E5)
@@ -86,6 +117,13 @@ public class ScoringService {
         "ProceedsFromLinesOfCredit",
         "RepaymentsOfLinesOfCredit",
         "ProceedsFromRepaymentsOfCommercialPaper",
+        "ProceedsFromShortTermDebt",
+        "ProceedsFromNotesPayable",
+        "ProceedsFromBankDebt",
+        "ProceedsFromOtherShortTermDebt",
+        "RepaymentsOfShortTermDebt",
+        "RepaymentsOfBankDebt",
+        "RepaymentsOfOtherShortTermDebt",
         // Cash flow — preferred stock
         "ProceedsFromIssuanceOfPreferredStockAndPreferenceStock",
         "PaymentsForRepurchaseOfPreferredStockAndPreferenceStock",
@@ -185,6 +223,64 @@ public class ScoringService {
     ];
     internal static readonly string[] StockRepurchaseChain = [
         "PaymentsForRepurchaseOfCommonStock", "PaymentsForRepurchaseOfEquity"
+    ];
+    // Debt and share lines for net cash flow (E12), by parent in the us-gaap cash-flow
+    // calculation tree. These are siblings to sum, not fallback chains.
+    internal static readonly string[] LongTermDebtProceedsLines = [
+        "ProceedsFromIssuanceOfSeniorLongTermDebt",
+        "ProceedsFromConvertibleDebt",
+        "ProceedsFromIssuanceOfSecuredDebt",
+        "ProceedsFromIssuanceOfUnsecuredDebt",
+        "ProceedsFromIssuanceOfSubordinatedLongTermDebt",
+        "ProceedsFromIssuanceOfMediumTermNotes",
+        "ProceedsFromIssuanceOfFirstMortgageBond",
+        "ProceedsFromIssuanceOfOtherLongTermDebt",
+        "ProceedsFromLongTermLinesOfCredit",
+        "ProceedsFromRelatedPartyDebt",
+    ];
+    internal static readonly string[] LongTermDebtRepaymentLines = [
+        "RepaymentsOfConvertibleDebt",
+        "RepaymentsOfSeniorDebt",
+        "RepaymentsOfSecuredDebt",
+        "RepaymentsOfUnsecuredDebt",
+        "RepaymentsOfSubordinatedDebt",
+        "RepaymentsOfMediumTermNotes",
+        "RepaymentsOfFirstMortgageBond",
+        "RepaymentsOfOtherLongTermDebt",
+        "RepaymentsOfLongTermLinesOfCredit",
+        "RepaymentsOfRelatedPartyDebt",
+    ];
+    internal static readonly string[] ShortTermDebtProceedsLines = [
+        "ProceedsFromNotesPayable",
+        "ProceedsFromBankDebt",
+        "ProceedsFromLinesOfCredit",
+        "ProceedsFromOtherShortTermDebt",
+    ];
+    internal static readonly string[] ShortTermDebtRepaymentLines = [
+        "RepaymentsOfNotesPayable",
+        "RepaymentsOfBankDebt",
+        "RepaymentsOfLinesOfCredit",
+        "RepaymentsOfOtherShortTermDebt",
+    ];
+    // Share issuance other than employee plans and preferred stock
+    internal static readonly string[] ShareIssuanceLines = [
+        "ProceedsFromIssuanceOfCommonStock",
+        "ProceedsFromIssuanceInitialPublicOffering",
+        "ProceedsFromIssuanceOfPrivatePlacement",
+        "ProceedsFromIssuanceOfWarrants",
+        "ProceedsFromWarrantExercises",
+        "ProceedsFromStockPlans",
+        "ProceedsFromIssuanceOfCommonLimitedPartnersUnits",
+        "ProceedsFromContributedCapital",
+        "ProceedsFromIssuanceOfConvertiblePreferredStock",
+    ];
+    private sealed record NetDebtLine(string Net, string Proceeds, string Repayments);
+    // Net tags that some filers use alone; ignored when either gross side is present.
+    private static readonly NetDebtLine[] NetOnlyDebtLines = [
+        new("ProceedsFromRepaymentsOfRelatedPartyDebt", "ProceedsFromRelatedPartyDebt", "RepaymentsOfRelatedPartyDebt"),
+        new("ProceedsFromRepaymentsOfSecuredDebt", "ProceedsFromIssuanceOfSecuredDebt", "RepaymentsOfSecuredDebt"),
+        new("ProceedsFromRepaymentsOfNotesPayable", "ProceedsFromNotesPayable", "RepaymentsOfNotesPayable"),
+        new("ProceedsFromRepaymentsOfOtherLongTermDebt", "ProceedsFromIssuanceOfOtherLongTermDebt", "RepaymentsOfOtherLongTermDebt"),
     ];
     internal static readonly string[] PreferredProceedsChain = ["ProceedsFromIssuanceOfPreferredStockAndPreferenceStock"];
     internal static readonly string[] PreferredRepurchaseChain = ["PaymentsForRepurchaseOfPreferredStockAndPreferenceStock"];
@@ -1032,7 +1128,7 @@ public class ScoringService {
         }
 
         decimal netDebtIssuance = ResolveDebtProceeds(yearData) - ResolveDebtRepayments(yearData)
-            + ResolveNetShortTermDebt(yearData);
+            + ResolveNetOnlyDebt(yearData) + ResolveNetShortTermDebt(yearData);
 
         decimal stockProceeds = ResolveStockProceeds(yearData);
         decimal stockRepurchase = ResolveField(yearData, StockRepurchaseChain, 0m)!.Value;
@@ -1049,68 +1145,89 @@ public class ScoringService {
     private const decimal ParentCoverTolerance = 0.001m;
 
     /// <summary>
-    /// Debt proceeds nested per the taxonomy: senior and convertible under long-term, long-term
-    /// under the all-debt total. A parent that is at least the sum of its present children
-    /// (within 0.1%) contains them; a smaller parent is a separate line and both count.
+    /// Long-term debt proceeds nested per the taxonomy: the instrument lines under long-term,
+    /// long-term under the all-debt total. A parent that is at least the sum of its present
+    /// children (within 0.1%) contains them; a smaller parent is a separate line and both count.
     /// </summary>
-    internal static decimal ResolveDebtProceeds(IReadOnlyDictionary<string, decimal> yearData) {
-        decimal? children = SumDistinct(
-            ValueOrNull(yearData, "ProceedsFromIssuanceOfSeniorLongTermDebt"),
-            ValueOrNull(yearData, "ProceedsFromConvertibleDebt"));
-        decimal? longTerm = NestParent(ValueOrNull(yearData, "ProceedsFromIssuanceOfLongTermDebt"), children);
-        return NestParent(ValueOrNull(yearData, "ProceedsFromIssuanceOfDebt"), longTerm) ?? 0m;
+    internal static decimal ResolveDebtProceeds(IReadOnlyDictionary<string, decimal> yearData) =>
+        ResolveNestedDebt(yearData, "ProceedsFromIssuanceOfDebt", "ProceedsFromIssuanceOfLongTermDebt",
+            LongTermDebtProceedsLines);
+
+    /// <summary>Long-term debt repayments, the same shape as proceeds.</summary>
+    internal static decimal ResolveDebtRepayments(IReadOnlyDictionary<string, decimal> yearData) =>
+        ResolveNestedDebt(yearData, "RepaymentsOfDebt", "RepaymentsOfLongTermDebt", LongTermDebtRepaymentLines);
+
+    private static decimal ResolveNestedDebt(IReadOnlyDictionary<string, decimal> yearData,
+        string allDebt, string longTermDebt, string[] lines) {
+        decimal? longTerm = NestParent(ValueOrNull(yearData, longTermDebt), SumDistinctLines(yearData, lines));
+        return NestParent(ValueOrNull(yearData, allDebt), longTerm) ?? 0m;
     }
 
-    /// <summary>
-    /// Debt repayments, the same shape as proceeds: convertible and senior under long-term,
-    /// long-term under the all-debt total. Notes payable repayments are short-term, added
-    /// unless the net short-term figure (their parent) is present.
-    /// </summary>
-    internal static decimal ResolveDebtRepayments(IReadOnlyDictionary<string, decimal> yearData) {
-        decimal? children = SumDistinct(
-            ValueOrNull(yearData, "RepaymentsOfConvertibleDebt"),
-            ValueOrNull(yearData, "RepaymentsOfSeniorDebt"));
-        decimal? longTerm = NestParent(ValueOrNull(yearData, "RepaymentsOfLongTermDebt"), children);
-        decimal total = NestParent(ValueOrNull(yearData, "RepaymentsOfDebt"), longTerm) ?? 0m;
-
-        if (!yearData.ContainsKey("ProceedsFromRepaymentsOfShortTermDebt")
-            && yearData.TryGetValue("RepaymentsOfNotesPayable", out decimal notes))
-            total += notes;
+    /// <summary>Net debt lines reported without either gross side.</summary>
+    internal static decimal ResolveNetOnlyDebt(IReadOnlyDictionary<string, decimal> yearData) {
+        decimal total = 0m;
+        foreach (NetDebtLine line in NetOnlyDebtLines) {
+            if (yearData.ContainsKey(line.Proceeds) || yearData.ContainsKey(line.Repayments))
+                continue;
+            total += ValueOrNull(yearData, line.Net) ?? 0m;
+        }
         return total;
     }
 
     /// <summary>
-    /// Net short-term borrowing: the net short-term debt figure if present; else lines of
-    /// credit (net, or proceeds - repayments); plus net commercial paper.
+    /// Net short-term borrowing: the net short-term debt figure if present; else the short-term
+    /// lines, gross (proceeds and repayments each nested under their total), with net lines of
+    /// credit only when neither gross lines-of-credit tag is present. Plus net commercial paper.
     /// </summary>
     internal static decimal ResolveNetShortTermDebt(IReadOnlyDictionary<string, decimal> yearData) {
-        decimal net;
-        if (yearData.TryGetValue("ProceedsFromRepaymentsOfShortTermDebt", out decimal shortTerm)) {
-            net = shortTerm;
-        } else if (yearData.TryGetValue("ProceedsFromRepaymentsOfLinesOfCredit", out decimal linesNet)) {
-            net = linesNet;
-        } else {
-            decimal linesProceeds = ValueOrNull(yearData, "ProceedsFromLinesOfCredit") ?? 0m;
-            decimal linesRepayments = ValueOrNull(yearData, "RepaymentsOfLinesOfCredit") ?? 0m;
-            net = linesProceeds - linesRepayments;
-        }
+        decimal commercialPaper = ValueOrNull(yearData, "ProceedsFromRepaymentsOfCommercialPaper") ?? 0m;
+        if (yearData.TryGetValue("ProceedsFromRepaymentsOfShortTermDebt", out decimal netShortTerm))
+            return netShortTerm + commercialPaper;
 
-        if (yearData.TryGetValue("ProceedsFromRepaymentsOfCommercialPaper", out decimal commercialPaper))
-            net += commercialPaper;
-        return net;
+        decimal proceeds = NestParent(ValueOrNull(yearData, "ProceedsFromShortTermDebt"),
+            SumDistinctLines(yearData, ShortTermDebtProceedsLines)) ?? 0m;
+        decimal repayments = NestParent(ValueOrNull(yearData, "RepaymentsOfShortTermDebt"),
+            SumDistinctLines(yearData, ShortTermDebtRepaymentLines)) ?? 0m;
+
+        decimal netLines = 0m;
+        if (!yearData.ContainsKey("ProceedsFromLinesOfCredit") && !yearData.ContainsKey("RepaymentsOfLinesOfCredit"))
+            netLines = ValueOrNull(yearData, "ProceedsFromRepaymentsOfLinesOfCredit") ?? 0m;
+
+        return proceeds - repayments + netLines + commercialPaper;
     }
 
     /// <summary>
-    /// Stock proceeds: common stock issuance and option exercises are siblings, so both count
-    /// (equal values are one line tagged twice and count once).
+    /// Stock proceeds: the share issuance lines plus the employee-plan total (which contains
+    /// option exercises), under the all-equity total. Preferred stock is part of that total,
+    /// so it counts for the nesting test, but it is taken out again: it has its own chain.
     /// </summary>
-    internal static decimal ResolveStockProceeds(IReadOnlyDictionary<string, decimal> yearData) =>
-        SumDistinct(
-            ValueOrNull(yearData, "ProceedsFromIssuanceOfCommonStock"),
-            ValueOrNull(yearData, "ProceedsFromStockOptionsExercised")) ?? 0m;
+    internal static decimal ResolveStockProceeds(IReadOnlyDictionary<string, decimal> yearData) {
+        decimal? plans = NestParent(
+            ValueOrNull(yearData, "ProceedsFromIssuanceOfSharesUnderIncentiveAndShareBasedCompensationPlansIncludingStockOptions"),
+            ValueOrNull(yearData, "ProceedsFromStockOptionsExercised"));
+        decimal? lines = SumDistinct(SumDistinctLines(yearData, ShareIssuanceLines), plans);
+
+        decimal? preferred = ResolveField(yearData, PreferredProceedsChain, null);
+        decimal? linesWithPreferred = preferred.HasValue ? (lines ?? 0m) + preferred.Value : lines;
+        decimal? total = NestParent(ValueOrNull(yearData, "ProceedsFromIssuanceOrSaleOfEquity"), linesWithPreferred);
+        return (total ?? 0m) - (preferred ?? 0m);
+    }
 
     private static decimal? ValueOrNull(IReadOnlyDictionary<string, decimal> yearData, string concept) =>
         yearData.TryGetValue(concept, out decimal value) ? value : null;
+
+    // Sum of the sibling lines present (null when none is); equal values are one line tagged
+    // more than once and count once.
+    private static decimal? SumDistinctLines(IReadOnlyDictionary<string, decimal> yearData, string[] lines) {
+        decimal? sum = null;
+        var seen = new HashSet<decimal>();
+        foreach (string line in lines) {
+            if (!yearData.TryGetValue(line, out decimal value) || !seen.Add(value))
+                continue;
+            sum = (sum ?? 0m) + value;
+        }
+        return sum;
+    }
 
     // Sum of two sibling lines; equal values are a duplicate tag and count once.
     private static decimal? SumDistinct(decimal? first, decimal? second) {

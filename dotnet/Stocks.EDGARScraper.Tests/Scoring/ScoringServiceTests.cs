@@ -2302,13 +2302,13 @@ public class ScoringServiceTests {
     }
 
     [Fact]
-    public void FinancingChains_LinesOfCredit_NetPreferredOverGross() {
+    public void FinancingChains_LinesOfCredit_GrossPreferredOverNet() {
         var data = new Dictionary<string, decimal> {
             ["ProceedsFromRepaymentsOfLinesOfCredit"] = 20m,
             ["ProceedsFromLinesOfCredit"] = 300m,
             ["RepaymentsOfLinesOfCredit"] = 100m,
         };
-        Assert.Equal(980m, YearNcf(data));
+        Assert.Equal(800m, YearNcf(data));
     }
 
     [Fact]

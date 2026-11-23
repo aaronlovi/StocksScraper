@@ -22,6 +22,14 @@
     </select>
   </label>
   <label>
+    Financials
+    <select [(ngModel)]="financials" (ngModelChange)="onFilterChange()">
+      <option [ngValue]="null">All</option>
+      <option value="only">Only financials</option>
+      <option value="exclude">Exclude financials</option>
+    </select>
+  </label>
+  <label>
     Page Size
     <select [(ngModel)]="pageSize" (ngModelChange)="onFilterChange()">
       <option [ngValue]="25">25</option>
@@ -83,6 +91,9 @@
           </td>
           <td>
             <a [routerLink]="['/company', row.cik, 'scoring']" target="_blank">{{ row.companyName ?? ('CIK ' + row.cik) }}</a>
+            @if (row.isFinancial) {
+              <span class="badge-financial" [title]="'SIC ' + row.sicCode + ' ' + (row.sicDescription ?? '')">Financial</span>
+            }
           </td>
           <td>{{ row.ticker ?? '' }}</td>
           <td>{{ row.exchange ?? '' }}</td>

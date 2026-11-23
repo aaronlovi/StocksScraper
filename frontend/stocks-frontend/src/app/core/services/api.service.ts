@@ -124,7 +124,13 @@ export interface CompanyScoreSummary {
   maxBuyPrice: number | null;
   percentageUpside: number | null;
   computedAt: string;
+  /** SEC SIC code and description; isFinancial = SIC 6000-6499 (set by the API). */
+  sicCode?: number | null;
+  sicDescription?: string | null;
+  isFinancial?: boolean;
 }
+
+export type FinancialsFilter = 'only' | 'exclude' | null;
 
 export interface ScoresReportParams {
   page: number;
@@ -133,6 +139,7 @@ export interface ScoresReportParams {
   sortDir: string;
   minScore: number | null;
   exchange: string | null;
+  financials?: FinancialsFilter;
 }
 
 export interface ArRevenueRow {
@@ -221,6 +228,10 @@ export interface CompanyMoatScoreSummary {
   priceDate: string | null;
   sharesOutstanding: number | null;
   computedAt: string;
+  /** SEC SIC code and description; isFinancial = SIC 6000-6499 (set by the API). */
+  sicCode?: number | null;
+  sicDescription?: string | null;
+  isFinancial?: boolean;
 }
 
 export interface CompanyScoreReturnSummary {
@@ -392,6 +403,7 @@ export class ApiService {
     ];
     if (params.minScore != null) parts.push(`minScore=${params.minScore}`);
     if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
+    if (params.financials != null) parts.push(`financials=${params.financials}`);
     return this.http.get<PaginatedResponse<CompanyScoreSummary>>(
       `/api/reports/scores?${parts.join('&')}`
     );
@@ -410,6 +422,7 @@ export class ApiService {
     ];
     if (params.minScore != null) parts.push(`minScore=${params.minScore}`);
     if (params.exchange != null) parts.push(`exchange=${encodeURIComponent(params.exchange)}`);
+    if (params.financials != null) parts.push(`financials=${params.financials}`);
     return this.http.get<PaginatedResponse<CompanyMoatScoreSummary>>(
       `/api/reports/moat-scores?${parts.join('&')}`
     );

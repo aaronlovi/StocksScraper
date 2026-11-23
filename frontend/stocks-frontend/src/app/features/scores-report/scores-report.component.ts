@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
   ApiService,
+  FinancialsFilter,
   CompanyScoreSummary,
   PaginationResponse
 } from '../../core/services/api.service';
@@ -31,6 +32,7 @@ export class ScoresReportComponent implements OnInit {
   sort = new SortState('overallScore');
   minScore: number | null = null;
   exchange: string | null = null;
+  financials: FinancialsFilter = null;
 
   items = signal<CompanyScoreSummary[]>([]);
   pagination = signal<PaginationResponse | null>(null);
@@ -76,7 +78,8 @@ export class ScoresReportComponent implements OnInit {
       sortBy: this.sort.sortBy,
       sortDir: this.sort.sortDir,
       minScore: this.minScore,
-      exchange: this.exchange
+      exchange: this.exchange,
+      financials: this.financials
     }).subscribe({
       next: data => {
         this.items.set(data.items);

@@ -23,4 +23,9 @@ public record CompanyMoatScoreSummary(
     decimal? PricePerShare,
     DateOnly? PriceDate,
     long? SharesOutstanding,
-    DateTime ComputedAt);
+    DateTime ComputedAt,
+    int? SicCode = null,
+    string? SicDescription = null) {
+    /// <summary>SIC 6000-6499 (<see cref="IndustryClassification"/>). Report reads fill the SIC; scoring does not.</summary>
+    public bool IsFinancial => IndustryClassification.IsFinancial(SicCode);
+}

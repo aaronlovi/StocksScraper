@@ -16,7 +16,7 @@ public static class MoatReportEndpoints {
         _ = app.MapGet("/api/reports/moat-scores",
             async (uint? page, uint? pageSize,
                    string? sortBy, string? sortDir,
-                   int? minScore, int? maxScore, string? exchange,
+                   int? minScore, int? maxScore, string? exchange, string? financials,
                    IDbmService dbm, CancellationToken ct) => {
 
                 uint pageNum = page ?? 1;
@@ -30,8 +30,10 @@ public static class MoatReportEndpoints {
                 SortDirection direction = ParseSortDirection(sortDir);
 
                 ScoresFilter? filter = null;
-                if (minScore.HasValue || maxScore.HasValue || !string.IsNullOrWhiteSpace(exchange))
-                    filter = new ScoresFilter(minScore, maxScore, exchange);
+                FinancialsFilter financialsFilter = FinancialsFilters.Parse(financials);
+                if (minScore.HasValue || maxScore.HasValue || !string.IsNullOrWhiteSpace(exchange)
+                    || financialsFilter != FinancialsFilter.All)
+                    filter = new ScoresFilter(minScore, maxScore, exchange, financialsFilter);
 
                 var pagination = new PaginationRequest(pageNum, size);
 

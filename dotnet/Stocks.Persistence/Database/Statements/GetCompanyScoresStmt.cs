@@ -42,6 +42,8 @@ internal sealed class GetCompanyScoresStmt : QueryDbStmtBase {
     private int _percentageUpsideIndex = -1;
     private int _computedAtIndex = -1;
     private int _checkResultsIndex = -1;
+    private int _sicCodeIndex = -1;
+    private int _sicDescriptionIndex = -1;
     private int _totalCountIndex = -1;
 
     public GetCompanyScoresStmt(PaginationRequest pagination, ScoresSortBy sortBy,
@@ -84,6 +86,9 @@ internal sealed class GetCompanyScoresStmt : QueryDbStmtBase {
                 whereClauses.Add("overall_score <= @max_score");
             if (!string.IsNullOrWhiteSpace(filter.Exchange))
                 whereClauses.Add("exchange = @exchange");
+            string? financials = FinancialsFilterSql.Predicate(filter.Financials);
+            if (financials is not null)
+                whereClauses.Add(financials);
         }
 
         string whereClause = whereClauses.Count > 0
@@ -91,7 +96,7 @@ internal sealed class GetCompanyScoresStmt : QueryDbStmtBase {
             : string.Empty;
 
         return $@"
-SELECT company_id, cik, company_name, ticker, exchange,
+SELECT s.company_id, s.cik, company_name, ticker, exchange,
     overall_score, computable_checks, years_of_data,
     book_value, market_cap, debt_to_equity_ratio,
     price_to_book_ratio, debt_to_book_ratio,
@@ -100,10 +105,12 @@ SELECT company_id, cik, company_name, ticker, exchange,
     estimated_return_cf, estimated_return_oe,
     price_per_share, price_date, shares_outstanding,
     current_dividends_paid, max_buy_price, percentage_upside, computed_at, check_results,
+    c.sic_code, c.sic_description,
     COUNT(*) OVER() AS total_count
-FROM company_scores
+FROM company_scores s
+{FinancialsFilterSql.CompaniesJoin}
 {whereClause}
-ORDER BY {orderColumn} {direction} {nullsPosition}, company_id ASC
+ORDER BY {orderColumn} {direction} {nullsPosition}, s.company_id ASC
 LIMIT @limit OFFSET @offset";
     }
 
@@ -137,6 +144,8 @@ LIMIT @limit OFFSET @offset";
         _percentageUpsideIndex = reader.GetOrdinal("percentage_upside");
         _computedAtIndex = reader.GetOrdinal("computed_at");
         _checkResultsIndex = reader.GetOrdinal("check_results");
+        _sicCodeIndex = reader.GetOrdinal("sic_code");
+        _sicDescriptionIndex = reader.GetOrdinal("sic_description");
         _totalCountIndex = reader.GetOrdinal("total_count");
     }
 
@@ -158,6 +167,7 @@ LIMIT @limit OFFSET @offset";
                 parameters.Add(new NpgsqlParameter<int>("max_score", _filter.MaxScore.Value) { NpgsqlDbType = NpgsqlDbType.Integer });
             if (!string.IsNullOrWhiteSpace(_filter.Exchange))
                 parameters.Add(new NpgsqlParameter<string>("exchange", _filter.Exchange));
+            FinancialsFilterSql.AddParameters(parameters, _filter.Financials);
         }
 
         return parameters;
@@ -198,7 +208,9 @@ LIMIT @limit OFFSET @offset";
             reader.IsDBNull(_maxBuyPriceIndex) ? null : reader.GetDecimal(_maxBuyPriceIndex),
             reader.IsDBNull(_percentageUpsideIndex) ? null : reader.GetDecimal(_percentageUpsideIndex),
             reader.GetDateTime(_computedAtIndex),
-            reader.IsDBNull(_checkResultsIndex) ? null : reader.GetString(_checkResultsIndex));
+            reader.IsDBNull(_checkResultsIndex) ? null : reader.GetString(_checkResultsIndex),
+            reader.IsDBNull(_sicCodeIndex) ? null : reader.GetInt32(_sicCodeIndex),
+            reader.IsDBNull(_sicDescriptionIndex) ? null : reader.GetString(_sicDescriptionIndex));
         _results.Add(result);
         return true;
     }

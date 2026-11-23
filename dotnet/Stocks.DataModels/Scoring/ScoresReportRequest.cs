@@ -19,4 +19,9 @@ public enum SortDirection {
     Descending
 }
 
-public record ScoresFilter(int? MinScore, int? MaxScore, string? Exchange);
+/// <summary>
+/// Score report filter. <see cref="Financials"/> applies to the value and moat score reports
+/// (and the backtest); the Graham snapshot report ignores it.
+/// </summary>
+public record ScoresFilter(int? MinScore, int? MaxScore, string? Exchange,
+    FinancialsFilter Financials = FinancialsFilter.All);

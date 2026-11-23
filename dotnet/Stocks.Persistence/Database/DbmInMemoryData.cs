@@ -74,6 +74,9 @@ public sealed class DbmInMemoryData {
         }
     }
 
+    private CompanySic? GetCompanySicNoLock(ulong companyId) =>
+        _companySics.TryGetValue(companyId, out CompanySic? sic) ? sic : null;
+
     public IReadOnlyCollection<CompanySic> GetCompanySics() {
         var results = new List<CompanySic>();
         lock (_mutex) {
@@ -764,8 +767,12 @@ public sealed class DbmInMemoryData {
         lock (_mutex) {
             // Filter
             var filtered = new List<CompanyScoreSummary>();
-            foreach (CompanyScoreSummary s in _companyScores) {
+            foreach (CompanyScoreSummary stored in _companyScores) {
+                CompanySic? sic = GetCompanySicNoLock(stored.CompanyId);
+                CompanyScoreSummary s = stored with { SicCode = sic?.SicCode, SicDescription = sic?.SicDescription };
                 if (filter is not null) {
+                    if (!filter.Financials.Matches(s.SicCode))
+                        continue;
                     if (filter.MinScore.HasValue && s.OverallScore < filter.MinScore.Value)
                         continue;
                     if (filter.MaxScore.HasValue && s.OverallScore > filter.MaxScore.Value)
@@ -937,8 +944,12 @@ public sealed class DbmInMemoryData {
         ScoresFilter? filter) {
         lock (_mutex) {
             var filtered = new List<CompanyMoatScoreSummary>();
-            foreach (CompanyMoatScoreSummary s in _companyMoatScores) {
+            foreach (CompanyMoatScoreSummary stored in _companyMoatScores) {
+                CompanySic? sic = GetCompanySicNoLock(stored.CompanyId);
+                CompanyMoatScoreSummary s = stored with { SicCode = sic?.SicCode, SicDescription = sic?.SicDescription };
                 if (filter is not null) {
+                    if (!filter.Financials.Matches(s.SicCode))
+                        continue;
                     if (filter.MinScore.HasValue && s.OverallScore < filter.MinScore.Value)
                         continue;
                     if (filter.MaxScore.HasValue && s.OverallScore > filter.MaxScore.Value)

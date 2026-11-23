@@ -35,4 +35,9 @@ public record CompanyScoreSummary(
     decimal? MaxBuyPrice,
     decimal? PercentageUpside,
     DateTime ComputedAt,
-    string? CheckResults = null);
+    string? CheckResults = null,
+    int? SicCode = null,
+    string? SicDescription = null) {
+    /// <summary>SIC 6000-6499 (<see cref="IndustryClassification"/>). Report reads fill the SIC; scoring does not.</summary>
+    public bool IsFinancial => IndustryClassification.IsFinancial(SicCode);
+}

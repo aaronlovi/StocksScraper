@@ -2734,4 +2734,67 @@ public class ScoringServiceTests {
     }
 
     #endregion
+
+    #region Financing-total net cash flow for financials (E5) tests
+
+    private static Dictionary<string, decimal> DepositYear() => new() {
+        // Cash up 100: deposits +100 inside the financing total, dividends -10.
+        ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 100m,
+        ["NetCashProvidedByUsedInFinancingActivities"] = 90m,
+        ["PaymentsOfDividends"] = 10m,
+    };
+
+    [Fact]
+    public void E5_FinancingTotalBasis_RemovesDepositInflow() {
+        // 100 - (90 + 10) = 0; the chains see no debt or stock and keep all 100.
+        Assert.Equal(0m, ScoringService.ComputeYearNetCashFlow(DepositYear(), 100m, NetCashFlowBasis.FinancingTotal));
+        Assert.Equal(100m, ScoringService.ComputeYearNetCashFlow(DepositYear(), 100m, NetCashFlowBasis.Chains));
+    }
+
+    [Fact]
+    public void E5_FinancingTotalBasis_FallsBackToChainsWithoutTotal() {
+        var data = new Dictionary<string, decimal> {
+            ["CashAndCashEquivalentsPeriodIncreaseDecrease"] = 100m,
+            ["ProceedsFromIssuanceOfLongTermDebt"] = 30m,
+        };
+        Assert.Equal(70m, ScoringService.ComputeYearNetCashFlow(data, 100m, NetCashFlowBasis.FinancingTotal));
+    }
+
+    [Fact]
+    public void E5_FinancingTotalBasis_UsesContinuingOperationsTotalAsFallback() {
+        var data = new Dictionary<string, decimal> {
+            ["NetCashProvidedByUsedInFinancingActivitiesContinuingOperations"] = 40m,
+        };
+        Assert.Equal(60m, ScoringService.ComputeYearNetCashFlow(data, 100m, NetCashFlowBasis.FinancingTotal));
+    }
+
+    [Fact]
+    public void E5_RoeCfNumerator_FollowsBasis() {
+        // NCF + dividends: financing total 0 + 10; chains 100 + 10.
+        Assert.Equal(10m, ScoringService.ComputeYearRoeCfNumerator(DepositYear(), NetCashFlowBasis.FinancingTotal));
+        Assert.Equal(110m, ScoringService.ComputeYearRoeCfNumerator(DepositYear(), NetCashFlowBasis.Chains));
+    }
+
+    [Fact]
+    public void E5_DerivedMetrics_FinancingTotalBasis_ChangesNcfAndRoeCf() {
+        var data = DepositYear();
+        data["StockholdersEquity"] = 100m;
+        DerivedMetrics metrics = ScoringService.ComputeDerivedMetrics(
+            MakeSingleYearData(2024, data), data, null, null, null, null, NetCashFlowBasis.FinancingTotal);
+
+        Assert.Equal(0m, metrics.AverageNetCashFlow);
+        Assert.Equal(10m, metrics.AverageRoeCF);
+    }
+
+    [Theory]
+    [InlineData(5999, NetCashFlowBasis.Chains)]
+    [InlineData(6000, NetCashFlowBasis.FinancingTotal)]
+    [InlineData(6499, NetCashFlowBasis.FinancingTotal)]
+    [InlineData(6500, NetCashFlowBasis.Chains)]
+    [InlineData(null, NetCashFlowBasis.Chains)]
+    public void E5_NetCashFlowBasisFor_FinancialRange(int? sicCode, NetCashFlowBasis expected) {
+        Assert.Equal(expected, IndustryClassification.NetCashFlowBasisFor(sicCode));
+    }
+
+    #endregion
 }

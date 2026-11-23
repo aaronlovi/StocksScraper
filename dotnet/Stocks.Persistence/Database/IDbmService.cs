@@ -45,6 +45,8 @@ public interface IDbmService {
 
     Task<Result> UpdateCompanySic(IReadOnlyCollection<CompanySic> sics, CancellationToken ct);
     Task<Result<IReadOnlyCollection<CompanySic>>> GetCompanySics(CancellationToken ct);
+    /// <summary>One company's SIC code; null when it has none.</summary>
+    Task<Result<CompanySic?>> GetCompanySic(ulong companyId, CancellationToken ct);
 
     // Company tickers
 

@@ -14,6 +14,10 @@ public static class IndustryClassification {
     public static bool IsFinancial(int? sicCode) =>
         sicCode is int sic && sic >= FinancialSicMin && sic <= FinancialSicMax;
 
+    /// <summary>Net cash flow basis for a company: the financing total for financials, else the chains.</summary>
+    public static NetCashFlowBasis NetCashFlowBasisFor(int? sicCode) =>
+        IsFinancial(sicCode) ? NetCashFlowBasis.FinancingTotal : NetCashFlowBasis.Chains;
+
     /// <summary>Parses a SIC string of 1-4 digits (surrounding spaces allowed); anything else is null.</summary>
     public static int? ParseSic(string? raw) {
         if (raw is null)

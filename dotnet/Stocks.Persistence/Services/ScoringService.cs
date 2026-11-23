@@ -77,6 +77,9 @@ public class ScoringService {
         "ProceedsFromStockOptionsExercised",
         "PaymentsForRepurchaseOfCommonStock",
         "PaymentsForRepurchaseOfEquity",
+        // Cash flow — financing-activities total (net cash flow of financials, E5)
+        "NetCashProvidedByUsedInFinancingActivities",
+        "NetCashProvidedByUsedInFinancingActivitiesContinuingOperations",
         // Cash flow — short-term debt (net), lines of credit, commercial paper
         "ProceedsFromRepaymentsOfShortTermDebt",
         "ProceedsFromRepaymentsOfLinesOfCredit",
@@ -172,6 +175,10 @@ public class ScoringService {
         "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
         "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect",
         "CashAndCashEquivalentsPeriodIncreaseDecrease"
+    ];
+    internal static readonly string[] FinancingTotalChain = [
+        "NetCashProvidedByUsedInFinancingActivities",
+        "NetCashProvidedByUsedInFinancingActivitiesContinuingOperations"
     ];
     internal static readonly string[] DividendsChain = [
         "PaymentsOfDividends", "PaymentsOfDividendsCommonStock", "Dividends", "DividendsCommonStockCash"
@@ -296,6 +303,13 @@ public class ScoringService {
                 ErrorCodes.GenericError, "Failed to fetch company tickers.");
         _logger?.LogInformation("Fetched {Count} company tickers", tickersResult.Value.Count);
 
+        // 3b. Financial companies (SIC 6000-6499) take the financing-total NCF (E5)
+        Result<HashSet<ulong>> financialsResult = await LoadFinancialCompanyIds(_dbmService, ct);
+        if (financialsResult.IsFailure || financialsResult.Value is null)
+            return Result<IReadOnlyCollection<CompanyScoreDetail>>.Failure(
+                ErrorCodes.GenericError, "Failed to fetch company SIC codes.");
+        HashSet<ulong> financialIds = financialsResult.Value;
+
         // 4. Fetch company names (company_id → name)
         _logger?.LogInformation("Fetching company names...");
         Result<IReadOnlyCollection<CompanyName>> namesResult =
@@ -388,9 +402,12 @@ public class ScoringService {
             }
 
             // Compute derived metrics
+            NetCashFlowBasis ncfBasis = financialIds.Contains(companyId)
+                ? NetCashFlowBasis.FinancingTotal
+                : NetCashFlowBasis.Chains;
             DerivedMetrics metrics = ComputeDerivedMetrics(
                 rawDataByYear, grouped.MostRecentSnapshot, grouped.OldestRetainedEarnings,
-                pricePerShare, sharesOutstanding, grouped.BalanceTypes);
+                pricePerShare, sharesOutstanding, grouped.BalanceTypes, ncfBasis);
 
             // Evaluate checks
             IReadOnlyList<ScoringCheck> scorecard = EvaluateChecks(metrics, yearsOfData);
@@ -497,10 +514,13 @@ public class ScoringService {
         if (sharesValue.HasValue)
             sharesOutstanding = (long)sharesValue.Value;
 
-        // 7. Compute derived metrics
+        // 7. Compute derived metrics (financials take the financing-total NCF, E5)
+        Result<NetCashFlowBasis> basisResult = await LoadNetCashFlowBasis(_dbmService, companyId, ct);
+        if (basisResult.IsFailure)
+            return Result<ScoringResult>.Failure(ErrorCodes.GenericError, "Failed to fetch the company's SIC code.");
         DerivedMetrics metrics = ComputeDerivedMetrics(
             rawDataByYear, grouped.MostRecentSnapshot, grouped.OldestRetainedEarnings,
-            pricePerShare, sharesOutstanding, grouped.BalanceTypes);
+            pricePerShare, sharesOutstanding, grouped.BalanceTypes, basisResult.Value);
 
         // 8. Evaluate the 15 checks
         IReadOnlyList<ScoringCheck> scorecard = EvaluateChecks(metrics, yearsOfData);
@@ -662,6 +682,32 @@ public class ScoringService {
     /// neither capex nor D&amp;A keeps capex 0.
     /// </summary>
     /// <summary>
+    /// Ids of financial companies (SIC 6000-6499), whose net cash flow uses the financing total
+    /// (E5). Today's SIC applies to as-of scores too (ADR 0014).
+    /// </summary>
+    internal static async Task<Result<HashSet<ulong>>> LoadFinancialCompanyIds(IDbmService dbm, CancellationToken ct) {
+        Result<IReadOnlyCollection<CompanySic>> sicsResult = await dbm.GetCompanySics(ct);
+        if (sicsResult.IsFailure || sicsResult.Value is null)
+            return Result<HashSet<ulong>>.Failure(sicsResult);
+        var ids = new HashSet<ulong>();
+        foreach (CompanySic sic in sicsResult.Value) {
+            if (IndustryClassification.IsFinancial(sic.SicCode))
+                ids.Add(sic.CompanyId);
+        }
+        return Result<HashSet<ulong>>.Success(ids);
+    }
+
+    /// <summary>One company's net cash flow basis from its SIC code (no code = chains).</summary>
+    internal static async Task<Result<NetCashFlowBasis>> LoadNetCashFlowBasis(
+        IDbmService dbm, ulong companyId, CancellationToken ct) {
+        Result<CompanySic?> sicResult = await dbm.GetCompanySic(companyId, ct);
+        if (sicResult.IsFailure)
+            return Result<NetCashFlowBasis>.Failure(sicResult);
+        return Result<NetCashFlowBasis>.Success(
+            IndustryClassification.NetCashFlowBasisFor(sicResult.Value?.SicCode));
+    }
+
+    /// <summary>
     /// Sum-over-sum ROE (E6): the ratio in percent (null when no year enters or the sum of
     /// average equity is 0), the sign-rule flag, and each entering year's own percentage.
     /// </summary>
@@ -672,11 +718,12 @@ public class ScoringService {
     /// ROE numerator for the cash-flow variant: net cash flow plus dividends paid (NCF starts
     /// from the change in cash, so it is after dividends). Null when the year has no cash change.
     /// </summary>
-    internal static decimal? ComputeYearRoeCfNumerator(IReadOnlyDictionary<string, decimal> yearData) {
+    internal static decimal? ComputeYearRoeCfNumerator(IReadOnlyDictionary<string, decimal> yearData,
+        NetCashFlowBasis basis = NetCashFlowBasis.Chains) {
         decimal? grossCashFlow = ResolveField(yearData, CashChangeChain, null);
         if (!grossCashFlow.HasValue)
             return null;
-        return ComputeYearNetCashFlow(yearData, grossCashFlow.Value)
+        return ComputeYearNetCashFlow(yearData, grossCashFlow.Value, basis)
             + ResolveField(yearData, DividendsChain, 0m)!.Value;
     }
 
@@ -973,7 +1020,17 @@ public class ScoringService {
     /// Net cash flow for one year: the change in cash minus net debt, stock and preferred
     /// issuance. Shared by the value score and the moat ROE (CF).
     /// </summary>
-    internal static decimal ComputeYearNetCashFlow(IReadOnlyDictionary<string, decimal> yearData, decimal grossCashFlow) {
+    internal static decimal ComputeYearNetCashFlow(IReadOnlyDictionary<string, decimal> yearData, decimal grossCashFlow,
+        NetCashFlowBasis basis = NetCashFlowBasis.Chains) {
+        // Financials (E5): the financing total also holds deposit and other funding flows that
+        // the chains miss. It includes dividends paid as an outflow; adding them back keeps NCF
+        // after dividends, as on the chain basis. Without the total, the chains apply.
+        if (basis == NetCashFlowBasis.FinancingTotal) {
+            decimal? financingTotal = ResolveField(yearData, FinancingTotalChain, null);
+            if (financingTotal.HasValue)
+                return grossCashFlow - (financingTotal.Value + ResolveField(yearData, DividendsChain, 0m)!.Value);
+        }
+
         decimal netDebtIssuance = ResolveDebtProceeds(yearData) - ResolveDebtRepayments(yearData)
             + ResolveNetShortTermDebt(yearData);
 
@@ -1117,7 +1174,8 @@ public class ScoringService {
         decimal? oldestRetainedEarnings,
         decimal? pricePerShare,
         long? sharesOutstanding,
-        IReadOnlyDictionary<string, TaxonomyBalanceTypes>? balanceTypes = null) {
+        IReadOnlyDictionary<string, TaxonomyBalanceTypes>? balanceTypes = null,
+        NetCashFlowBasis ncfBasis = NetCashFlowBasis.Chains) {
 
         if (annualDataByYear.Count == 0)
             return new DerivedMetrics(null, null, null, null, null, null, null, null, null, null, null, null, null, null);
@@ -1173,7 +1231,7 @@ public class ScoringService {
             decimal? grossCashFlow = ResolveField(yearData, CashChangeChain, null);
             if (grossCashFlow.HasValue) {
                 hasAnyCashFlow = true;
-                decimal netCashFlow = ComputeYearNetCashFlow(yearData, grossCashFlow.Value);
+                decimal netCashFlow = ComputeYearNetCashFlow(yearData, grossCashFlow.Value, ncfBasis);
                 totalNetCashFlow += netCashFlow;
                 yearsWithNCF++;
             }
@@ -1215,7 +1273,7 @@ public class ScoringService {
 
         // ROE: sum of numerators over sum of average equity (E6)
         IReadOnlyDictionary<string, TaxonomyBalanceTypes> types = balanceTypes ?? EmptyBalanceTypes;
-        SumOverSumRoe roeCf = ComputeSumOverSumRoe(annualDataByYear, ComputeYearRoeCfNumerator);
+        SumOverSumRoe roeCf = ComputeSumOverSumRoe(annualDataByYear, yearData => ComputeYearRoeCfNumerator(yearData, ncfBasis));
         SumOverSumRoe roeOe = ComputeSumOverSumRoe(annualDataByYear, yearData => ComputeYearOwnerEarnings(yearData, types));
         decimal? averageRoeCF = roeCf.Value;
         decimal? averageRoeOE = roeOe.Value;

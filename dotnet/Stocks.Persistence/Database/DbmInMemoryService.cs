@@ -100,6 +100,9 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<IReadOnlyCollection<CompanySic>>> GetCompanySics(CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<CompanySic>>.Success(_data.GetCompanySics()));
 
+    public Task<Result<CompanySic?>> GetCompanySic(ulong companyId, CancellationToken ct) =>
+        Task.FromResult(Result<CompanySic?>.Success(_data.GetCompanySic(companyId)));
+
     // Dashboard
 
     public Task<Result<DashboardStats>> GetDashboardStats(CancellationToken ct) =>

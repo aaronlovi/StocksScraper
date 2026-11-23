@@ -261,6 +261,15 @@ public sealed class DbmService : IDisposable, IDbmService {
         return Result<IReadOnlyCollection<CompanySic>>.Failure(res);
     }
 
+    public async Task<Result<CompanySic?>> GetCompanySic(ulong companyId, CancellationToken ct) {
+        var stmt = new GetCompanySicStmt(companyId);
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            return Result<CompanySic?>.Success(stmt.Result);
+        _logger.LogWarning("GetCompanySic failed for company {CompanyId} with error {Error}", companyId, res.ErrorMessage);
+        return Result<CompanySic?>.Failure(res);
+    }
+
     #endregion
 
     #region Company tickers

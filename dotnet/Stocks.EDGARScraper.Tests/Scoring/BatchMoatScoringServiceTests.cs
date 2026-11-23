@@ -195,4 +195,74 @@ public class BatchMoatScoringServiceTests {
             Assert.Equal(d.Summary.ComputableChecks, computable);
         }
     }
+
+    #region Financing-total net cash flow for financials (E5) tests
+
+    private const int FINANCING_CONCEPT_ID = 21;
+
+    private async Task SeedSic(ulong companyId, int sicCode) =>
+        await _dbm.UpdateCompanySic([new CompanySic(companyId, sicCode, "test")], _ct);
+
+    /// <summary>Adds a financing-activities total to each of the company's seeded 10-K years.</summary>
+    private async Task SeedFinancingConcept() =>
+        await _dbm.BulkInsertTaxonomyConcepts([
+            new ConceptDetailsDTO(FINANCING_CONCEPT_ID, 1, 1, 2, false, "NetCashProvidedByUsedInFinancingActivities", "Financing", ""),
+        ], _ct);
+
+    private async Task SeedFinancingTotal(ulong companyId, int numYears, decimal value) {
+        var dataPoints = new List<DataPoint>();
+        for (int i = 0; i < numYears; i++) {
+            int year = 2024 - i;
+            var dp = new DatePair(new DateOnly(year, 1, 1), new DateOnly(year, 12, 31));
+            dataPoints.Add(new DataPoint(companyId * 10000 + 9000 + (ulong)i, companyId,
+                "NetCashProvidedByUsedInFinancingActivities", "ref", dp, value, UsdUnit,
+                new DateOnly(year + 1, 2, 1), companyId * 1000 + (ulong)i, FINANCING_CONCEPT_ID));
+        }
+        await _dbm.BulkInsertDataPoints(dataPoints, _ct);
+    }
+
+    // Chains: NCF = 120M + 50M buybacks = 170M; ROE CF = (170 + 25) / 600 per year.
+    // Financing total +25M (deposits +100, buybacks -50, dividends -25): NCF = 120 - (25 + 25)
+    // = 70M; ROE CF = (70 + 25) / 600.
+    private static readonly decimal BankRoeCf = 100m * (95_000_000m * 8) / (600_000_000m * 8);
+    private static readonly decimal MakerRoeCf = 100m * (195_000_000m * 8) / (600_000_000m * 8);
+
+    [Fact]
+    public async Task E5_Moat_Batch_FinancialUsesFinancingTotal_OthersUseChains() {
+        await SeedTaxonomyConcepts();
+        await SeedCompanyWithMoatData(1, 111, "Bank", "BANK", "NYSE", 8);
+        await SeedCompanyWithMoatData(2, 222, "Maker", "MAKE", "NYSE", 8);
+        await SeedFinancingConcept();
+        await SeedFinancingTotal(1, 8, 25_000_000m);
+        await SeedFinancingTotal(2, 8, 25_000_000m);
+        await SeedSic(1, 6021);
+        await SeedSic(2, 3571);
+
+        var service = new MoatScoringService(_dbm);
+        Result<IReadOnlyCollection<CompanyMoatScoreSummary>> result = await service.ComputeAllMoatScores(_ct);
+
+        Assert.True(result.IsSuccess);
+        var byId = new Dictionary<ulong, CompanyMoatScoreSummary>();
+        foreach (CompanyMoatScoreSummary s in result.Value!)
+            byId[s.CompanyId] = s;
+        Assert.Equal(BankRoeCf, byId[1].AverageRoeCF);
+        Assert.Equal(MakerRoeCf, byId[2].AverageRoeCF);
+    }
+
+    [Fact]
+    public async Task E5_Moat_Single_FinancialUsesFinancingTotal() {
+        await SeedTaxonomyConcepts();
+        await SeedCompanyWithMoatData(1, 111, "Bank", "BANK", "NYSE", 8);
+        await SeedFinancingConcept();
+        await SeedFinancingTotal(1, 8, 25_000_000m);
+        await SeedSic(1, 6021);
+
+        var service = new MoatScoringService(_dbm);
+        Result<MoatScoringResult> result = await service.ComputeScore(1, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(BankRoeCf, result.Value!.Metrics.AverageRoeCF);
+    }
+
+    #endregion
 }

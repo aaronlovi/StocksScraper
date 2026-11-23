@@ -77,6 +77,13 @@ public sealed class DbmInMemoryData {
     private CompanySic? GetCompanySicNoLock(ulong companyId) =>
         _companySics.TryGetValue(companyId, out CompanySic? sic) ? sic : null;
 
+    public CompanySic? GetCompanySic(ulong companyId) {
+        lock (_mutex) {
+            CompanySic? sic = GetCompanySicNoLock(companyId);
+            return sic?.SicCode is null ? null : sic;
+        }
+    }
+
     public IReadOnlyCollection<CompanySic> GetCompanySics() {
         var results = new List<CompanySic>();
         lock (_mutex) {

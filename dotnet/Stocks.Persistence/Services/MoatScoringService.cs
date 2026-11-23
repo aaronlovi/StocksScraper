@@ -88,7 +88,8 @@ public class MoatScoringService {
             decimal? oldestRetainedEarnings,
             decimal? pricePerShare,
             long? sharesOutstanding,
-            IReadOnlyDictionary<string, TaxonomyBalanceTypes>? balanceTypes = null) {
+            IReadOnlyDictionary<string, TaxonomyBalanceTypes>? balanceTypes = null,
+            NetCashFlowBasis ncfBasis = NetCashFlowBasis.Chains) {
 
         if (annualDataByYear.Count == 0)
             return (new MoatDerivedMetrics(null, null, null, null, null, null, null, null, null, null, null, null, 0, 0, 0, 0),
@@ -107,7 +108,7 @@ public class MoatScoringService {
         // ROE: sum of numerators over sum of average equity (E6), shared with the value score
         IReadOnlyDictionary<string, TaxonomyBalanceTypes> types = balanceTypes ?? EmptyBalanceTypes;
         ScoringService.SumOverSumRoe roeCf = ScoringService.ComputeSumOverSumRoe(
-            annualDataByYear, ScoringService.ComputeYearRoeCfNumerator);
+            annualDataByYear, yearData => ScoringService.ComputeYearRoeCfNumerator(yearData, ncfBasis));
         ScoringService.SumOverSumRoe roeOe = ScoringService.ComputeSumOverSumRoe(
             annualDataByYear, yearData => ScoringService.ComputeYearOwnerEarnings(yearData, types));
         decimal totalOwnerEarnings = 0m;
@@ -469,9 +470,12 @@ public class MoatScoringService {
             sharesOutstanding = (long)sharesValue.Value;
 
         // 7. Compute Moat derived metrics
+        Result<NetCashFlowBasis> basisResult = await ScoringService.LoadNetCashFlowBasis(_dbmService, companyId, ct);
+        if (basisResult.IsFailure)
+            return Result<MoatScoringResult>.Failure(ErrorCodes.GenericError, "Failed to fetch the company's SIC code.");
         (MoatDerivedMetrics metrics, IReadOnlyList<MoatYearMetrics> trendData) = ComputeMoatDerivedMetrics(
             rawDataByYear, grouped.MostRecentSnapshot, grouped.OldestRetainedEarnings,
-            pricePerShare, sharesOutstanding, grouped.BalanceTypes);
+            pricePerShare, sharesOutstanding, grouped.BalanceTypes, basisResult.Value);
 
         // 8. Evaluate the 13 checks
         IReadOnlyList<ScoringCheck> scorecard = EvaluateMoatChecks(metrics, yearsOfData);
@@ -545,6 +549,13 @@ public class MoatScoringService {
             return Result<IReadOnlyCollection<CompanyMoatScoreDetail>>.Failure(
                 ErrorCodes.GenericError, "Failed to fetch company tickers.");
         _logger?.LogInformation("Fetched {Count} company tickers", tickersResult.Value.Count);
+
+        // 3b. Financial companies (SIC 6000-6499) take the financing-total NCF (E5)
+        Result<HashSet<ulong>> financialsResult = await ScoringService.LoadFinancialCompanyIds(_dbmService, ct);
+        if (financialsResult.IsFailure || financialsResult.Value is null)
+            return Result<IReadOnlyCollection<CompanyMoatScoreDetail>>.Failure(
+                ErrorCodes.GenericError, "Failed to fetch company SIC codes.");
+        HashSet<ulong> financialIds = financialsResult.Value;
 
         // 4. Fetch company names
         _logger?.LogInformation("Fetching company names...");
@@ -633,9 +644,12 @@ public class MoatScoringService {
                 }
             }
 
+            NetCashFlowBasis ncfBasis = financialIds.Contains(companyId)
+                ? NetCashFlowBasis.FinancingTotal
+                : NetCashFlowBasis.Chains;
             (MoatDerivedMetrics metrics, _) = ComputeMoatDerivedMetrics(
                 rawDataByYear, grouped.MostRecentSnapshot, grouped.OldestRetainedEarnings,
-                pricePerShare, sharesOutstanding, grouped.BalanceTypes);
+                pricePerShare, sharesOutstanding, grouped.BalanceTypes, ncfBasis);
 
             IReadOnlyList<ScoringCheck> scorecard = EvaluateMoatChecks(metrics, yearsOfData);
 

@@ -35,6 +35,7 @@ public class BatchScoringServiceTests {
             new ConceptDetailsDTO(10, 1, 1, 2, false, "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect", "Cash Change", ""),
             new ConceptDetailsDTO(11, 1, 1, 2, false, "PaymentsToAcquirePropertyPlantAndEquipment", "CapEx", ""),
             new ConceptDetailsDTO(12, 1, 1, 2, false, "DepreciationDepletionAndAmortization", "DDA", ""),
+            new ConceptDetailsDTO(FINANCING_CONCEPT_ID, 1, 1, 2, false, "NetCashProvidedByUsedInFinancingActivities", "Financing", ""),
         ], _ct);
     }
 
@@ -365,4 +366,76 @@ public class BatchScoringServiceTests {
         Assert.Equal(individualResult.Value!.OverallScore, batchScore.OverallScore);
         Assert.Equal(1, batchScore.YearsOfData);
     }
+
+    #region Financing-total net cash flow for financials (E5) tests
+
+    private const int FINANCING_CONCEPT_ID = 13;
+
+    private async Task SeedSic(ulong companyId, int sicCode) =>
+        await _dbm.UpdateCompanySic([new CompanySic(companyId, sicCode, "test")], _ct);
+
+    /// <summary>Adds a financing-activities total to each of the company's seeded 10-K years.</summary>
+    private async Task SeedFinancingTotal(ulong companyId, int numYears, decimal value) {
+        var dataPoints = new List<DataPoint>();
+        for (int i = 0; i < numYears; i++) {
+            int year = 2024 - i;
+            var dp = new DatePair(new DateOnly(year, 1, 1), new DateOnly(year, 12, 31));
+            dataPoints.Add(new DataPoint(companyId * 10000 + 9000 + (ulong)i, companyId,
+                "NetCashProvidedByUsedInFinancingActivities", "ref", dp, value, UsdUnit,
+                new DateOnly(year + 1, 2, 1), companyId * 1000 + (ulong)i, FINANCING_CONCEPT_ID));
+        }
+        await _dbm.BulkInsertDataPoints(dataPoints, _ct);
+    }
+
+    [Fact]
+    public async Task E5_Batch_FinancialUsesFinancingTotal_OthersUseChains() {
+        // Same data for both; the financing total (+100M, e.g. deposit growth) leaves the
+        // bank's NCF: 120M - 100M = 20M. The manufacturer keeps the chain NCF of 120M.
+        await SeedTaxonomyConcepts();
+        await SeedCompanyWithScoringData(1, 111, "Bank", "BANK", "NYSE", 5);
+        await SeedCompanyWithScoringData(2, 222, "Maker", "MAKE", "NYSE", 5);
+        await SeedFinancingTotal(1, 5, 100_000_000m);
+        await SeedFinancingTotal(2, 5, 100_000_000m);
+        await SeedSic(1, 6021);
+        await SeedSic(2, 3571);
+
+        var service = new ScoringService(_dbm);
+        Result<IReadOnlyCollection<CompanyScoreSummary>> result = await service.ComputeAllScores(_ct);
+
+        Assert.True(result.IsSuccess);
+        var byId = new Dictionary<ulong, CompanyScoreSummary>();
+        foreach (CompanyScoreSummary s in result.Value!)
+            byId[s.CompanyId] = s;
+        Assert.Equal(20_000_000m, byId[1].AverageNetCashFlow);
+        Assert.Equal(120_000_000m, byId[2].AverageNetCashFlow);
+    }
+
+    [Fact]
+    public async Task E5_Single_FinancialUsesFinancingTotal() {
+        await SeedTaxonomyConcepts();
+        await SeedCompanyWithScoringData(1, 111, "Bank", "BANK", "NYSE", 5);
+        await SeedFinancingTotal(1, 5, 100_000_000m);
+        await SeedSic(1, 6021);
+
+        var service = new ScoringService(_dbm);
+        Result<ScoringResult> result = await service.ComputeScore(1, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(20_000_000m, result.Value!.Metrics.AverageNetCashFlow);
+    }
+
+    [Fact]
+    public async Task E5_Single_NoSic_UsesChains() {
+        await SeedTaxonomyConcepts();
+        await SeedCompanyWithScoringData(1, 111, "Unknown", "UNKN", "NYSE", 5);
+        await SeedFinancingTotal(1, 5, 100_000_000m);
+
+        var service = new ScoringService(_dbm);
+        Result<ScoringResult> result = await service.ComputeScore(1, _ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(120_000_000m, result.Value!.Metrics.AverageNetCashFlow);
+    }
+
+    #endregion
 }

@@ -3,6 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
   ApiService,
+  FinancialsFilter,
   GrahamBacktestPeriod,
   GrahamBacktestReport
 } from '../../core/services/api.service';
@@ -40,6 +41,7 @@ export class GrahamBacktestReportComponent implements OnInit {
   minScore = 15;
   interval: 'monthly' | 'weekly' = 'monthly';
   policy: 'all' | 'filing' | 'price' = 'all';
+  financials: FinancialsFilter = null;
   confirm = false;
 
   report = signal<GrahamBacktestReport | null>(null);
@@ -106,6 +108,10 @@ export class GrahamBacktestReportComponent implements OnInit {
     if (policyParam === 'filing' || policyParam === 'price') {
       this.policy = policyParam;
     }
+    const financialsParam = params.get('financials');
+    if (financialsParam === 'only' || financialsParam === 'exclude') {
+      this.financials = financialsParam;
+    }
     if (params.get('confirm') === 'true') {
       this.confirm = true;
     }
@@ -119,7 +125,10 @@ export class GrahamBacktestReportComponent implements OnInit {
   onFilterChange(): void {
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { interval: this.interval, policy: this.policy, confirm: this.confirm, minScore: this.minScore },
+      queryParams: {
+        interval: this.interval, policy: this.policy, confirm: this.confirm, minScore: this.minScore,
+        financials: this.financials
+      },
       replaceUrl: true
     });
     this.fetchBacktest();
@@ -148,7 +157,7 @@ export class GrahamBacktestReportComponent implements OnInit {
     this.error.set(null);
     this.expanded.set(new Set());
 
-    this.api.getGrahamBacktest(this.minScore, this.interval, this.policy, this.confirm).subscribe({
+    this.api.getGrahamBacktest(this.minScore, this.interval, this.policy, this.confirm, this.financials).subscribe({
       next: data => {
         this.report.set(data);
         this.loading.set(false);

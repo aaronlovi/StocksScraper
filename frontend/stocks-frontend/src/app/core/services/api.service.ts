@@ -466,10 +466,12 @@ export class ApiService {
     minScore: number | null,
     interval: 'monthly' | 'weekly' = 'monthly',
     policy: 'all' | 'filing' | 'price' = 'all',
-    confirm = false
+    confirm = false,
+    financials: FinancialsFilter = null
   ): Observable<GrahamBacktestReport> {
     const parts: string[] = [`interval=${interval}`, `policy=${policy}`, `confirm=${confirm}`];
     if (minScore != null) parts.push(`minScore=${minScore}`);
+    if (financials != null) parts.push(`financials=${financials}`);
     return this.http.get<GrahamBacktestReport>(`/api/reports/graham-backtest?${parts.join('&')}`);
   }
 

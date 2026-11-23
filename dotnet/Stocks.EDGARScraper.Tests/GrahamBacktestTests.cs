@@ -204,6 +204,70 @@ public class GrahamBacktestTests {
         Assert.Equal(1020.1m, report.Summary.BenchmarkFinalValue);
     }
 
+    // BBB is a bank (SIC 6021); AAA and CCC are not financials
+    private async Task MarkBbbAsBank() =>
+        _ = await _dbm.UpdateCompanySic([
+            new CompanySic(1, 3571, "Electronic Computers"),
+            new CompanySic(2, 6021, "National Commercial Banks"),
+        ], _ct);
+
+    [Fact]
+    public async Task GetBacktest_ExcludeFinancials_DropsTheBank() {
+        await SeedBacktestScenario();
+        await MarkBbbAsBank();
+        var service = new GrahamBacktestService(_dbm);
+
+        Result<GrahamBacktestReport> result = await service.GetBacktest(
+            15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, FinancialsFilter.Exclude, _ct);
+        Assert.True(result.IsSuccess);
+
+        // Period 1: AAA alone, +10%. Period 2: AAA +10%, CCC (no SIC) +5% -> +7.5%
+        GrahamBacktestPeriod first = result.Value!.Periods[0];
+        Assert.Equal(1, first.ConstituentCount);
+        Assert.Equal("AAA", Assert.Single(first.Constituents).Ticker);
+        Assert.Equal(10m, first.PortfolioReturnPct);
+        Assert.Equal(1100m, first.CumulativeValue);
+        GrahamBacktestPeriod second = result.Value.Periods[1];
+        Assert.Equal(2, second.ConstituentCount);
+        Assert.Equal(1182.5m, second.CumulativeValue);
+    }
+
+    [Fact]
+    public async Task GetBacktest_OnlyFinancials_KeepsOnlyTheBank() {
+        await SeedBacktestScenario();
+        await MarkBbbAsBank();
+        var service = new GrahamBacktestService(_dbm);
+
+        Result<GrahamBacktestReport> result = await service.GetBacktest(
+            15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, FinancialsFilter.Only, _ct);
+        Assert.True(result.IsSuccess);
+
+        // Period 1: BBB alone, -10%. Period 2: no financial at 15/15 -> cash, 0%
+        GrahamBacktestPeriod first = result.Value!.Periods[0];
+        Assert.Equal("BBB", Assert.Single(first.Constituents).Ticker);
+        Assert.Equal(-10m, first.PortfolioReturnPct);
+        GrahamBacktestPeriod second = result.Value.Periods[1];
+        Assert.Equal(0, second.ConstituentCount);
+        Assert.Equal(900m, second.CumulativeValue);
+        // SPY is unaffected by the filter
+        Assert.Equal(1020.1m, result.Value.Summary.BenchmarkFinalValue);
+    }
+
+    [Fact]
+    public async Task GetBacktest_AllFinancials_MatchesTheUnfilteredRun() {
+        await SeedBacktestScenario();
+        await MarkBbbAsBank();
+        var service = new GrahamBacktestService(_dbm);
+
+        Result<GrahamBacktestReport> all = await service.GetBacktest(
+            15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, FinancialsFilter.All, _ct);
+        Result<GrahamBacktestReport> legacy = await service.GetBacktest(
+            15, GrahamBacktestInterval.Monthly, GrahamBacktestPolicy.All, false, _ct);
+
+        Assert.Equal(legacy.Value!.Summary.FinalValue, all.Value!.Summary.FinalValue);
+        Assert.Equal(1075m, all.Value.Summary.FinalValue);
+    }
+
     [Fact]
     public async Task GetBacktest_FlagsEnteredAndLeftConstituents() {
         await SeedBacktestScenario();

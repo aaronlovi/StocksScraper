@@ -189,6 +189,65 @@ describe('GrahamBacktestReportComponent', () => {
     expect(fixture.componentInstance.minScore).toBe(14);
   });
 
+  it('should not send the financials param by default', () => {
+    const fixture = TestBed.createComponent(GrahamBacktestReportComponent);
+    fixture.detectChanges();
+    const req = httpMock.expectOne(r => r.url.startsWith('/api/reports/graham-backtest'));
+    expect(req.request.url).not.toContain('financials=');
+    req.flush(makeReport());
+  });
+
+  it('should send the financials filter when chosen', () => {
+    const fixture = TestBed.createComponent(GrahamBacktestReportComponent);
+    fixture.detectChanges();
+    flushRequest();
+
+    fixture.componentInstance.financials = 'exclude';
+    fixture.componentInstance.onFilterChange();
+
+    const req = httpMock.expectOne(r => r.url.startsWith('/api/reports/graham-backtest'));
+    expect(req.request.url).toContain('financials=exclude');
+    req.flush(makeReport());
+  });
+
+  it('should restore the financials filter from query params', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [GrahamBacktestReportComponent],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: convertToParamMap({ financials: 'only' }) } }
+        }
+      ]
+    }).compileComponents();
+    httpMock = TestBed.inject(HttpTestingController);
+
+    const fixture = TestBed.createComponent(GrahamBacktestReportComponent);
+    fixture.detectChanges();
+
+    const req = httpMock.expectOne(r =>
+      r.url.startsWith('/api/reports/graham-backtest') && r.url.includes('financials=only'));
+    req.flush(makeReport());
+    expect(fixture.componentInstance.financials).toBe('only');
+  });
+
+  it('should offer the financials select', () => {
+    const fixture = TestBed.createComponent(GrahamBacktestReportComponent);
+    fixture.detectChanges();
+    flushRequest();
+    fixture.detectChanges();
+
+    const labels: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('label'));
+    const label = labels.find(l => l.textContent?.includes('Financials'));
+    expect(label).toBeTruthy();
+    const options = Array.from(label!.querySelectorAll('option')).map(o => o.textContent?.trim());
+    expect(options).toEqual(['All', 'Only financials', 'Exclude financials']);
+  });
+
   it('should show the backfill hint on 404', () => {
     const fixture = TestBed.createComponent(GrahamBacktestReportComponent);
     fixture.detectChanges();

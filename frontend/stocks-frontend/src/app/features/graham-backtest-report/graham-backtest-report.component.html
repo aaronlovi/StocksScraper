@@ -29,6 +29,14 @@
       <option [ngValue]="13">13+</option>
     </select>
   </label>
+  <label>
+    Financials
+    <select [(ngModel)]="financials" (ngModelChange)="onFilterChange()">
+      <option [ngValue]="null">All</option>
+      <option value="only">Only financials</option>
+      <option value="exclude">Exclude financials</option>
+    </select>
+  </label>
   <label class="checkbox-label" title="Hysteresis: a change must persist for two consecutive snapshots before it is traded, so one-period threshold flicker never trades">
     <input type="checkbox" [(ngModel)]="confirm" (ngModelChange)="onFilterChange()" />
     Confirm changes (2 periods)

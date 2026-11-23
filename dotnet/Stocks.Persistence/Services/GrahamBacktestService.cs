@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Stocks.DataModels;
 using Stocks.DataModels.Scoring;
 using Stocks.Persistence.Database;
 using Stocks.Shared;
@@ -30,9 +31,18 @@ public sealed class GrahamBacktestService {
         _dbm = dbm;
     }
 
+    public Task<Result<GrahamBacktestReport>> GetBacktest(
+        int minScore, GrahamBacktestInterval interval, GrahamBacktestPolicy policy,
+        bool confirmChanges, CancellationToken ct) =>
+        GetBacktest(minScore, interval, policy, confirmChanges, FinancialsFilter.All, ct);
+
+    /// <summary>
+    /// As above, keeping only constituents that pass <paramref name="financials"/> (by each
+    /// company's current SIC code). The benchmark is unaffected.
+    /// </summary>
     public async Task<Result<GrahamBacktestReport>> GetBacktest(
         int minScore, GrahamBacktestInterval interval, GrahamBacktestPolicy policy,
-        bool confirmChanges, CancellationToken ct) {
+        bool confirmChanges, FinancialsFilter financials, CancellationToken ct) {
         Result<IReadOnlyCollection<DateOnly>> datesResult = await _dbm.GetGrahamScoreSnapshotDates(ct);
         if (datesResult.IsFailure || datesResult.Value is null)
             return Result<GrahamBacktestReport>.Failure(ErrorCodes.GenericError, datesResult.ErrorMessage);
@@ -52,9 +62,26 @@ public sealed class GrahamBacktestService {
         if (constituentsResult.IsFailure || constituentsResult.Value is null)
             return Result<GrahamBacktestReport>.Failure(ErrorCodes.GenericError, constituentsResult.ErrorMessage);
 
+        Dictionary<ulong, int>? sicByCompany = null;
+        if (financials != FinancialsFilter.All) {
+            Result<IReadOnlyCollection<CompanySic>> sicResult = await _dbm.GetCompanySics(ct);
+            if (sicResult.IsFailure || sicResult.Value is null)
+                return Result<GrahamBacktestReport>.Failure(ErrorCodes.GenericError, sicResult.ErrorMessage);
+            sicByCompany = [];
+            foreach (CompanySic sic in sicResult.Value) {
+                if (sic.SicCode.HasValue)
+                    sicByCompany[sic.CompanyId] = sic.SicCode.Value;
+            }
+        }
+
         var byDate = new Dictionary<DateOnly, Dictionary<ulong, GrahamSnapshotConstituent>>();
         var allConstituentIds = new HashSet<ulong>();
         foreach (GrahamSnapshotConstituent c in constituentsResult.Value) {
+            if (sicByCompany is not null) {
+                int? sicCode = sicByCompany.TryGetValue(c.CompanyId, out int code) ? code : null;
+                if (!financials.Matches(sicCode))
+                    continue;
+            }
             if (!byDate.TryGetValue(c.AsOfDate, out Dictionary<ulong, GrahamSnapshotConstituent>? qualifying)) {
                 qualifying = [];
                 byDate[c.AsOfDate] = qualifying;

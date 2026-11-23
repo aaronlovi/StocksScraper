@@ -59,6 +59,31 @@ public sealed class DbmInMemoryData {
 
     // Company names
 
+    // Company SIC codes, keyed by company id (only non-null codes are kept)
+
+    private readonly Dictionary<ulong, CompanySic> _companySics = [];
+
+    public void UpdateCompanySic(IReadOnlyCollection<CompanySic> sics) {
+        lock (_mutex) {
+            foreach (CompanySic sic in sics) {
+                if (sic.SicCode.HasValue)
+                    _companySics[sic.CompanyId] = sic;
+                else
+                    _ = _companySics.Remove(sic.CompanyId);
+            }
+        }
+    }
+
+    public IReadOnlyCollection<CompanySic> GetCompanySics() {
+        var results = new List<CompanySic>();
+        lock (_mutex) {
+            foreach (CompanySic sic in _companySics.Values)
+                results.Add(sic);
+        }
+        results.Sort((a, b) => a.CompanyId.CompareTo(b.CompanyId));
+        return results;
+    }
+
     public void AddCompanyNames(IReadOnlyCollection<CompanyName> names) {
         lock (_mutex)
             _companyNames.AddRange(names);

@@ -41,6 +41,11 @@ public interface IDbmService {
     Task<Result<IReadOnlyCollection<CompanyName>>> GetAllCompanyNames(CancellationToken ct);
     Task<Result<IReadOnlyCollection<CompanyName>>> GetCompanyNamesByCompanyId(ulong companyId, CancellationToken ct);
 
+    // Company SIC codes
+
+    Task<Result> UpdateCompanySic(IReadOnlyCollection<CompanySic> sics, CancellationToken ct);
+    Task<Result<IReadOnlyCollection<CompanySic>>> GetCompanySics(CancellationToken ct);
+
     // Company tickers
 
     Task<Result> BulkInsertCompanyTickers(List<CompanyTicker> tickers, CancellationToken ct);

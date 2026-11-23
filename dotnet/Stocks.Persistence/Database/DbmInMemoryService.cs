@@ -90,6 +90,16 @@ public sealed class DbmInMemoryService : IDbmService {
     public Task<Result<IReadOnlyCollection<CompanyTicker>>> GetAllCompanyTickers(CancellationToken ct) =>
         Task.FromResult(Result<IReadOnlyCollection<CompanyTicker>>.Success(_data.GetAllCompanyTickers()));
 
+    // Company SIC codes
+
+    public Task<Result> UpdateCompanySic(IReadOnlyCollection<CompanySic> sics, CancellationToken ct) {
+        _data.UpdateCompanySic(sics);
+        return Task.FromResult(Result.Success);
+    }
+
+    public Task<Result<IReadOnlyCollection<CompanySic>>> GetCompanySics(CancellationToken ct) =>
+        Task.FromResult(Result<IReadOnlyCollection<CompanySic>>.Success(_data.GetCompanySics()));
+
     // Dashboard
 
     public Task<Result<DashboardStats>> GetDashboardStats(CancellationToken ct) =>

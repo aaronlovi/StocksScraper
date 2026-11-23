@@ -236,6 +236,33 @@ public sealed class DbmService : IDisposable, IDbmService {
 
     #endregion
 
+    #region Company SIC codes
+
+    public async Task<Result> UpdateCompanySic(IReadOnlyCollection<CompanySic> sics, CancellationToken ct) {
+        if (sics.Count == 0)
+            return Result.Success;
+        var stmt = new UpdateCompanySicBatchStmt(sics);
+        DbStmtResult res = await _exec.ExecuteWithRetry(stmt, ct);
+        if (res.IsSuccess)
+            _logger.LogInformation("UpdateCompanySic success - Num companies: {NumCompanies}", sics.Count);
+        else
+            _logger.LogError("UpdateCompanySic failed with error {Error}", res.ErrorMessage);
+        return res;
+    }
+
+    public async Task<Result<IReadOnlyCollection<CompanySic>>> GetCompanySics(CancellationToken ct) {
+        var stmt = new GetCompanySicsStmt();
+        DbStmtResult res = await _exec.ExecuteQueryWithRetry(stmt, ct);
+        if (res.IsSuccess) {
+            _logger.LogInformation("GetCompanySics success - Num companies: {NumCompanies}", stmt.Results.Count);
+            return Result<IReadOnlyCollection<CompanySic>>.Success(stmt.Results);
+        }
+        _logger.LogWarning("GetCompanySics failed with error {Error}", res.ErrorMessage);
+        return Result<IReadOnlyCollection<CompanySic>>.Failure(res);
+    }
+
+    #endregion
+
     #region Company tickers
 
     public async Task<Result> BulkInsertCompanyTickers(List<CompanyTicker> tickers, CancellationToken ct) {

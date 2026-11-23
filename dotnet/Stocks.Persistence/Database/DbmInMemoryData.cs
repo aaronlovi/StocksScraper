@@ -523,6 +523,8 @@ public sealed class DbmInMemoryData {
 
                 if (!conceptIdToInfo.TryGetValue(dp.TaxonomyConceptId, out var conceptInfo))
                     continue;
+                if (!ScoringFactPeriod.IsOfFilingPeriod(dp.DatePair.EndDate, submission.ReportDate))
+                    continue;
 
                 var key = (dp.SubmissionId, conceptInfo.Name);
                 if (!bestByKey.TryGetValue(key, out var existing) || IsPreferredScoringFact(dp, existing.point))
@@ -654,6 +656,8 @@ public sealed class DbmInMemoryData {
                 if (!topDates.Contains(submission.ReportDate))
                     continue;
                 if (!conceptIdToInfo.TryGetValue(dp.TaxonomyConceptId, out var conceptInfo))
+                    continue;
+                if (!ScoringFactPeriod.IsOfFilingPeriod(dp.DatePair.EndDate, submission.ReportDate))
                     continue;
 
                 var key = (dp.CompanyId, dp.SubmissionId, conceptInfo.Name);

@@ -58,6 +58,7 @@ JOIN eligible_dates ed ON ed.company_id = dp.company_id AND ed.report_date = s.r
 JOIN data_point_units u ON u.data_point_unit_id = dp.unit_id
 WHERE s.filing_type IN (1, 2){cutoff}
   AND tc.name = ANY(@concept_names)
+  AND dp.end_date >= s.report_date - @max_days_before_report_date
 ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_date ASC,
     CASE WHEN u.data_point_unit_name IN ('usd', 'shares') THEN 0 ELSE 1 END, dp.data_point_id";
     }
@@ -106,7 +107,8 @@ ORDER BY dp.company_id, s.submission_id, tc.name, dp.end_date DESC, dp.start_dat
     protected override IReadOnlyCollection<NpgsqlParameter> GetBoundParameters() {
         var parameters = new List<NpgsqlParameter> {
             new NpgsqlParameter("concept_names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = _conceptNames },
-            new NpgsqlParameter<int>("year_limit", _yearLimit)
+            new NpgsqlParameter<int>("year_limit", _yearLimit),
+            new NpgsqlParameter<int>("max_days_before_report_date", ScoringFactPeriod.MaxDaysBeforeReportDate)
         };
 
         if (_asOfDate.HasValue) {

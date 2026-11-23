@@ -21,6 +21,7 @@ FROM (
     WHERE dp.company_id = @company_id
       AND s.filing_type IN (1, 2)
       AND tc.name = ANY(@concept_names)
+      AND dp.end_date >= s.report_date - @max_days_before_report_date
       AND s.report_date IN (
         SELECT report_date FROM (
             SELECT DISTINCT s2.report_date
@@ -95,7 +96,8 @@ ORDER BY report_date DESC, concept_name";
         [
             new NpgsqlParameter<long>("company_id", unchecked((long)_companyId)),
             new NpgsqlParameter("concept_names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = _conceptNames },
-            new NpgsqlParameter<int>("year_limit", _yearLimit)
+            new NpgsqlParameter<int>("year_limit", _yearLimit),
+            new NpgsqlParameter<int>("max_days_before_report_date", ScoringFactPeriod.MaxDaysBeforeReportDate)
         ];
 
     protected override bool ProcessCurrentRow(NpgsqlDataReader reader) {

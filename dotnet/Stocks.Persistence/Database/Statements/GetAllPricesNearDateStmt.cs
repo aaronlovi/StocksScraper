@@ -27,6 +27,9 @@ ORDER BY ticker, price_date DESC";
 
     public IReadOnlyCollection<LatestPrice> Results => _results;
 
+    // Scans the whole price history up to the date; 30 s was not enough under load
+    protected override int CommandTimeoutSeconds => 600;
+
     protected override void BeforeRowProcessing(NpgsqlDataReader reader) {
         base.BeforeRowProcessing(reader);
         _tickerIndex = reader.GetOrdinal("ticker");

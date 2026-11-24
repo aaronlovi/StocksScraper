@@ -1,7 +1,7 @@
 # 13. Scoring Data Rules
 
 ## Status
-Accepted (2026-11-22; amended the same day for E10 and E11, and on 2026-11-23 for E6)
+Accepted (2026-11-22; amended the same day for E10 and E11, and on 2026-11-23 for E6, E12, E13 and E15)
 
 ## Context
 The value score (`ScoringService`, 15 checks) and the moat score (`MoatScoringService`, 13 checks) were ported from tsx-aggregator before tsx fixed a series of data-handling defects. A review of the 2026-08-23 load found that the ports still carried those defects and that EDGAR's XBRL tags added some of their own:
@@ -15,7 +15,9 @@ The value score (`ScoringService`, 15 checks) and the moat score (`MoatScoringSe
 - a sparse latest 10-Q hid 10-K balances (CAT: $30.7B of debt read as 0);
 - debt-free companies got n/a on interest coverage;
 - facts tagged in two currencies were picked by query plan, not by rule;
-- the adjusted retained earnings counted the oldest year's flows twice.
+- the adjusted retained earnings counted the oldest year's flows twice;
+- a line present only in a filing's comparative columns was scored as the current period (found 2026-11-23);
+- the debt and share chains missed many of the taxonomy's lines, so net cash flow counted those flows as cash generated or spent (found 2026-11-23).
 
 These change what the scores mean, so the rules are recorded here. The full analysis, measurements and per-fix specs are in the Obsidian note *EDGAR Scoring Bug Fix Plan* (Stocks Research / Edgar Scraper Notes).
 
@@ -57,9 +59,10 @@ Signs follow the us-gaap calculation weights in the indirect cash-flow statement
 ### Chain classification and summing
 A chain is either alternatives (first found) or lines to combine:
 - **Alternatives:** equity, dividends, buybacks, D&A totals, capex. The capex chain is PP&E, productive assets, oil and gas P&E, other productive assets, other PP&E, capital improvements. Real-estate development is investment, not capex, and is left out.
-- **Nested, with a parent guard:** debt proceeds and repayments follow the taxonomy tree (senior and convertible under long-term, long-term under the all-debt total). A parent at least the sum of its present children (within 0.1%) contains them; a smaller parent is a separate line, so both count. Equal sibling values are one line tagged twice.
-- **Siblings, summed:** stock issuance and option exercises.
-- **Short-term debt:** net short-term debt, else lines of credit (net, or gross proceeds − repayments), plus net commercial paper. Notes-payable repayments count unless the net short-term figure (their parent) is present.
+- **Nested, with a parent guard:** debt proceeds and repayments follow the taxonomy tree: the instrument lines (senior, convertible, secured, unsecured, subordinated, medium-term notes, first mortgage bonds, other, long-term credit lines, related-party; E12) under long-term, long-term under the all-debt total. A parent at least the sum of its present children (within 0.1%) contains them; a smaller parent is a separate line, so both count. Equal sibling values are one line tagged twice.
+- **Share proceeds (E12):** common stock, IPO, private placement, warrant issuance and exercise, stock plans, LP units, contributed capital and convertible preferred are siblings, with the employee-plan total (over option exercises), under the all-equity total. Preferred stock counts for that nesting test but stays in its own chain. The same figure feeds adjusted retained earnings (checks 11 and 13).
+- **Net-only debt tags (E12):** `ProceedsFromRepaymentsOf` related-party, secured, notes payable and other long-term debt count only when neither gross side is present.
+- **Short-term debt:** the net short-term figure stands alone when present. Otherwise notes payable, bank debt, lines of credit and other short-term debt, proceeds and repayments each under their total (E12); lines-of-credit proceeds nest over the unsecured and secured lines (E15); net lines of credit only without a gross lines tag. Plus net commercial paper.
 
 ### Debt for the debt ratios
 Value D/E and D/B and moat D/E use the first long-term chain concept found (`LongTermDebtAndCapitalLeaseObligations`, `LongTermDebt`, `LongTermDebtNoncurrent`), plus `LongTermDebtCurrent`, plus `ShortTermBorrowings` (E4, added 2026-11-22). Per the taxonomy, `LongTermDebt` includes current maturities and the other two are noncurrent. So when `LongTermDebt` is the figure used, the current portion is added only if `LongTermDebt` does not cover noncurrent + current (within 0.1%); with no noncurrent tag to compare against, `LongTermDebt` is taken as the total.
@@ -78,6 +81,9 @@ Some filers tag a line twice with the same concept, period and filing, in USD an
 4. lowest `data_point_id`.
 
 So the pick no longer depends on the query plan. A filer that reports only in a foreign currency keeps its foreign values, now picked deterministically; converting them is out of scope. `DbmInMemoryData` uses the same order.
+
+### The filing's own period (E13)
+A fact is scored only when its `end_date` is at least the filing's `report_date` − 30 days (`ScoringFactPeriod`; both scoring statements and `DbmInMemoryData`). A line present only in the comparative columns used to count the prior year's amount as the current year's. It is now missing, under the rules above. Facts dated after the report date (cover-page shares) stay.
 
 ### Adjusted retained earnings window
 Adjusted RE = current RE + dividends − net stock issuance − net preferred issuance (checks 11 and 13). The flows are summed only over annual years **after the oldest**: oldest < year ≤ current (E11, added 2026-11-22). The oldest year's flows are already inside the oldest RE it is compared against. A company with one annual year gets no add-backs, so check 13 passes only if RE actually grew.
@@ -118,6 +124,8 @@ ROE = 100 × Σ numerator ÷ Σ average equity, over the annual years where both
   - E10: value 5 and moat 6 scores changed, no group changes. Most multi-currency filers already got USD by chance.
   - E11: value 525 changed both ways (checks 11 and 13 only); 13+ 233 → 230, 14+ 103 → 102, 15/15 30 → 29. Moat unchanged.
 - **E6, measured on the 2026-11-22 load** (against the SIC baseline, split with `--split financials`): value 1,070 changed, mostly up (checks 14 and 15 only); 13+ 259 → 289; 15/15 32 → 60, split evenly (financials 14 → 29, others 18 → 31). Moat 831 changed (checks 1 and 2 only); 13/13 4 → 13, all non-financial. Backtest of the 61 month-ends (2021-10-31..2026-10-31, monthly, SPY +60.6%): 15/15 all +68.6% → +66.3% (45 → 70 names on average), excluding financials +82.7% → +76.9%, financials only +50.7% → +47.4%; 14+ all +65.0% → +60.9%. E6 is adopted as a correctness fix, not for returns. Rebuilt on 2026-11-23.
+- **E13, E12 and E15, measured on the 2026-11-22 load** (against E5, ADR 0015): value 2,977 of 14,040 changed (financials 121, others 2,856); 13+ 229 → 220, 14+ 111 → 111, 15/15 43 → 47 (+CAL HDSN LPG MATX OVV RYZ, −BTU INSW). Moat 1,223 changed (75 / 1,148); 11+ 128 → 118, 12+ 56 → 57, 13/13 13 → 12 (−EW). One company (#384279) drops out. By step, value / moat: E13 1,010 / 751, E12 2,479 / 581, E15 20 / 13. The gap between the chains and the financing total, non-financial years above 5%: 71.7% (E13) → 55.9% (E12) → 55.8% (E15); E12 narrows it in 14,811 years and widens it in 4,653. Backtest (61 month-ends 2021-10-31..2026-10-31, before = E5, SPY +60.6%): 15/15 all +77.4% → +77.3% (40.9 → 41.6 names on average), excluding financials +76.9% → +76.1% (34.5 → 35.3), financials only +104.0% unchanged (6.4 names); 14+ all +53.6% → +57.7%, excluding financials +47.3% → +50.5%, financials only +79.5% → +89.9% (21.0 → 21.5 names). Adopted as correctness fixes, not for returns. Rebuilt on 2026-11-24 (local time; 61 dates and the live tables).
+- **E13 side effects:** a filing with a wrong `report_date` (often the filing date) loses its facts: 131 of 65,192 filings in the score window, 107 companies, 1 listed. A real in-year flow whose only fact ends mid-year is dropped too (2.9% of the dropped non-zero 10-K picks), for example WY's FY2022 repayment.
 - **Stale until rebuilt:** `company_scores`, `company_moat_scores` and the 61 `graham_score_snapshots` dates keep the old scores until rebuilt (`--compute-all-scores`, `--compute-all-moat-scores`, then `--compute-score-snapshots`, about 2 hours). Backtest and Portfolio Advisor results change after the rebuild. Done on 2026-11-22 with the 2026-11-22 data reimport: every live score and all 61 snapshot dates carry every rule here, including E10 and E11.
 - **Portfolio Advisor reasons:** until the rebuild fills `check_results`, `PortfolioAdvisorService` falls back to rebuilding checks from the metric columns, which lack equity and the ROE flags, so its "why it flipped" text can't reflect the sign rule for checks 1, 14 and 15. After the rebuild it reads the stored results (display only; scores are unaffected).
 - **Concept-list side effect (fixed by E10):** adding concepts (P3, P4, E3, E4) made a handful of companies flip unrelated checks. Checked 2026-11-22 on the four P4 strays: their eligible dates did not move. The cause was facts tagged in two currencies with the same concept, period and filing, with the tie broken by the query plan, so a plan change could switch the currency used. Since E10 the pick is fixed (see "Duplicate facts in several units"), and adding a concept no longer moves unrelated values.
@@ -139,4 +147,7 @@ Footprints are value / moat scores changed, measured against the baseline in a s
 - **E10: drop non-USD monetary facts** (not measured): also ends the random pick, but a company that reports only in a foreign currency would lose every monetary value.
 - **E10: keep the plan-dependent pick** (status quo): scores could move whenever the concept list or the query plan changed.
 - **E11: keep all years in the window** (status quo, the tsx P8 defect): counts the oldest year's dividends and issuance twice; tsx measured 29 of 654 scores moving.
+- **E14: accept in-year flows** (a duration fact inside the fiscal year when no full-period fact exists; measured: 88 / 35 for financing and payout lines): the gap to the financing total narrows in 421 non-financial years and widens in 665.
+- **E15 duplicate guards** (a parent equal to one child, an all-debt total or long-term line equal to a short-term line; measured: 11 / 3, gap 127 / 35): three more rules for little; skipped.
+- **E12: net lines of credit over gross** (the P3 rule; 95 non-financial years, gap 40 / 48 in its favour / against): gross first.
 - **E5** (financing-total NCF): measured per segment after the SIC/financials flag (ADR 0014) and adopted for financials only (ADR 0015).

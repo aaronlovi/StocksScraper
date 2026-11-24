@@ -26,6 +26,8 @@ public class WiderFinancingLinesTests {
     [InlineData("ProceedsFromNotesPayable")]
     [InlineData("ProceedsFromBankDebt")]
     [InlineData("ProceedsFromOtherShortTermDebt")]
+    [InlineData("ProceedsFromUnsecuredLinesOfCredit")]
+    [InlineData("ProceedsFromSecuredLinesOfCredit")]
     [InlineData("ProceedsFromShortTermDebt")]
     [InlineData("ProceedsFromRepaymentsOfRelatedPartyDebt")]
     [InlineData("ProceedsFromRepaymentsOfSecuredDebt")]
@@ -154,6 +156,43 @@ public class WiderFinancingLinesTests {
         Assert.Equal(expected, Stripped(new Dictionary<string, decimal> {
             ["ProceedsFromRepaymentsOfLinesOfCredit"] = 20m,
             [gross] = 30m,
+        }));
+    }
+
+    [Theory]
+    [InlineData(100, 100)] // covers unsecured 60 + secured 40
+    [InlineData(70, 170)]  // smaller: a separate line
+    public void LinesOfCredit_NestedOverUnsecuredAndSecured(int total, int expected) {
+        Assert.Equal(expected, Stripped(new Dictionary<string, decimal> {
+            ["ProceedsFromLinesOfCredit"] = total,
+            ["ProceedsFromUnsecuredLinesOfCredit"] = 60m,
+            ["ProceedsFromSecuredLinesOfCredit"] = 40m,
+        }));
+    }
+
+    [Theory]
+    [InlineData("ProceedsFromUnsecuredLinesOfCredit")]
+    [InlineData("ProceedsFromSecuredLinesOfCredit")]
+    public void NetLinesOfCredit_IgnoredWithAnUnsecuredOrSecuredLine(string line) {
+        Assert.Equal(30m, Stripped(new Dictionary<string, decimal> {
+            ["ProceedsFromRepaymentsOfLinesOfCredit"] = 20m,
+            [line] = 30m,
+        }));
+    }
+
+    [Fact]
+    public void UnsecuredLine_EqualToAnotherShortTermLine_CountedOnce() {
+        Assert.Equal(30m, Stripped(new Dictionary<string, decimal> {
+            ["ProceedsFromBankDebt"] = 30m,
+            ["ProceedsFromUnsecuredLinesOfCredit"] = 30m,
+        }));
+    }
+
+    [Fact]
+    public void UnsecuredLine_IgnoredWithTheNetShortTermTotal() {
+        Assert.Equal(10m, Stripped(new Dictionary<string, decimal> {
+            ["ProceedsFromRepaymentsOfShortTermDebt"] = 10m,
+            ["ProceedsFromUnsecuredLinesOfCredit"] = 30m,
         }));
     }
 

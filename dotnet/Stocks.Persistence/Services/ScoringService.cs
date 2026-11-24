@@ -121,6 +121,8 @@ public class ScoringService {
         "ProceedsFromNotesPayable",
         "ProceedsFromBankDebt",
         "ProceedsFromOtherShortTermDebt",
+        "ProceedsFromUnsecuredLinesOfCredit",
+        "ProceedsFromSecuredLinesOfCredit",
         "RepaymentsOfShortTermDebt",
         "RepaymentsOfBankDebt",
         "RepaymentsOfOtherShortTermDebt",
@@ -250,11 +252,15 @@ public class ScoringService {
         "RepaymentsOfLongTermLinesOfCredit",
         "RepaymentsOfRelatedPartyDebt",
     ];
+    // Beside the lines-of-credit proceeds, which have children of their own
     internal static readonly string[] ShortTermDebtProceedsLines = [
         "ProceedsFromNotesPayable",
         "ProceedsFromBankDebt",
-        "ProceedsFromLinesOfCredit",
         "ProceedsFromOtherShortTermDebt",
+    ];
+    internal static readonly string[] LinesOfCreditProceedsLines = [
+        "ProceedsFromUnsecuredLinesOfCredit",
+        "ProceedsFromSecuredLinesOfCredit",
     ];
     internal static readonly string[] ShortTermDebtRepaymentLines = [
         "RepaymentsOfNotesPayable",
@@ -1184,13 +1190,15 @@ public class ScoringService {
         if (yearData.TryGetValue("ProceedsFromRepaymentsOfShortTermDebt", out decimal netShortTerm))
             return netShortTerm + commercialPaper;
 
+        decimal? linesOfCreditProceeds = NestParent(ValueOrNull(yearData, "ProceedsFromLinesOfCredit"),
+            SumDistinctLines(yearData, LinesOfCreditProceedsLines));
         decimal proceeds = NestParent(ValueOrNull(yearData, "ProceedsFromShortTermDebt"),
-            SumDistinctLines(yearData, ShortTermDebtProceedsLines)) ?? 0m;
+            SumDistinctLines(yearData, ShortTermDebtProceedsLines, linesOfCreditProceeds)) ?? 0m;
         decimal repayments = NestParent(ValueOrNull(yearData, "RepaymentsOfShortTermDebt"),
             SumDistinctLines(yearData, ShortTermDebtRepaymentLines)) ?? 0m;
 
         decimal netLines = 0m;
-        if (!yearData.ContainsKey("ProceedsFromLinesOfCredit") && !yearData.ContainsKey("RepaymentsOfLinesOfCredit"))
+        if (!linesOfCreditProceeds.HasValue && !yearData.ContainsKey("RepaymentsOfLinesOfCredit"))
             netLines = ValueOrNull(yearData, "ProceedsFromRepaymentsOfLinesOfCredit") ?? 0m;
 
         return proceeds - repayments + netLines + commercialPaper;
@@ -1216,11 +1224,14 @@ public class ScoringService {
     private static decimal? ValueOrNull(IReadOnlyDictionary<string, decimal> yearData, string concept) =>
         yearData.TryGetValue(concept, out decimal value) ? value : null;
 
-    // Sum of the sibling lines present (null when none is); equal values are one line tagged
-    // more than once and count once.
-    private static decimal? SumDistinctLines(IReadOnlyDictionary<string, decimal> yearData, string[] lines) {
-        decimal? sum = null;
+    // Sum of the sibling lines present, plus a sibling already resolved (null when there is
+    // none); equal values are one line tagged more than once and count once.
+    private static decimal? SumDistinctLines(IReadOnlyDictionary<string, decimal> yearData, string[] lines,
+        decimal? resolvedSibling = null) {
+        decimal? sum = resolvedSibling;
         var seen = new HashSet<decimal>();
+        if (resolvedSibling.HasValue)
+            _ = seen.Add(resolvedSibling.Value);
         foreach (string line in lines) {
             if (!yearData.TryGetValue(line, out decimal value) || !seen.Add(value))
                 continue;
